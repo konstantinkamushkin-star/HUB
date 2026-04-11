@@ -92,6 +92,32 @@ location = /agreement {
 
 Проверка: `curl -fsSI https://dive-hub.ru/privacy | head -n 5` → **200**, `Content-Type: text/html`.
 
+### Caddy (если на VPS нет `/etc/nginx`, а `ss` показывает `caddy` на `:80`/`:443`)
+
+Конфиг обычно **`/etc/caddy/Caddyfile`**. Для **`dive-hub.ru`**: `/privacy` и `/agreement` → **`API_PUBLISH_PORT`** (часто `3002`), остальное → Next (часто `3001`). **`api.dive-hub.ru`** → тот же порт API.
+
+```caddy
+api.dive-hub.ru {
+	reverse_proxy 127.0.0.1:3002
+}
+
+www.dive-hub.ru {
+	redir https://dive-hub.ru{uri} permanent
+}
+
+dive-hub.ru {
+	@apiLegal path /privacy /agreement
+	handle @apiLegal {
+		reverse_proxy 127.0.0.1:3002
+	}
+	handle {
+		reverse_proxy 127.0.0.1:3001
+	}
+}
+```
+
+Проверка: `caddy validate --config /etc/caddy/Caddyfile` → `systemctl reload caddy`.
+
 ---
 
 ## `backend/.env` (релевантные строки — секреты замазать)
