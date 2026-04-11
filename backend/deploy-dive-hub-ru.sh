@@ -74,8 +74,17 @@ DB_HOST=127.0.0.1 \
 echo ">>> Сборка и перезапуск контейнера API"
 docker compose build api
 docker compose up -d api
+sleep 2
 
 echo ">>> Проверки на localhost:${PUBLISH_PORT} (внешний порт API)"
+if ! curl -fsS --connect-timeout 3 "http://127.0.0.1:${PUBLISH_PORT}/api/health" >/dev/null 2>&1; then
+  echo "!!! API не отвечает на порту ${PUBLISH_PORT}."
+  echo "!!! Частая причина: «Bind for 0.0.0.0:3000 failed» — в backend/.env задайте API_PUBLISH_PORT=3001 (или другой свободный порт),"
+  echo "!!! затем снова ./deploy-dive-hub-ru.sh и обновите nginx: proxy_pass http://127.0.0.1:<тот_же_порт>; с интернета достаточно 443."
+  docker compose ps
+  docker compose logs api --tail 50 2>/dev/null || true
+  exit 1
+fi
 curl -fsS "http://127.0.0.1:${PUBLISH_PORT}/api/health" | head -c 500 && echo ""
 curl -fsSI "http://127.0.0.1:${PUBLISH_PORT}/privacy" | head -n 8
 
