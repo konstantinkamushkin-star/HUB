@@ -29,6 +29,17 @@ function loadEnv(filePath) {
   return env;
 }
 
+/** Как в apply-all-migrations.cjs: явные переменные окружения важнее .env (там часто DB_USERNAME=admin для внешней БД). */
+function pick(fileEnv, key, fallback) {
+  if (process.env[key] != null && String(process.env[key]).length > 0) {
+    return process.env[key];
+  }
+  if (fileEnv[key] != null && String(fileEnv[key]).length > 0) {
+    return fileEnv[key];
+  }
+  return fallback;
+}
+
 const TABLES = [
   'dive_sites',
   'dive_centers',
@@ -43,13 +54,13 @@ const TABLES = [
 
 async function main() {
   const root = path.join(__dirname, '..');
-  const env = loadEnv(path.join(root, '.env'));
+  const fileEnv = loadEnv(path.join(root, '.env'));
   const client = new Client({
-    host: env.DB_HOST || process.env.DB_HOST || 'localhost',
-    port: parseInt(env.DB_PORT || process.env.DB_PORT || '5432', 10),
-    user: env.DB_USERNAME || process.env.DB_USERNAME || 'postgres',
-    password: env.DB_PASSWORD || process.env.DB_PASSWORD || '',
-    database: env.DB_DATABASE || process.env.DB_DATABASE || 'divehub',
+    host: String(pick(fileEnv, 'DB_HOST', 'localhost') ?? 'localhost'),
+    port: parseInt(String(pick(fileEnv, 'DB_PORT', '5432') ?? '5432'), 10),
+    user: String(pick(fileEnv, 'DB_USERNAME', 'postgres') ?? 'postgres'),
+    password: String(pick(fileEnv, 'DB_PASSWORD', '') ?? ''),
+    database: String(pick(fileEnv, 'DB_DATABASE', 'divehub') ?? 'divehub'),
   });
 
   await client.connect();
