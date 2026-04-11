@@ -77,6 +77,20 @@ node scripts/import_opendivemap_geojson.js /path/to/file.geojson --dry-run
 
 **Важно:** в production Docker-образе API обычно **нет** исходников `scripts/` — импорт выполняют с **хоста** или из checkout репозитория, с доступом к Postgres.
 
+**Пустые дайв-сайты на проде после нового Postgres в compose:** таблица `dive_sites` создана миграциями, но **пустая**, пока не выполнен импорт. Файл в корне репозитория: `opendivemap_all_sites.geojson`. С **хоста VPS** (не из контейнера `api`) подставьте **`POSTGRES_PUBLISH_PORT`** из `backend/.env` (часто `5433`) и пароль **`POSTGRES_PASSWORD`**:
+
+```bash
+cd /opt/divehub-src/DivePROD/backend
+# сухой прогон
+DB_HOST=127.0.0.1 DB_PORT=5433 DB_USERNAME=postgres DB_PASSWORD='ВАШ_POSTGRES_PASSWORD' DB_DATABASE=divehub \
+  node scripts/import_opendivemap_geojson.js ../opendivemap_all_sites.geojson --dry-run
+# запись в БД
+DB_HOST=127.0.0.1 DB_PORT=5433 DB_USERNAME=postgres DB_PASSWORD='ВАШ_POSTGRES_PASSWORD' DB_DATABASE=divehub \
+  node scripts/import_opendivemap_geojson.js ../opendivemap_all_sites.geojson
+```
+
+Проверка количества: `DB_HOST=127.0.0.1 DB_PORT=5433 … node scripts/db-show-counts.cjs`. Старые данные при необходимости переносят с **другого** инстанса Postgres (например прежний compose на `:5432`), а не из GeoJSON.
+
 ## 7. Сборка и тесты
 
 ```bash
