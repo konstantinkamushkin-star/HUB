@@ -2,6 +2,7 @@
 # Деплой под ваш стек: dive-hub.ru + docker-compose (postgres, redis, api) из .env.production.example.
 # На VPS один раз: chmod +x deploy-dive-hub-ru.sh
 # Обновление: cd .../backend && ./deploy-dive-hub-ru.sh
+# Git: либо .git в backend/, либо (часто) корень репозитория — родительская папка DivePROD/
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -14,7 +15,10 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
-if [[ -d .git ]]; then
+if [[ -d ../.git ]] && [[ "$(basename "$ROOT")" == "backend" ]]; then
+  echo ">>> git pull (репозиторий: $(cd .. && pwd))"
+  (cd .. && git pull --ff-only)
+elif [[ -d .git ]]; then
   echo ">>> git pull"
   git pull --ff-only
 fi

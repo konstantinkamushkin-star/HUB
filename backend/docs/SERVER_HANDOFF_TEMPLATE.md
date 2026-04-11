@@ -1,0 +1,146 @@
+# Карточка сервера / репозитория (заполнить и хранить у DevOps)
+
+Скопируйте разделы ниже во внутреннюю wiki или передайте команде. **Пароли, JWT, ключи в чат не копировать** — только «задано в `.env` / в панели».
+
+---
+
+## Git
+
+| Поле | Значение (заполнить) |
+|------|----------------------|
+| **URL репозитория (HTTPS)** | `https://github.com/konstantinkamushkin-star/HUB.git` |
+| **URL репозитория (SSH)** | `git@github.com:konstantinkamushkin-star/HUB.git` |
+| **Remote по умолчанию** | `origin` |
+| **Ветка на прод** | `main` _(или указать: `release` / иное)_ |
+
+| Поле | Значение (заполнить) |
+|------|----------------------|
+| **Корень репозитория на сервере** | `/opt/divehub-src/DivePROD` |
+| **Каталог backend** | `/opt/divehub-src/DivePROD/backend` |
+| **Обновление кода + деплой** | `cd /opt/divehub-src/DivePROD/backend && ./deploy-dive-hub-ru.sh` — скрипт делает `git pull` из родителя `DivePROD/`, если `.git` там; иначе `git pull` в `backend/`. |
+
+Вручную только pull:
+
+```bash
+cd /opt/divehub-src/DivePROD && git pull origin main && cd backend && ./deploy-dive-hub-ru.sh
+```
+
+---
+
+## Сервер (VPS)
+
+| Поле | Значение (заполнить) |
+|------|----------------------|
+| **SSH (одна строка, без пароля/ключа)** | Пример из практики: `ssh root@cv6364107` или `ssh divehub`, если в `~/.ssh/config` задан `Host` + ключ (например `IdentityFile ~/.ssh/id_ed25519_regcloud`). |
+| **Провайдер / hostname** | _(REG.RU / иной; hostname панели)_ |
+| **ОС** | Ubuntu 24.04 _(проверка: `lsb_release -a`)_ |
+| **Пользователь деплоя** | `root` _(или отдельный пользователь + sudo)_ |
+
+---
+
+## Как крутится бэкенд
+
+| Поле | Значение (заполнить) |
+|------|----------------------|
+| **Способ** | **Docker Compose** в каталоге `backend/`: `docker compose build` / `up -d`. Скрипт **`backend/deploy-dive-hub-ru.sh`** поднимает postgres + redis, миграции с хоста, затем `api`. |
+| **Дополнительно** | systemd / pm2 / k8s: _(если есть — описать; иначе «нет»)_ |
+
+---
+
+## Порты и Compose (`backend/docker-compose.yml`)
+
+На **хосте** в актуальном файле:
+
+| Сервис | Хост | Примечание |
+|--------|------|------------|
+| **API** | `${API_PUBLISH_PORT:-3000}` → контейнер `3000` | Если порт занят старым процессом — в `.env` рядом с compose: `API_PUBLISH_PORT=3001`, nginx на `api.dive-hub.ru` и проверки `curl` — на этот порт. |
+| **Postgres** | `5432:5432` | Миграции с хоста: `DB_HOST=127.0.0.1` (скрипт задаёт пароль по умолчанию `postgres` или из `POSTGRES_PASSWORD` в `.env`). |
+| **Redis** | **не** публикуется на хост | Только сеть Docker `api` ↔ `redis` (избегает конфликта с Redis на хосте на `6379`). |
+
+---
+
+## HTML-документы на API (вне `/api`)
+
+Nest отдаёт **`GET /privacy`** и **`GET /agreement`** (без префикса `api`). Чтобы работало **`https://dive-hub.ru/privacy`**, на nginx для этого `server` нужен `proxy_pass` на тот же хост-порт, что и у API (см. `legal-pages.controller.ts`).
+
+---
+
+## `backend/.env` (релевантные строки — секреты замазать)
+
+Скопируйте с сервера только **имена** переменных и безопасные значения; секреты: `***`.
+
+```env
+NODE_ENV=production
+PORT=3000
+
+# опционально, если 3000 на хосте занят:
+# API_PUBLISH_PORT=3001
+
+JWT_SECRET=***
+
+CORS_ORIGINS=https://dive-hub.ru,https://www.dive-hub.ru,...
+# в CORS — origin браузерных приложений, не URL API
+
+# при необходимости за reverse proxy:
+# TRUST_PROXY=1
+
+THROTTLE_TTL_MS=60000
+THROTTLE_LIMIT=120
+
+# внутри Docker-сети (для контейнера api):
+DB_HOST=postgres
+DB_PORT=5432
+DB_USERNAME=postgres
+DB_PASSWORD=***
+DB_DATABASE=divehub
+
+REDIS_HOST=redis
+REDIS_PORT=6379
+```
+
+Если переменные задаются **только** в `docker-compose.yml` через `environment:` — так и напишите: «дублируется в compose» или «часть в `.env`, часть в compose».
+
+---
+
+## Домены и reverse proxy
+
+| Домен | Назначение | Куда прокси (заполнить) |
+|-------|------------|-------------------------|
+| `dive-hub.ru` | Сайт / Next (admin-web) + юр. страницы | `127.0.0.1:_____` для сайта; для `/privacy` и `/agreement` — на **порт Nest** (как у API) |
+| `api.dive-hub.ru` | Nest API | `127.0.0.1:_____` = **API_PUBLISH_PORT** на хосте |
+| `www` | редирект на apex / наоборот | _(кратко)_ |
+
+**Nginx:** фрагмент `server { ... }` для API — приложить **без** путей к сертификатам и без секретов.
+
+**Caddy:** фрагмент `reverse_proxy` / блоки `handle` — аналогично.
+
+---
+
+## Опционально (обрывы, 429, дубликаты)
+
+| Вопрос | Ответ |
+|--------|--------|
+| Второй инстанс API на том же хосте? | _____ |
+| Старый контейнер/процесс на том же порту? | _____ |
+| CDN / WAF перед API? | _____ |
+
+---
+
+## Быстрая шпаргалка после `git push` на GitHub
+
+На сервере:
+
+```bash
+cd /opt/divehub-src/DivePROD/backend
+./deploy-dive-hub-ru.sh
+```
+
+Проверка (порт подставить по `API_PUBLISH_PORT` или `3000`):
+
+```bash
+curl -fsS http://127.0.0.1:3000/api/dive-sites/ping
+curl -fsSI http://127.0.0.1:3000/privacy | head -n 5
+docker compose ps
+```
+
+Обновление только образа из registry — по вашему процессу, если отойдёте от compose-сборки на сервере.
