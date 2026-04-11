@@ -204,7 +204,15 @@ export class AuthService {
       this.logger.warn(`User ${user.id} has empty password hash`);
       throw new UnauthorizedException('Invalid email or password');
     }
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    let isPasswordValid = false;
+    try {
+      isPasswordValid = await bcrypt.compare(password, user.password);
+    } catch (e) {
+      this.logger.warn(
+        `bcrypt.compare failed for user ${user.id}: ${e instanceof Error ? e.message : String(e)}`,
+      );
+      throw new UnauthorizedException('Invalid email or password');
+    }
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid email or password');
     }
