@@ -9,9 +9,10 @@ services:
   postgres:
     image: postgis/postgis:16-3.4
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: divehub
+      # Должны совпадать с DB_* у api (см. ниже). Иначе импорт с хоста через POSTGRES_PASSWORD ок, а логин в приложении — 500.
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-divehub}
     ports:
       # Если на хосте уже занят 5432 — в .env рядом с compose: POSTGRES_PUBLISH_PORT=5433
       - "${POSTGRES_PUBLISH_PORT:-5432}:5432"
@@ -42,9 +43,9 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://127.0.0.1:3001}
       DB_HOST: postgres
       DB_PORT: "5432"
-      DB_USERNAME: postgres
-      DB_PASSWORD: postgres
-      DB_DATABASE: divehub
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_DATABASE: ${POSTGRES_DB:-divehub}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
     depends_on:
