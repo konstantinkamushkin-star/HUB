@@ -71,16 +71,29 @@ DB_HOST=127.0.0.1 \
   DB_DATABASE="${MIGRATE_DB_DATABASE}" \
   node scripts/apply-all-migrations.cjs
 
-echo ">>> Сборка и перезапуск контейнера API"
+echo ">>> Сборка и перезапуск контейнера API (хост-порт из .env: ${PUBLISH_PORT} → контейнер :3000)"
 docker compose build api
+set +e
 docker compose up -d api
+compose_api_rc=$?
+set -e
+if [[ "$compose_api_rc" -ne 0 ]]; then
+  echo "!!! docker compose up -d api завершился с кодом ${compose_api_rc}."
+  echo "!!! Часто: «failed to bind host port … address already in use» — занят API_PUBLISH_PORT=${PUBLISH_PORT} (или 3000 по умолчанию)."
+  echo "!!! Кто слушает порты: ss -tlnp | grep -E ':(3000|3001|3002|8080)\\b' || true"
+  echo "!!! В backend/.env задайте свободный порт, например: API_PUBLISH_PORT=3002"
+  echo "!!! sed -i 's/^API_PUBLISH_PORT=.*/API_PUBLISH_PORT=3002/' .env   # подставьте свой порт"
+  echo "!!! Затем снова ./deploy-dive-hub-ru.sh и в nginx: proxy_pass http://127.0.0.1:<тот_же_порт> (снаружи достаточно 443)."
+  docker compose ps -a 2>/dev/null || true
+  exit 1
+fi
 sleep 2
 
 echo ">>> Проверки на localhost:${PUBLISH_PORT} (внешний порт API)"
 if ! curl -fsS --connect-timeout 3 "http://127.0.0.1:${PUBLISH_PORT}/api/health" >/dev/null 2>&1; then
   echo "!!! API не отвечает на порту ${PUBLISH_PORT}."
-  echo "!!! Частая причина: «Bind for 0.0.0.0:3000 failed» — в backend/.env задайте API_PUBLISH_PORT=3001 (или другой свободный порт),"
-  echo "!!! затем снова ./deploy-dive-hub-ru.sh и обновите nginx: proxy_pass http://127.0.0.1:<тот_же_порт>; с интернета достаточно 443."
+  echo "!!! Проверьте, что контейнер api в состоянии running: docker compose ps; логи: docker compose logs api --tail 80"
+  echo "!!! Если порт занят при старте — смените API_PUBLISH_PORT в .env (см. сообщение выше при ошибке compose)."
   docker compose ps
   docker compose logs api --tail 50 2>/dev/null || true
   exit 1
