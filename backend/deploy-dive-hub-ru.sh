@@ -28,10 +28,23 @@ PUBLISH_PORT="${API_PUBLISH_PORT:-3000}"
 if grep -q '^API_PUBLISH_PORT=' .env 2>/dev/null; then
   PUBLISH_PORT="$(grep '^API_PUBLISH_PORT=' .env | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
 fi
-# Пароль Postgres на 127.0.0.1 (как в docker-compose POSTGRES_PASSWORD, если не задан в .env).
+# Учётные данные для миграций на 127.0.0.1 — только контейнерный Postgres из compose,
+# не DB_USERNAME из .env (там часто admin/внешняя БД для другого окружения).
+MIGRATE_DB_USER="${MIGRATE_DB_USER:-postgres}"
+if grep -q '^POSTGRES_USER=' .env 2>/dev/null; then
+  MIGRATE_DB_USER="$(grep '^POSTGRES_USER=' .env | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
+fi
 MIGRATE_DB_PASSWORD="${MIGRATE_DB_PASSWORD:-postgres}"
 if grep -q '^POSTGRES_PASSWORD=' .env 2>/dev/null; then
   MIGRATE_DB_PASSWORD="$(grep '^POSTGRES_PASSWORD=' .env | cut -d= -f2- | tr -d '\r')"
+fi
+MIGRATE_DB_DATABASE="${MIGRATE_DB_DATABASE:-divehub}"
+if grep -q '^POSTGRES_DB=' .env 2>/dev/null; then
+  MIGRATE_DB_DATABASE="$(grep '^POSTGRES_DB=' .env | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
+fi
+MIGRATE_DB_PORT="${MIGRATE_DB_PORT:-5432}"
+if grep -q '^POSTGRES_PUBLISH_PORT=' .env 2>/dev/null; then
+  MIGRATE_DB_PORT="$(grep '^POSTGRES_PUBLISH_PORT=' .env | cut -d= -f2- | tr -d '\r' | tr -d ' ')"
 fi
 
 echo ">>> Docker: Postgres + Redis"
@@ -49,9 +62,14 @@ for i in $(seq 1 90); do
   fi
 done
 
-echo ">>> Миграции с хоста → 127.0.0.1 (пароль как у контейнера postgres)"
+echo ">>> Миграции с хоста → 127.0.0.1:${MIGRATE_DB_PORT} (пользователь ${MIGRATE_DB_USER}, БД ${MIGRATE_DB_DATABASE})"
 npm ci --omit=dev
-DB_HOST=127.0.0.1 DB_PASSWORD="${MIGRATE_DB_PASSWORD}" node scripts/apply-all-migrations.cjs
+DB_HOST=127.0.0.1 \
+  DB_PORT="${MIGRATE_DB_PORT}" \
+  DB_USERNAME="${MIGRATE_DB_USER}" \
+  DB_PASSWORD="${MIGRATE_DB_PASSWORD}" \
+  DB_DATABASE="${MIGRATE_DB_DATABASE}" \
+  node scripts/apply-all-migrations.cjs
 
 echo ">>> Сборка и перезапуск контейнера API"
 docker compose build api

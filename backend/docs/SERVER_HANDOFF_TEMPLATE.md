@@ -54,7 +54,7 @@ cd /opt/divehub-src/DivePROD && git pull origin main && cd backend && ./deploy-d
 | Сервис | Хост | Примечание |
 |--------|------|------------|
 | **API** | `${API_PUBLISH_PORT:-3000}` → контейнер `3000` | Если порт занят старым процессом — в `.env` рядом с compose: `API_PUBLISH_PORT=3001`, nginx на `api.dive-hub.ru` и проверки `curl` — на этот порт. |
-| **Postgres** | `5432:5432` | Миграции с хоста: `DB_HOST=127.0.0.1` (скрипт задаёт пароль по умолчанию `postgres` или из `POSTGRES_PASSWORD` в `.env`). |
+| **Postgres** | `5432:5432` | Миграции с хоста: `deploy-dive-hub-ru.sh` передаёт **`DB_USERNAME=postgres`** (и пароль из compose / `POSTGRES_PASSWORD` в `.env`), **не** `DB_USERNAME` из `.env` для API — иначе при `admin` в `.env` будет ошибка входа в контейнерную БД. |
 | **Redis** | **не** публикуется на хост | Только сеть Docker `api` ↔ `redis` (избегает конфликта с Redis на хосте на `6379`). |
 
 ---
