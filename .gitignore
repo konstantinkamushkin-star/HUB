@@ -1,2 +1,10 @@
 # Cursor IDE — логи могут быть сотни МБ, не коммитить
 .cursor/
+
+# Android — сборка и кэш Gradle (не коммитить)
+DiveHubAndroid/app/build/
+DiveHubAndroid/.gradle/
+DiveHubAndroid/**/build/
+
+# Локальные большие датасеты (при необходимости раскомментируйте)
+# opendivemap_all_sites.geojson
