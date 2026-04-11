@@ -1,0 +1,1127 @@
+[
+  {
+    "name": "Ras Mohammed",
+    "description": "Famous reef with abundant marine life",
+    "longitude": 34.2833,
+    "latitude": 27.7333,
+    "country": "Egypt",
+    "region": "Sinai Peninsula",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "SS Thistlegorm",
+    "description": "World War II wreck, one of the best wreck dives",
+    "longitude": 33.9167,
+    "latitude": 27.8167,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": 3,
+    "depthMin": 15,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Blue Hole Dahab",
+    "description": "Famous sinkhole dive site",
+    "longitude": 34.5167,
+    "latitude": 28.5667,
+    "country": "Egypt",
+    "region": "Dahab",
+    "siteTypes": [
+      "wall",
+      "cave"
+    ],
+    "difficulty": 4,
+    "depthMin": 0,
+    "depthMax": 130,
+    "marineLife": []
+  },
+  {
+    "name": "Brothers Islands",
+    "description": "Remote islands with sharks and pelagics",
+    "longitude": 34.8333,
+    "latitude": 26.2833,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Elphinstone Reef",
+    "description": "Famous reef with sharks",
+    "longitude": 34.8833,
+    "latitude": 25.2167,
+    "country": "Egypt",
+    "region": "Marsa Alam",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Manta Point",
+    "description": "Cleaning station for manta rays",
+    "longitude": 73.4167,
+    "latitude": 3.8167,
+    "country": "Maldives",
+    "region": "Ari Atoll",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Fish Head",
+    "description": "Shark aggregation site",
+    "longitude": 73.3667,
+    "latitude": 3.8667,
+    "country": "Maldives",
+    "region": "Ari Atoll",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Kandu Thila",
+    "description": "Channel dive with strong currents",
+    "longitude": 73.2833,
+    "latitude": 4.2167,
+    "country": "Maldives",
+    "region": "North Male Atoll",
+    "siteTypes": [
+      "reef",
+      "drift"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Maaya Thila",
+    "description": "Night dive with nurse sharks",
+    "longitude": 73.3333,
+    "latitude": 4.1167,
+    "country": "Maldives",
+    "region": "Ari Atoll",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Banana Reef",
+    "description": "Classic reef dive with colorful corals",
+    "longitude": 73.4167,
+    "latitude": 4.1833,
+    "country": "Maldives",
+    "region": "North Male Atoll",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 1,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Manta Point Nusa Penida",
+    "description": "Manta ray cleaning station",
+    "longitude": 115.5167,
+    "latitude": -8.7167,
+    "country": "Indonesia",
+    "region": "Bali",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Crystal Bay",
+    "description": "Beautiful bay with mola mola",
+    "longitude": 115.4667,
+    "latitude": -8.6833,
+    "country": "Indonesia",
+    "region": "Bali",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "USAT Liberty",
+    "description": "WWII wreck covered in corals",
+    "longitude": 115.5833,
+    "latitude": -8.2833,
+    "country": "Indonesia",
+    "region": "Bali",
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Komodo National Park",
+    "description": "Dragon island with amazing diving",
+    "longitude": 119.4667,
+    "latitude": -8.55,
+    "country": "Indonesia",
+    "region": "Komodo",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Raja Ampat",
+    "description": "Biodiversity hotspot",
+    "longitude": 130.6667,
+    "latitude": -0.8667,
+    "country": "Indonesia",
+    "region": "West Papua",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Tubbataha Reef",
+    "description": "UNESCO World Heritage Site",
+    "longitude": 119.9167,
+    "latitude": 8.95,
+    "country": "Philippines",
+    "region": "Palawan",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Apo Reef",
+    "description": "Second largest reef in the Philippines",
+    "longitude": 120.7167,
+    "latitude": 12.6667,
+    "country": "Philippines",
+    "region": "Mindoro",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Malapascua",
+    "description": "Thresher shark dive site",
+    "longitude": 124.0667,
+    "latitude": 11.3333,
+    "country": "Philippines",
+    "region": "Cebu",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 15,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Anilao",
+    "description": "Macro photography paradise",
+    "longitude": 121.0167,
+    "latitude": 13.75,
+    "country": "Philippines",
+    "region": "Batangas",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Coron Bay",
+    "description": "WWII Japanese wrecks",
+    "longitude": 120.2,
+    "latitude": 12,
+    "country": "Philippines",
+    "region": "Palawan",
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Richelieu Rock",
+    "description": "Whale shark and manta ray site",
+    "longitude": 98.0167,
+    "latitude": 9.3667,
+    "country": "Thailand",
+    "region": "Similan Islands",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 35,
+    "marineLife": []
+  },
+  {
+    "name": "Hin Daeng",
+    "description": "Red rock with pelagics",
+    "longitude": 97.6667,
+    "latitude": 7.4167,
+    "country": "Thailand",
+    "region": "Koh Lanta",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Koh Tao",
+    "description": "Beginner friendly dive site",
+    "longitude": 99.8333,
+    "latitude": 10.1,
+    "country": "Thailand",
+    "region": "Gulf of Thailand",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 1,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Chumphon Pinnacle",
+    "description": "Shark and pelagic site",
+    "longitude": 99.9167,
+    "latitude": 10.4167,
+    "country": "Thailand",
+    "region": "Koh Tao",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 35,
+    "marineLife": []
+  },
+  {
+    "name": "Sail Rock",
+    "description": "Best dive site in the Gulf",
+    "longitude": 100.0667,
+    "latitude": 9.7167,
+    "country": "Thailand",
+    "region": "Koh Phangan",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Cod Hole",
+    "description": "Friendly giant potato cod",
+    "longitude": 146.5833,
+    "latitude": -14.6167,
+    "country": "Australia",
+    "region": "Queensland",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "SS Yongala",
+    "description": "Famous wreck dive",
+    "longitude": 147.6167,
+    "latitude": -19.3167,
+    "country": "Australia",
+    "region": "Queensland",
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": 3,
+    "depthMin": 15,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Ningaloo Reef",
+    "description": "Whale shark aggregation",
+    "longitude": 113.7833,
+    "latitude": -22.1167,
+    "country": "Australia",
+    "region": "Western Australia",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Julian Rocks",
+    "description": "Shark and ray dive site",
+    "longitude": 153.6,
+    "latitude": -28.6333,
+    "country": "Australia",
+    "region": "New South Wales",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Bloody Bay Wall",
+    "description": "Famous wall dive",
+    "longitude": -80.0833,
+    "latitude": 19.6833,
+    "country": "Cayman Islands",
+    "region": "Little Cayman",
+    "siteTypes": [
+      "wall"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Stingray City",
+    "description": "Swim with friendly stingrays",
+    "longitude": -81.3667,
+    "latitude": 19.3667,
+    "country": "Cayman Islands",
+    "region": "Grand Cayman",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 1,
+    "depthMin": 3,
+    "depthMax": 12,
+    "marineLife": []
+  },
+  {
+    "name": "The Wall",
+    "description": "Vertical wall drop-off",
+    "longitude": -64.6167,
+    "latitude": 18.2167,
+    "country": "Bonaire",
+    "region": "Bonaire",
+    "siteTypes": [
+      "wall"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Shark Reef",
+    "description": "Shark feeding dive",
+    "longitude": -64.6333,
+    "latitude": 18.2833,
+    "country": "Bonaire",
+    "region": "Bonaire",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "The Caves",
+    "description": "Underwater cave system",
+    "longitude": -64.65,
+    "latitude": 18.25,
+    "country": "Bonaire",
+    "region": "Bonaire",
+    "siteTypes": [
+      "cave"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Cenote Dos Ojos",
+    "description": "Famous cenote dive",
+    "longitude": -87.4667,
+    "latitude": 20.3167,
+    "country": "Mexico",
+    "region": "Yucatan",
+    "siteTypes": [
+      "cave"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 10,
+    "marineLife": []
+  },
+  {
+    "name": "Cenote Angelita",
+    "description": "Underwater river in cenote",
+    "longitude": -87.45,
+    "latitude": 20.3,
+    "country": "Mexico",
+    "region": "Yucatan",
+    "siteTypes": [
+      "cave"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Cozumel Reefs",
+    "description": "Drift diving paradise",
+    "longitude": -86.95,
+    "latitude": 20.5,
+    "country": "Mexico",
+    "region": "Cozumel",
+    "siteTypes": [
+      "reef",
+      "drift"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Palancar Reef",
+    "description": "Famous Cozumel reef",
+    "longitude": -86.9833,
+    "latitude": 20.4833,
+    "country": "Mexico",
+    "region": "Cozumel",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Santa Rosa Wall",
+    "description": "Wall dive with pelagics",
+    "longitude": -86.9667,
+    "latitude": 20.4667,
+    "country": "Mexico",
+    "region": "Cozumel",
+    "siteTypes": [
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Darwin Island",
+    "description": "Hammerhead shark aggregation",
+    "longitude": -91.9833,
+    "latitude": 1.6833,
+    "country": "Ecuador",
+    "region": "Galapagos",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Wolf Island",
+    "description": "Shark and pelagic paradise",
+    "longitude": -91.8167,
+    "latitude": 1.3833,
+    "country": "Ecuador",
+    "region": "Galapagos",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Cousins Rock",
+    "description": "Sea lion and penguin dive",
+    "longitude": -90.2833,
+    "latitude": -0.7667,
+    "country": "Ecuador",
+    "region": "Galapagos",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Kicker Rock",
+    "description": "Famous rock formation",
+    "longitude": -89.6167,
+    "latitude": -0.8167,
+    "country": "Ecuador",
+    "region": "Galapagos",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Punta Vicente Roca",
+    "description": "Mola mola and penguins",
+    "longitude": -91.1167,
+    "latitude": 0.0167,
+    "country": "Ecuador",
+    "region": "Galapagos",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Aliwal Shoal",
+    "description": "Ragged-tooth shark dive",
+    "longitude": 30.2667,
+    "latitude": -30.2667,
+    "country": "South Africa",
+    "region": "KwaZulu-Natal",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Sardine Run",
+    "description": "Annual sardine migration",
+    "longitude": 30.2167,
+    "latitude": -30.2167,
+    "country": "South Africa",
+    "region": "KwaZulu-Natal",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Protea Banks",
+    "description": "Shark diving site",
+    "longitude": 30.2833,
+    "latitude": -30.2833,
+    "country": "South Africa",
+    "region": "KwaZulu-Natal",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Cape Town Kelp Forests",
+    "description": "Kelp forest diving",
+    "longitude": 18.4167,
+    "latitude": -34.0167,
+    "country": "South Africa",
+    "region": "Western Cape",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "False Bay",
+    "description": "Great white shark cage diving",
+    "longitude": 18.4667,
+    "latitude": -34.1833,
+    "country": "South Africa",
+    "region": "Western Cape",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 5,
+    "depthMax": 15,
+    "marineLife": []
+  },
+  {
+    "name": "Sipadan",
+    "description": "Turtle tomb and barracuda tornado",
+    "longitude": 118.6167,
+    "latitude": 4.1167,
+    "country": "Malaysia",
+    "region": "Sabah",
+    "siteTypes": [
+      "reef",
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Layang Layang",
+    "description": "Hammerhead shark site",
+    "longitude": 113.8333,
+    "latitude": 7.3667,
+    "country": "Malaysia",
+    "region": "Sabah",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Mabul",
+    "description": "Macro photography paradise",
+    "longitude": 118.6333,
+    "latitude": 4.25,
+    "country": "Malaysia",
+    "region": "Sabah",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Kapalai",
+    "description": "House reef diving",
+    "longitude": 118.65,
+    "latitude": 4.2333,
+    "country": "Malaysia",
+    "region": "Sabah",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 1,
+    "depthMin": 3,
+    "depthMax": 15,
+    "marineLife": []
+  },
+  {
+    "name": "Mataking",
+    "description": "Wreck and reef diving",
+    "longitude": 118.6833,
+    "latitude": 4.3,
+    "country": "Malaysia",
+    "region": "Sabah",
+    "siteTypes": [
+      "wreck",
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Yonaguni",
+    "description": "Mysterious underwater ruins",
+    "longitude": 122.9333,
+    "latitude": 24.45,
+    "country": "Japan",
+    "region": "Okinawa",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Kerama Islands",
+    "description": "Crystal clear water diving",
+    "longitude": 127.3167,
+    "latitude": 26.2,
+    "country": "Japan",
+    "region": "Okinawa",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Ishigaki",
+    "description": "Manta ray cleaning station",
+    "longitude": 124.15,
+    "latitude": 24.3333,
+    "country": "Japan",
+    "region": "Okinawa",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Miyakojima",
+    "description": "Beautiful coral reefs",
+    "longitude": 125.2833,
+    "latitude": 24.8,
+    "country": "Japan",
+    "region": "Okinawa",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Okinawa Main Island",
+    "description": "Variety of dive sites",
+    "longitude": 127.8,
+    "latitude": 26.5,
+    "country": "Japan",
+    "region": "Okinawa",
+    "siteTypes": [
+      "reef",
+      "wreck"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Palau Blue Corner",
+    "description": "Shark and current diving",
+    "longitude": 134.5167,
+    "latitude": 7.1667,
+    "country": "Palau",
+    "region": "Palau",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Jellyfish Lake",
+    "description": "Swim with harmless jellyfish",
+    "longitude": 134.3833,
+    "latitude": 7.1667,
+    "country": "Palau",
+    "region": "Palau",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 1,
+    "depthMin": 0,
+    "depthMax": 15,
+    "marineLife": []
+  },
+  {
+    "name": "German Channel",
+    "description": "Manta ray cleaning station",
+    "longitude": 134.5,
+    "latitude": 7.15,
+    "country": "Palau",
+    "region": "Palau",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Ulong Channel",
+    "description": "Drift dive with sharks",
+    "longitude": 134.4833,
+    "latitude": 7.1333,
+    "country": "Palau",
+    "region": "Palau",
+    "siteTypes": [
+      "reef",
+      "drift"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Siaes Tunnel",
+    "description": "Underwater tunnel dive",
+    "longitude": 134.4667,
+    "latitude": 7.1167,
+    "country": "Palau",
+    "region": "Palau",
+    "siteTypes": [
+      "cave"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Fiji Great White Wall",
+    "description": "Famous wall dive",
+    "longitude": 177.2667,
+    "latitude": -17.7833,
+    "country": "Fiji",
+    "region": "Taveuni",
+    "siteTypes": [
+      "wall"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Rainbow Reef",
+    "description": "Colorful soft corals",
+    "longitude": 177.2833,
+    "latitude": -17.7667,
+    "country": "Fiji",
+    "region": "Taveuni",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Beqa Lagoon",
+    "description": "Shark feeding dive",
+    "longitude": 178.4167,
+    "latitude": -18.3667,
+    "country": "Fiji",
+    "region": "Viti Levu",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 5,
+    "depthMax": 20,
+    "marineLife": []
+  },
+  {
+    "name": "Namena Marine Reserve",
+    "description": "Pristine reef diving",
+    "longitude": 179.0167,
+    "latitude": -17.1167,
+    "country": "Fiji",
+    "region": "Vanua Levu",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Bligh Water",
+    "description": "Pelagic and shark diving",
+    "longitude": 178.5,
+    "latitude": -17.5,
+    "country": "Fiji",
+    "region": "Fiji",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Socorro Islands",
+    "description": "Giant mantas and dolphins",
+    "longitude": -111,
+    "latitude": 18.7833,
+    "country": "Mexico",
+    "region": "Revillagigedo",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Cocos Island",
+    "description": "Hammerhead shark aggregation",
+    "longitude": -87.05,
+    "latitude": 5.5167,
+    "country": "Costa Rica",
+    "region": "Cocos Island",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 10,
+    "depthMax": 30,
+    "marineLife": []
+  },
+  {
+    "name": "Malpelo Island",
+    "description": "Shark diving paradise",
+    "longitude": -81.7167,
+    "latitude": 3.9833,
+    "country": "Colombia",
+    "region": "Malpelo",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 10,
+    "depthMax": 40,
+    "marineLife": []
+  },
+  {
+    "name": "Socorro Mantas",
+    "description": "Manta ray cleaning station",
+    "longitude": -111.0167,
+    "latitude": 18.8,
+    "country": "Mexico",
+    "region": "Revillagigedo",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 3,
+    "depthMin": 10,
+    "depthMax": 25,
+    "marineLife": []
+  },
+  {
+    "name": "Roca Partida",
+    "description": "Pelagic and shark site",
+    "longitude": -111.0333,
+    "latitude": 18.8167,
+    "country": "Mexico",
+    "region": "Revillagigedo",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 4,
+    "depthMin": 10,
+    "depthMax": 35,
+    "marineLife": []
+  }
+]

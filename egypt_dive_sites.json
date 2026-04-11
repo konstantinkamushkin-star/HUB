@@ -1,0 +1,128 @@
+[
+  {
+    "name": "Abu Helal",
+    "depth": "29 m",
+    "description": "Gulf of Aqaba. entry: boat. ocean",
+    "coordinates": "28.5422, 34.5167",
+    "country": "Egypt"
+  },
+  {
+    "name": "Anemone City",
+    "depth": "24 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "27.7278, 34.2591",
+    "country": "Egypt"
+  },
+  {
+    "name": "Circle Divers Dahab House Reef",
+    "depth": "12 m",
+    "description": "entry: boat. ocean",
+    "coordinates": "28.4789, 34.4917",
+    "country": "Egypt"
+  },
+  {
+    "name": "Elphinstone South",
+    "depth": "29 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "25.3063, 34.8619",
+    "country": "Egypt"
+  },
+  {
+    "name": "Gamul Soraya",
+    "depth": "16 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "26.7961, 33.9916",
+    "country": "Egypt"
+  },
+  {
+    "name": "Gota El Dir",
+    "depth": "15 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "27.4352, 33.7393",
+    "country": "Egypt"
+  },
+  {
+    "name": "Gota Iris",
+    "depth": "13 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "27.346, 33.8396",
+    "country": "Egypt"
+  },
+  {
+    "name": "Marsa Egla",
+    "depth": "15 m",
+    "description": "entry: boat. ocean",
+    "coordinates": "25.1726, 34.8422",
+    "country": "Egypt"
+  },
+  {
+    "name": "Marsa Shagra House Reef",
+    "depth": "19 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "25.2452, 34.7966",
+    "country": "Egypt"
+  },
+  {
+    "name": "Poseidon Reef",
+    "depth": "15 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "27.3906, 33.8719",
+    "country": "Egypt"
+  },
+  {
+    "name": "Robinson Club Soma Bay House Reef",
+    "depth": "8 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "26.8439, 33.9875",
+    "country": "Egypt"
+  },
+  {
+    "name": "Salem Express, wreck",
+    "depth": "26 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "26.6395, 34.0611",
+    "country": "Egypt"
+  },
+  {
+    "name": "Shaab Hamdallah",
+    "depth": "20 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "26.6305, 34.0688",
+    "country": "Egypt"
+  },
+  {
+    "name": "Sha’ab Marsa Alam",
+    "depth": "18 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "25.0719, 34.9364",
+    "country": "Egypt"
+  },
+  {
+    "name": "Shabha",
+    "depth": "14 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "27.3394, 33.776",
+    "country": "Egypt"
+  },
+  {
+    "name": "Tobia Kebir",
+    "depth": "17 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "26.8089, 33.9954",
+    "country": "Egypt"
+  },
+  {
+    "name": "Tower",
+    "depth": "21 m",
+    "description": "entry: boat. ocean",
+    "coordinates": "27.8829, 34.3265",
+    "country": "Egypt"
+  },
+  {
+    "name": "Villa Koraffi",
+    "depth": "20 m",
+    "description": "Red Sea. entry: boat. ocean",
+    "coordinates": "25.5555, 34.6426",
+    "country": "Egypt"
+  }
+]

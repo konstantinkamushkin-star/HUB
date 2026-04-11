@@ -1,0 +1,1641 @@
+[
+  {
+    "name": "San Jose",
+    "lat": -0.321801,
+    "lng": -90.550805,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Chuyo Maru",
+    "lat": 7.340286,
+    "lng": 134.43929,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Pieraurou",
+    "lat": 2.783429,
+    "lng": 132.532679,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Helmet Wreck",
+    "lat": 7.327866,
+    "lng": 134.465797,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Jake SeaPlane",
+    "lat": 7.369152,
+    "lng": 134.44846,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "WWII Shohatsu-class landing craft 小発動艇",
+    "lat": 7.31602,
+    "lng": 134.483338,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Ryuko Maru",
+    "lat": 7.344003,
+    "lng": 134.444271,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Amatsu Maru",
+    "lat": 7.338262,
+    "lng": 134.434025,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "LST",
+    "lat": 7.345456,
+    "lng": 134.434797,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Urakami Maru",
+    "lat": 7.332154,
+    "lng": 134.440441,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Hafa Adai",
+    "lat": 7.320385,
+    "lng": 134.443938,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Raizan Maru",
+    "lat": 7.351734,
+    "lng": 134.429733,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Scattered WWII Japanese Landing Craft Wreck",
+    "lat": 7.276037,
+    "lng": 134.388149,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Fishing Vessel - Shipwreck",
+    "lat": 7.286406,
+    "lng": 134.410794,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Lukes",
+    "lat": 6.929564,
+    "lng": 134.199703,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Velasco Reef",
+    "lat": 8.323842,
+    "lng": 134.613225,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Hin Jom",
+    "lat": 7.807392,
+    "lng": 98.627376,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "MS King Cruiser",
+    "lat": 7.801344,
+    "lng": 98.642907,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "HTMS Kut",
+    "lat": 12.950011,
+    "lng": 100.79889,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "หินบิดา",
+    "lat": 7.636639,
+    "lng": 98.820822,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Hin Daeng",
+    "lat": 7.367574,
+    "lng": 98.875754,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Hin Muang",
+    "lat": 7.367387,
+    "lng": 98.87002,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Ko Dok Mai",
+    "lat": 7.796424,
+    "lng": 98.530281,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Wooden Restaurant Boat",
+    "lat": 17.734728,
+    "lng": 105.152087,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Na Yak Reef snorkeling and diving place",
+    "lat": 8.573914,
+    "lng": 98.210542,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Snorkeling Point",
+    "lat": 7.906393,
+    "lng": 98.550284,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "ซากเรือ",
+    "lat": 7.866393,
+    "lng": 98.400625,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "หินกลาง",
+    "lat": 7.79198,
+    "lng": 98.779384,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "แนวปะการังเกาะบุโหลนดอน",
+    "lat": 6.855256,
+    "lng": 99.594513,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "แนวประการัง",
+    "lat": 9.797931,
+    "lng": 99.9783,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Canoes Surf Break",
+    "lat": 21.273695,
+    "lng": -157.827715,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "China Walls",
+    "lat": 21.261364,
+    "lng": -157.711705,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Queen's Surf Break",
+    "lat": 21.272584,
+    "lng": -157.826433,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Public's Surf Break",
+    "lat": 21.267836,
+    "lng": -157.825312,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Popular's Surf Break",
+    "lat": 21.27242,
+    "lng": -157.832694,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Paradise Surf Break",
+    "lat": 21.272752,
+    "lng": -157.835065,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Three's Surf Break",
+    "lat": 21.27326,
+    "lng": -157.836792,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Four's Surf Break",
+    "lat": 21.27475,
+    "lng": -157.839071,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Kaiser's Surf Break",
+    "lat": 21.276927,
+    "lng": -157.840721,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Rockpiles Surf Break",
+    "lat": 21.278825,
+    "lng": -157.843064,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Ala Moana Bowls Surf Break",
+    "lat": 21.280355,
+    "lng": -157.844475,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Half Point",
+    "lat": 21.284672,
+    "lng": -157.671854,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Full Point",
+    "lat": 21.28408,
+    "lng": -157.670074,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Turtle Alley",
+    "lat": 21.27589,
+    "lng": -157.841248,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Turtle Canyon",
+    "lat": 21.273849,
+    "lng": -157.839389,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "USS Arizona",
+    "lat": 21.364862,
+    "lng": -157.950146,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "USS Utah",
+    "lat": 21.368935,
+    "lng": -157.962678,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Kaneohe Sandbar",
+    "lat": 21.466566,
+    "lng": -157.810598,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Tripod Reef",
+    "lat": 21.306785,
+    "lng": -158.038492,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Aiea Shoal",
+    "lat": 21.372698,
+    "lng": -157.937149,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "USS LST-480",
+    "lat": 21.357215,
+    "lng": -157.997083,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Blonde Reef",
+    "lat": 19.742157,
+    "lng": -155.045059,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "YOGN-42",
+    "lat": 20.921224,
+    "lng": -156.910065,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "YO-21",
+    "lat": 20.929296,
+    "lng": -157.000722,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SS Columbia",
+    "lat": 39.958194,
+    "lng": -124.184393,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Cuba",
+    "lat": 34.031127,
+    "lng": -120.4534,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Ex-Tortuga",
+    "lat": 34.018605,
+    "lng": -120.310987,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Aggi",
+    "lat": 34.020746,
+    "lng": -120.233927,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Goldenhorn",
+    "lat": 33.980504,
+    "lng": -120.233233,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "S.S. Chickasaw",
+    "lat": 33.903254,
+    "lng": -120.138144,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Jane L. Stanford",
+    "lat": 33.984364,
+    "lng": -120.000474,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Del Rio",
+    "lat": 34.007231,
+    "lng": -119.40854,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Equator",
+    "lat": 34.005326,
+    "lng": -119.385518,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Winfield Scott",
+    "lat": 34.009048,
+    "lng": -119.385932,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SS Dominator",
+    "lat": 33.774029,
+    "lng": -118.428401,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "S.S. Garden City",
+    "lat": 38.054248,
+    "lng": -122.202267,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SS Monte Carlo",
+    "lat": 32.674283,
+    "lng": -117.173181,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "S.S. Point Reyes",
+    "lat": 38.09783,
+    "lng": -122.850729,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "The Smartest Sailing Vessel Out of San Francisco: Brigantine Galilee",
+    "lat": 37.807251,
+    "lng": -122.42986,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SS Tahoe",
+    "lat": 39.091627,
+    "lng": -119.954274,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SS Avalon",
+    "lat": 33.788492,
+    "lng": -118.427788,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Sibyl Marston",
+    "lat": 34.669369,
+    "lng": -120.611928,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Point Estero Shipwreck",
+    "lat": 35.447487,
+    "lng": -120.918977,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Ohioan",
+    "lat": 37.781925,
+    "lng": -122.514635,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "USS PC-815",
+    "lat": 32.632039,
+    "lng": -117.236942,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "HMCS Yukon (DDE 265)",
+    "lat": 32.771582,
+    "lng": -117.271046,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "USS Milwaukee (C-21)",
+    "lat": 40.812247,
+    "lng": -124.198536,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "King Philip",
+    "lat": 37.751443,
+    "lng": -122.510033,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Pomona",
+    "lat": 38.510298,
+    "lng": -123.245761,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Zuñiga Jetty",
+    "lat": 32.668925,
+    "lng": -117.223125,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "S. S. Palo Alto",
+    "lat": 36.969495,
+    "lng": -121.914007,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "USS Corry (DD-334)",
+    "lat": 38.166757,
+    "lng": -122.287414,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Solano",
+    "lat": 38.017187,
+    "lng": -121.805131,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Bluefish Wall",
+    "lat": 36.522816,
+    "lng": -121.942055,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Wreck Alley",
+    "lat": 32.773612,
+    "lng": -117.269352,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Anita Rock",
+    "lat": 37.808292,
+    "lng": -122.453509,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Great Break",
+    "lat": 41.806469,
+    "lng": -124.345865,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Arena Rock",
+    "lat": 38.976029,
+    "lng": -123.748213,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SS Marin",
+    "lat": 38.335763,
+    "lng": -123.059668,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Chump's Reef",
+    "lat": 37.611058,
+    "lng": -122.498023,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Zuñiga Jetty",
+    "lat": 32.672798,
+    "lng": -117.223119,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Conagra Flour Milling Co.",
+    "lat": 37.774408,
+    "lng": -122.240256,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "USS Thompson",
+    "lat": 37.553148,
+    "lng": -122.157815,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Brig Galilee",
+    "lat": 37.862637,
+    "lng": -122.489454,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef",
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Grand Romance",
+    "lat": 38.083377,
+    "lng": -122.247891,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "The Schooner Forester",
+    "lat": 38.022514,
+    "lng": -122.145887,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "FS 485",
+    "lat": 38.121092,
+    "lng": -122.286899,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SS Cabrillo",
+    "lat": 38.226709,
+    "lng": -122.306776,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Wreck of the La Jenelle",
+    "lat": 34.144908,
+    "lng": -119.21685,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Remire Reef",
+    "lat": -5.099866,
+    "lng": 53.34612,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "São Gonçalo",
+    "lat": -34.097326,
+    "lng": 23.378711,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Antipolis",
+    "lat": -33.983729,
+    "lng": 18.356253,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "BOS 400 Shipwreck",
+    "lat": -34.03702,
+    "lng": 18.308405,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Harvest Capella Shipwreck",
+    "lat": -34.027449,
+    "lng": 18.312475,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Timavo Trieste",
+    "lat": -27.867584,
+    "lng": 32.596496,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "SELI1",
+    "lat": -33.82465,
+    "lng": 18.471063,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "S.S. Kakapo",
+    "lat": -34.123776,
+    "lng": 18.348744,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Aristea Shipwreck",
+    "lat": -30.345424,
+    "lng": 17.279161,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Meisho Maru Skeepswrak",
+    "lat": -34.829787,
+    "lng": 19.983944,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Het Huis te Kraaienstjin",
+    "lat": -33.980684,
+    "lng": 18.362086,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Thomas T. Tucker",
+    "lat": -34.273486,
+    "lng": 18.380844,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Nolloth",
+    "lat": -34.283802,
+    "lng": 18.388413,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Phyllisia Shipwreck",
+    "lat": -34.307869,
+    "lng": 18.401874,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Eerste Mosselbank",
+    "lat": -32.801837,
+    "lng": 17.897912,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Whittle Rock",
+    "lat": -34.248002,
+    "lng": 18.553971,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Jolly Robino",
+    "lat": -28.504495,
+    "lng": 32.410497,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  },
+  {
+    "name": "Nolloth",
+    "lat": -34.275829,
+    "lng": 18.387213,
+    "source": "OpenStreetMap",
+    "country": null,
+    "region": null,
+    "siteTypes": [
+      "wreck"
+    ],
+    "difficulty": null,
+    "depthMin": null,
+    "depthMax": null
+  }
+]

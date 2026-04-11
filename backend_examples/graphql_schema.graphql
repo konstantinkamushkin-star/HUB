@@ -1,0 +1,203 @@
+# GraphQL Schema для DiveHub Geo API
+# Примечание: REST API рекомендуется для геосервисов (см. GEO_API_ARCHITECTURE.md)
+
+type Query {
+  # Поиск дайвсайтов по геолокации
+  searchDiveSites(
+    lat: Float!
+    lng: Float!
+    radius: Int = 50000
+    filters: DiveSiteFilters
+    sortBy: SortOption = DISTANCE
+    limit: Int = 20
+    cursor: String
+  ): DiveSiteSearchResult!
+
+  # Поиск по bounding box (для карты)
+  diveSitesInBounds(
+    bounds: BoundingBox!
+    filters: DiveSiteFilters
+    limit: Int = 500
+  ): [DiveSiteListItem!]!
+
+  # Популярные дайвсайты (fallback)
+  popularDiveSites(
+    country: String
+    limit: Int = 20
+  ): [DiveSiteListItem!]!
+
+  # Кластеры для карты
+  diveSiteClusters(
+    bounds: BoundingBox!
+    zoom: Int!
+    clusterDistance: Float = 0.01
+  ): ClusterResult!
+}
+
+# Фильтры для поиска
+input DiveSiteFilters {
+  difficultyLevel: Int
+  siteTypes: [String!]
+  minDepth: Float
+  maxDepth: Float
+  minRating: Float
+  accessTypes: [String!]
+  country: String
+}
+
+# Bounding box для карты
+input BoundingBox {
+  north: Float!
+  south: Float!
+  east: Float!
+  west: Float!
+}
+
+# Опции сортировки
+enum SortOption {
+  DISTANCE
+  RATING
+  POPULARITY
+  NEWEST
+}
+
+# Результат поиска
+type DiveSiteSearchResult {
+  sites: [DiveSiteListItem!]!
+  pagination: PaginationInfo!
+  meta: SearchMeta!
+}
+
+# Информация о пагинации
+type PaginationInfo {
+  hasMore: Boolean!
+  nextCursor: String
+  limit: Int!
+}
+
+# Метаинформация о поиске
+type SearchMeta {
+  totalInRadius: Int
+  queryTimeMs: Int
+}
+
+# DTO для списка дайвсайтов
+type DiveSiteListItem {
+  id: ID!
+  name: String!
+  latitude: Float!
+  longitude: Float!
+  distanceMeters: Int
+  siteTypes: [String!]!
+  difficultyLevel: Int!
+  depthMin: Float
+  depthMax: Float
+  averageRating: Float!
+  reviewCount: Int!
+  country: String
+  region: String
+  thumbnailUrl: String
+}
+
+# Детальная информация о дайвсайте
+type DiveSiteDetail {
+  id: ID!
+  name: String!
+  description: String!
+  localizedName: JSON
+  localizedDescription: JSON
+  latitude: Float!
+  longitude: Float!
+  country: String
+  region: String
+  address: String
+  siteTypes: [String!]!
+  difficultyLevel: Int!
+  depthMin: Float
+  depthMax: Float
+  waterTempMin: Float
+  waterTempMax: Float
+  seasonality: JSON
+  accessType: [String!]!
+  priceFrom: Float
+  averageRating: Float!
+  reviewCount: Int!
+  photoUrls: [String!]!
+  videoUrls: [String!]!
+  marineLife: [String!]!
+  aiSummary: String
+  affiliatedCenters: [ID!]!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# Результат кластеризации
+type ClusterResult {
+  clusters: [Cluster!]!
+  points: [DiveSiteListItem!]!
+}
+
+# Кластер точек
+type Cluster {
+  id: ID!
+  latitude: Float!
+  longitude: Float!
+  count: Int!
+  bounds: BoundingBox
+}
+
+# Скалярные типы
+scalar JSON
+scalar DateTime
+
+# Пример запроса:
+"""
+query SearchDiveSites {
+  searchDiveSites(
+    lat: 20.0
+    lng: -80.0
+    radius: 50000
+    filters: {
+      difficultyLevel: 2
+      siteTypes: ["reef", "wreck"]
+      minRating: 4.0
+    }
+    sortBy: DISTANCE
+    limit: 20
+  ) {
+    sites {
+      id
+      name
+      latitude
+      longitude
+      distanceMeters
+      siteTypes
+      difficultyLevel
+      averageRating
+      reviewCount
+      thumbnailUrl
+    }
+    pagination {
+      hasMore
+      nextCursor
+    }
+    meta {
+      totalInRadius
+      queryTimeMs
+    }
+  }
+}
+"""
+
+# Проблемы GraphQL для геосервисов:
+# 1. Сложнее кэшировать (нет простого URL как cache key)
+# 2. Больше overhead для простых запросов
+# 3. Сложнее отлаживать
+# 4. Нет преимуществ для простых CRUD операций
+#
+# GraphQL хорош для:
+# - Сложных связанных данных
+# - Гибких запросов клиента
+# - Когда нужна точная выборка полей
+#
+# Для геосервисов REST проще и эффективнее

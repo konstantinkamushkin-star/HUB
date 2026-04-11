@@ -1,0 +1,61 @@
+# compiled output
+/dist
+/node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# OS
+.DS_Store
+
+# Tests
+/coverage
+/.nyc_output
+
+# IDEs and editors
+/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+
+# IDE - VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Python (ai-service / scripts)
+**/__pycache__/
+**/*.py[cod]
+.venv/
+**/.venv/
+
+# ML weights, datasets, checkpoints (large binaries — не в git)
+ai-service/models/
+ai-service/train/data_israel/
+underwater-vision-module/checkpoints*/
+underwater-vision-module/**/pseudo_train/
+underwater-vision-module/**/pseudo_val/
+underwater-vision-module/**/*.pt
+underwater-vision-module/**/*.onnx
+underwater-vision-module/**/*.onnx.data
+underwater-vision-module/**/.egg-info/
+underwater-vision-module/**/PKG-INFO
+
+# User uploads (runtime)
+uploads/

@@ -1,0 +1,60 @@
+# Локальная проверка production-сборки с PostGIS + Redis.
+# Из каталога backend:
+#   docker compose up --build
+# Затем прогоните миграции (с хоста при DB на localhost:5432 или через exec в api после npm ci в образе — см. docs/PRODUCTION_PREP.md).
+#
+# Обязательно задайте JWT_SECRET и CORS_ORIGINS для реального деплоя; для локального docker подойдут переменные окружения хоста или .env рядом с compose.
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: divehub
+    ports:
+      - "5432:5432"
+    volumes:
+      - divehub_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    # Порт 6379 только внутри сети compose (иначе конфликт с redis на хосте).
+    command: redis-server --appendonly yes
+    volumes:
+      - divehub_redis:/data
+
+  api:
+    build: .
+    ports:
+      # Если на хосте уже занят 3000 — в .env рядом с compose: API_PUBLISH_PORT=3001
+      - "${API_PUBLISH_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      JWT_SECRET: ${JWT_SECRET:-docker-local-only-generate-real-secret-for-prod}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3001,http://127.0.0.1:3001}
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USERNAME: postgres
+      DB_PASSWORD: postgres
+      DB_DATABASE: divehub
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - divehub_uploads:/app/uploads
+
+volumes:
+  divehub_pgdata:
+  divehub_redis:
+  divehub_uploads:

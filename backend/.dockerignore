@@ -1,0 +1,12 @@
+node_modules
+dist
+coverage
+.git
+.env
+.env.*
+*.log
+uploads
+ai-service
+underwater-vision-module
+*.md
+!README.md

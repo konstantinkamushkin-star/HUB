@@ -1,0 +1,21 @@
+module_name: underwater-vision-module
+
+data:
+  manifest_path: ./configs/samples_manifest.json
+  split_strategy: loso
+  heldout_site: Satil
+  input_size: 512
+  batch_size: 4
+
+train:
+  epochs: 60
+  lr: 0.0002
+  weight_decay: 0.0001
+  amp: true
+  gradient_clip: 1.0
+  checkpoint_dir: ./checkpoints
+
+api:
+  max_image_side: 2048
+  allow_raw: true
+  enable_video: true

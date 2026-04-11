@@ -1,0 +1,18 @@
+# Обучение: сначала поставьте torch (часто достаточно этого шага):
+#   pip install "torch>=2.1.0" "torchvision>=0.16.0"
+# ONNX для экспорта (на Python 3.14 может подтянуть numpy 2.x).
+# PyTorch 2.x тянет onnxscript при torch.onnx.export:
+#   pip install "onnx>=1.15.0" onnxscript
+# Полный `pip install -r requirements-train.txt` на 3.14 иногда ломается
+# из‑за пересборки scipy; scipy/tifffile для prepare_israel_stereo_dataset.py
+# можно ставить отдельно: pip install scipy tifffile
+
+torch>=2.1.0
+torchvision>=0.16.0
+tqdm>=4.66.0
+opencv-python-headless>=4.8.0
+numpy>=1.24.0
+onnx>=1.15.0
+onnxscript>=0.5.0
+scipy>=1.11.0
+tifffile>=2023.12.0
