@@ -67,7 +67,30 @@ cd /opt/divehub-src/DivePROD && git pull origin main && cd backend && ./deploy-d
 
 ## HTML-документы на API (вне `/api`)
 
-Nest отдаёт **`GET /privacy`** и **`GET /agreement`** (без префикса `api`). Чтобы работало **`https://dive-hub.ru/privacy`**, на nginx для этого `server` нужен `proxy_pass` на тот же хост-порт, что и у API (см. `legal-pages.controller.ts`).
+Nest отдаёт **`GET /privacy`** и **`GET /agreement`** (без префикса `api`). Если **`dive-hub.ru`** смотрит на **Next.js** и в браузере **404 Next** на `/privacy` — либо **обновите сборку** `admin-web` (в репозитории маршруты есть), либо **проксируйте** эти пути на API (ниже).
+
+Пример для **`server_name dive-hub.ru`** — блоки **выше** `location /`, порт = **`API_PUBLISH_PORT`** на хосте (часто `3002`):
+
+```nginx
+location = /privacy {
+    proxy_pass http://127.0.0.1:3002;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+location = /agreement {
+    proxy_pass http://127.0.0.1:3002;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+Проверка: `curl -fsSI https://dive-hub.ru/privacy | head -n 5` → **200**, `Content-Type: text/html`.
 
 ---
 
