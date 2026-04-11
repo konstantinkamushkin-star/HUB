@@ -73,6 +73,7 @@ CREATE INDEX IF NOT EXISTS idx_trips_end_date ON trips(end_date);
 CREATE INDEX IF NOT EXISTS idx_trips_available_courses ON trips USING GIN(available_courses);
 
 -- Create trigger for updated_at
+DROP TRIGGER IF EXISTS update_trips_updated_at ON trips;
 CREATE TRIGGER update_trips_updated_at
     BEFORE UPDATE ON trips
     FOR EACH ROW

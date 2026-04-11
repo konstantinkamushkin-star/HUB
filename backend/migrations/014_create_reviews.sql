@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS reviews (
 CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews("userId");
 CREATE INDEX IF NOT EXISTS idx_reviews_reviewable ON reviews("reviewableType", "reviewableId");
 
+DROP TRIGGER IF EXISTS update_reviews_updated_at ON reviews;
 CREATE TRIGGER update_reviews_updated_at BEFORE UPDATE ON reviews
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 

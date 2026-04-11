@@ -14,5 +14,6 @@ CREATE INDEX IF NOT EXISTS idx_friendships_requester ON friendships("requesterId
 CREATE INDEX IF NOT EXISTS idx_friendships_addressee ON friendships("addresseeId");
 CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
 
+DROP TRIGGER IF EXISTS update_friendships_updated_at ON friendships;
 CREATE TRIGGER update_friendships_updated_at BEFORE UPDATE ON friendships
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS feed_posts (
 CREATE INDEX IF NOT EXISTS idx_feed_posts_user ON feed_posts("userId");
 CREATE INDEX IF NOT EXISTS idx_feed_posts_created ON feed_posts("createdAt" DESC);
 
+DROP TRIGGER IF EXISTS update_feed_posts_updated_at ON feed_posts;
 CREATE TRIGGER update_feed_posts_updated_at BEFORE UPDATE ON feed_posts
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -38,5 +39,6 @@ CREATE TABLE IF NOT EXISTS feed_post_comments (
 
 CREATE INDEX IF NOT EXISTS idx_feed_post_comments_post ON feed_post_comments("postId");
 
+DROP TRIGGER IF EXISTS update_feed_post_comments_updated_at ON feed_post_comments;
 CREATE TRIGGER update_feed_post_comments_updated_at BEFORE UPDATE ON feed_post_comments
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();

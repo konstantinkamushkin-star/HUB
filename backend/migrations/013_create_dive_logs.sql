@@ -24,5 +24,6 @@ CREATE TABLE IF NOT EXISTS dive_logs (
 CREATE INDEX IF NOT EXISTS idx_dive_logs_user ON dive_logs("userId");
 CREATE INDEX IF NOT EXISTS idx_dive_logs_date ON dive_logs(date DESC);
 
+DROP TRIGGER IF EXISTS update_dive_logs_updated_at ON dive_logs;
 CREATE TRIGGER update_dive_logs_updated_at BEFORE UPDATE ON dive_logs
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
