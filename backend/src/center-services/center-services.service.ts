@@ -6,7 +6,6 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
-import { AuthService } from '../auth/auth.service';
 import { isAdminRole } from '../auth/rbac/admin-roles';
 import { CreateCenterServiceDto } from './dto/create-center-service.dto';
 import { UpdateCenterServiceDto } from './dto/update-center-service.dto';
@@ -16,7 +15,6 @@ export class CenterServicesService {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
-    private readonly authService: AuthService,
   ) {}
 
   async listByCenter(
@@ -256,7 +254,20 @@ export class CenterServicesService {
     if (isAdminRole(actorRole)) {
       return;
     }
-    const resolved = await this.authService.getDiveCenterIdForUser(actorUserId);
+    const rows = await this.dataSource.query(
+      `
+      SELECT dc.id
+      FROM dive_centers dc
+      WHERE dc.deleted_at IS NULL
+        AND (
+          dc.owner_id = $1
+          OR $1 = ANY(dc.instructor_ids)
+        )
+      LIMIT 1
+      `,
+      [actorUserId],
+    );
+    const resolved = rows.length ? String(rows[0].id) : null;
     if (!resolved || resolved !== diveCenterId) {
       throw new ForbiddenException(
         'No permission to manage services for this dive center',

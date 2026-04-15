@@ -16,11 +16,22 @@ if [[ ! -f .env ]]; then
 fi
 
 if [[ -d ../.git ]] && [[ "$(basename "$ROOT")" == "backend" ]]; then
-  echo ">>> git pull (репозиторий: $(cd .. && pwd))"
-  (cd .. && git pull --ff-only)
+  REPO_ROOT="$(cd .. && pwd)"
+  if [[ -n "$(cd "$REPO_ROOT" && git status --porcelain)" ]]; then
+    echo ">>> git pull пропущен: в репозитории есть локальные изменения ($REPO_ROOT)"
+    echo ">>> Подсказка: закоммитьте/стэшните изменения, чтобы снова включить авто-pull."
+  else
+    echo ">>> git pull (репозиторий: $REPO_ROOT)"
+    (cd "$REPO_ROOT" && git pull --ff-only)
+  fi
 elif [[ -d .git ]]; then
-  echo ">>> git pull"
-  git pull --ff-only
+  if [[ -n "$(git status --porcelain)" ]]; then
+    echo ">>> git pull пропущен: в backend-репозитории есть локальные изменения"
+    echo ">>> Подсказка: закоммитьте/стэшните изменения, чтобы снова включить авто-pull."
+  else
+    echo ">>> git pull"
+    git pull --ff-only
+  fi
 fi
 
 # Порт на ХОСТЕ, куда проброшен api:3000 (см. docker-compose API_PUBLISH_PORT).
