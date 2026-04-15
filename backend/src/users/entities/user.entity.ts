@@ -88,6 +88,10 @@ export class User {
   @Column({ nullable: true })
   countryCode?: string;
 
+  /** Client-managed diver profile (onboarding, privacy, interests). */
+  @Column({ name: 'diver_profile', type: 'jsonb', nullable: true })
+  diverProfile?: Record<string, unknown> | null;
+
   @Column({ default: 'UTC' })
   timezone: string;
 

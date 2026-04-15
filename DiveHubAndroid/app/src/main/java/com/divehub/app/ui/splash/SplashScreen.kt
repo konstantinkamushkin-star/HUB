@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.divehub.app.AppGraph
+import com.divehub.app.data.remote.dto.needsProfileOnboarding
 import com.divehub.app.ui.Routes
 import kotlinx.coroutines.delay
 
@@ -56,6 +57,8 @@ fun SplashRoute(nav: NavHostController, graph: AppGraph) {
                 nav.navigate(Routes.Login) { popUpTo(Routes.Splash) { inclusive = true } }
             user?.mustChangePassword == true ->
                 nav.navigate(Routes.ChangePassword) { popUpTo(Routes.Splash) { inclusive = true } }
+            user != null && user.needsProfileOnboarding() ->
+                nav.navigate(Routes.ProfileOnboarding) { popUpTo(Routes.Splash) { inclusive = true } }
             else ->
                 nav.navigate(Routes.Main) { popUpTo(Routes.Splash) { inclusive = true } }
         }

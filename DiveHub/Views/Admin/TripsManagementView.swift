@@ -148,10 +148,10 @@ struct TripManagementRowView: View {
                 .lineLimit(2)
             
             HStack {
-                Label("\(trip.startDate.formatted(date: .abbreviated, time: .omitted)) - \(trip.endDate.formatted(date: .abbreviated, time: .omitted))", systemImage: "calendar")
+                Label("ui_admin_value_value_3".localized, systemImage: "calendar")
                     .font(.caption)
                 Spacer()
-                Label("\(trip.bookedSpots)/\(trip.totalSpots)", systemImage: "person.2")
+                Label("ui_admin_value_value".localized, systemImage: "person.2")
                     .font(.caption)
                     .foregroundColor(trip.isFullyBooked ? .red : .green)
             }
@@ -447,7 +447,7 @@ struct TripManagementDetailView: View {
                     Text(localizationService.localizedString("booked", table: "trips"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("\(currentTrip.bookedSpots)")
+                    Text("ui_admin_value_2".localized)
                         .font(.title2)
                         .bold()
                 }
@@ -456,7 +456,7 @@ struct TripManagementDetailView: View {
                     Text(localizationService.localizedString("available", table: "trips"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("\(currentTrip.availableSpots)")
+                    Text("ui_admin_value_9".localized)
                         .font(.title2)
                         .bold()
                         .foregroundColor(.green)
@@ -466,7 +466,7 @@ struct TripManagementDetailView: View {
                     Text(localizationService.localizedString("total", table: "trips"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("\(currentTrip.totalSpots)")
+                    Text("ui_admin_value_3".localized)
                         .font(.title2)
                         .bold()
                 }

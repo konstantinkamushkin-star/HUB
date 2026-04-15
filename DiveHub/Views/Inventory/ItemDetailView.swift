@@ -44,15 +44,15 @@ struct ItemDetailView: View {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Menu {
                         Button(action: { showCheckout = true }) {
-                            Label("Check Out", systemImage: "arrow.up.circle")
+                            Label("ui_inventory_check_out".localized, systemImage: "arrow.up.circle")
                         }
                         
                         Button(action: { showInspection = true }) {
-                            Label("Inspection", systemImage: "checkmark.shield")
+                            Label("ui_inventory_inspection".localized, systemImage: "checkmark.shield")
                         }
                         
                         Button(action: { showEdit = true }) {
-                            Label("Edit", systemImage: "pencil")
+                            Label("ui_feed_edit".localized, systemImage: "pencil")
                         }
                         
                         Divider()
@@ -63,7 +63,7 @@ struct ItemDetailView: View {
                                 dismiss()
                             }
                         }) {
-                            Label("Delete", systemImage: "trash")
+                            Label("ui_inventory_delete".localized, systemImage: "trash")
                         }
                     } label: {
                         Image(systemName: "ellipsis.circle")
@@ -116,7 +116,7 @@ struct ItemDetailView: View {
                 ConditionBadge(condition: item.condition)
                 
                 if item.isInspectionOverdue {
-                    Label("Inspection Overdue", systemImage: "exclamationmark.triangle.fill")
+                    Label("ui_inventory_inspection_overdue".localized, systemImage: "exclamationmark.triangle.fill")
                         .font(.caption)
                         .foregroundColor(.red)
                         .padding(.horizontal, 8)
@@ -245,18 +245,18 @@ struct ItemDetailView: View {
                 
                 if let nextInspection = item.nextInspectionDate {
                     HStack {
-                        Text("Next Inspection")
+                        Text("ui_inventory_next_inspection".localized)
                             .foregroundColor(.secondary)
                         Spacer()
                         VStack(alignment: .trailing, spacing: 4) {
                             Text(formatDate(nextInspection))
                             if item.isInspectionOverdue {
-                                Text("OVERDUE")
+                                Text("ui_inventory_overdue".localized)
                                     .font(.caption2)
                                     .fontWeight(.bold)
                                     .foregroundColor(.red)
                             } else if let days = item.daysUntilInspection {
-                                Text("\(days) days")
+                                Text("ui_inventory_value_days".localized)
                                     .font(.caption)
                                     .foregroundColor(days <= 30 ? .orange : .secondary)
                             }
@@ -303,7 +303,7 @@ struct ItemDetailView: View {
             let itemLogs = viewModel.eventLogs.filter { $0.gearItemId == item.id }
             
             if itemLogs.isEmpty {
-                Text("No history available")
+                Text("ui_inventory_no_history_available".localized)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
@@ -323,11 +323,11 @@ struct ItemDetailView: View {
             
             if itemTickets.isEmpty {
                 VStack(spacing: 16) {
-                    Text("No maintenance tickets")
+                    Text("ui_inventory_no_maintenance_tickets".localized)
                         .foregroundColor(.secondary)
                     
                     Button(action: {}) {
-                        Label("Create Maintenance Ticket", systemImage: "wrench.and.screwdriver")
+                        Label("ui_inventory_create_maintenance_ticket".localized, systemImage: "wrench.and.screwdriver")
                             .padding()
                             .background(Color.blue)
                             .foregroundColor(.white)
@@ -351,7 +351,7 @@ struct ItemDetailView: View {
             let itemCheckouts = viewModel.checkouts.filter { $0.gearItemIds.contains(item.id) }
             
             if itemCheckouts.isEmpty {
-                Text("No rental history")
+                Text("ui_inventory_no_rental_history".localized)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
@@ -368,7 +368,7 @@ struct ItemDetailView: View {
     private var documentsTab: some View {
         VStack(alignment: .leading, spacing: 16) {
             if item.documents.isEmpty {
-                Text("No documents")
+                Text("ui_inventory_no_documents".localized)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
@@ -388,11 +388,11 @@ struct ItemDetailView: View {
             
             if itemInspections.isEmpty {
                 VStack(spacing: 16) {
-                    Text("No inspections yet")
+                    Text("ui_inventory_no_inspections_yet".localized)
                         .foregroundColor(.secondary)
                     
                     Button(action: { showInspection = true }) {
-                        Label("Start Inspection", systemImage: "checkmark.shield")
+                        Label("ui_inventory_start_inspection".localized, systemImage: "checkmark.shield")
                             .padding()
                             .background(Color.blue)
                             .foregroundColor(.white)
@@ -416,7 +416,7 @@ struct ItemDetailView: View {
             let relatedItems = viewModel.gearItems.filter { item.relatedItemIds.contains($0.id) }
             
             if relatedItems.isEmpty {
-                Text("No related items")
+                Text("ui_inventory_no_related_items".localized)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
@@ -606,12 +606,12 @@ struct CheckoutRow: View {
             }
             
             HStack {
-                Text("Due: \(formatDate(checkout.dueDate))")
+                Text("ui_inventory_due_value".localized)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
                 if checkout.isOverdue {
-                    Text("OVERDUE")
+                    Text("ui_inventory_overdue".localized)
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.red)
@@ -686,8 +686,8 @@ struct InspectionRow: View {
                     .cornerRadius(8)
             }
             
-            if let performedBy = inspection.performedByName {
-                Text("By: \(performedBy)")
+            if inspection.performedByName != nil {
+                Text("ui_inventory_by_value".localized)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

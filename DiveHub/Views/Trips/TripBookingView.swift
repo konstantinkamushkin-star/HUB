@@ -12,14 +12,14 @@ enum ParticipantStatus: String, CaseIterable {
     case discoverScuba = "discover_scuba"
     case wantCourse = "want_course"
     
-    var displayName: String {
+    var localizedKey: String {
         switch self {
         case .certified:
-            return "Сертифицированный дайвер"
+            return "participantStatusCertified"
         case .discoverScuba:
-            return "Хочу попробовать (Discover Scuba)"
+            return "participantStatusDiscoverScuba"
         case .wantCourse:
-            return "Хочу пройти курс"
+            return "participantStatusWantCourse"
         }
     }
 }
@@ -43,29 +43,37 @@ struct TripBookingView: View {
     init(trip: Trip) {
         self.trip = trip
     }
+
+    private func tripsString(_ key: String) -> String {
+        localizationService.localizedString(key, table: "trips")
+    }
+
+    private func commonString(_ key: String) -> String {
+        localizationService.localizedString(key, table: "common")
+    }
     
     var body: some View {
         NavigationView {
             formContent
-                .navigationTitle(localizationService.localizedString("bookTrip", table: "trips"))
+                .navigationTitle(tripsString("bookTrip"))
                 .toolbar {
                     toolbarContent
                 }
                 .onAppear {
                     initializeParticipants()
                 }
-                .alert("Success", isPresented: $showSuccess) {
-                    Button(localizationService.localizedString("ok", table: "common")) {
+                .alert(commonString("success"), isPresented: $showSuccess) {
+                    Button(commonString("ok")) {
                         dismiss()
                     }
                 } message: {
-                    Text(localizationService.localizedString("tripBooked", table: "trips"))
+                    Text(tripsString("tripBooked"))
                 }
-                .alert("Error", isPresented: Binding(
+                .alert(commonString("error"), isPresented: Binding(
                     get: { errorMessage != nil },
                     set: { if !$0 { errorMessage = nil } }
                 )) {
-                    Button("OK") {
+                    Button(commonString("ok")) {
                         errorMessage = nil
                     }
                 } message: {
@@ -89,10 +97,10 @@ struct TripBookingView: View {
                 
     @ViewBuilder
     private var statusSection: some View {
-                Section("1️⃣ \(localizationService.localizedString("selectStatus", table: "trips"))") {
-                    Picker(localizationService.localizedString("status", table: "trips"), selection: $participantStatus) {
+                Section("1️⃣ \(tripsString("selectStatus"))") {
+                    Picker(tripsString("status"), selection: $participantStatus) {
                         ForEach(ParticipantStatus.allCases, id: \.self) { status in
-                            Text(status.displayName).tag(status)
+                            Text(tripsString(status.localizedKey)).tag(status)
                 }
                         }
                     }
@@ -114,8 +122,8 @@ struct TripBookingView: View {
     @ViewBuilder
     private var equipmentSection: some View {
                 if trip.equipmentRentalAvailable && participantStatus == .certified {
-                    Section("Equipment") {
-                        Toggle(localizationService.localizedString("rentEquipment", table: "trips"), isOn: $needsEquipmentRental)
+                    Section(tripsString("equipment")) {
+                        Toggle(tripsString("rentEquipment"), isOn: $needsEquipmentRental)
             }
                     }
                 }
@@ -131,13 +139,11 @@ struct TripBookingView: View {
     @ViewBuilder
     private var priceSection: some View {
                 Section(localizationService.localizedString("priceSummary", table: "trips")) {
-                    let totalPrice = calculateTotalPrice()
-            let currency = trip.priceDetails.currency.isEmpty ? "USD" : trip.priceDetails.currency
                     HStack {
                         Text(localizationService.localizedString("total", table: "trips"))
                             .font(.headline)
                         Spacer()
-                Text("\(totalPrice, format: .currency(code: currency))")
+                Text("ui_trips_value_3".localized)
                             .font(.headline)
                     }
                 }
@@ -232,10 +238,10 @@ struct TripBookingView: View {
                         
                         Picker(localizationService.localizedString("certificationLevel", table: "trips"), selection: $participants[index].certificationLevel) {
                             Text(localizationService.localizedString("none", table: "trips")).tag(nil as String?)
-                            Text("Open Water").tag("Open Water" as String?)
-                            Text("Advanced Open Water").tag("Advanced Open Water" as String?)
-                            Text("Rescue Diver").tag("Rescue Diver" as String?)
-                            Text("Divemaster").tag("Divemaster" as String?)
+                            Text(tripsString("certOpenWater")).tag("Open Water" as String?)
+                            Text(tripsString("certAdvancedOpenWater")).tag("Advanced Open Water" as String?)
+                            Text(tripsString("certRescueDiver")).tag("Rescue Diver" as String?)
+                            Text(tripsString("certDivemaster")).tag("Divemaster" as String?)
                         }
                         
                         HStack {
@@ -303,29 +309,29 @@ struct TripBookingView: View {
                         HStack {
                             Text(localizationService.localizedString("height", table: "trips"))
                             Spacer()
-                            TextField("cm", value: $participants[index].height, format: .number)
+                            TextField(commonString("unitCm"), value: $participants[index].height, format: .number)
                                 .keyboardType(.decimalPad)
                                 .frame(width: 80)
-                            Text("cm")
+                            Text(commonString("unitCm"))
                         }
                         
                         HStack {
                             Text(localizationService.localizedString("weight", table: "trips"))
                             Spacer()
-                            TextField("kg", value: $participants[index].weight, format: .number)
+                            TextField(commonString("unitKg"), value: $participants[index].weight, format: .number)
                                 .keyboardType(.decimalPad)
                                 .frame(width: 80)
-                            Text("kg")
+                            Text(commonString("unitKg"))
                         }
                         
                         Picker(localizationService.localizedString("instructorLanguage", table: "trips"), selection: Binding(
                             get: { participants[index].instructorLanguage ?? "ru" },
                             set: { participants[index].instructorLanguage = $0 }
                         )) {
-                            Text("Русский").tag("ru")
-                            Text("English").tag("en")
-                            Text("Español").tag("es")
-                            Text("Français").tag("fr")
+                            Text(tripsString("langRussian")).tag("ru")
+                            Text(tripsString("langEnglish")).tag("en")
+                            Text(tripsString("langSpanish")).tag("es")
+                            Text(tripsString("langFrench")).tag("fr")
                         }
                     }
                     .padding(.vertical, 4)
@@ -421,29 +427,29 @@ struct TripBookingView: View {
                         HStack {
                             Text(localizationService.localizedString("height", table: "trips"))
                             Spacer()
-                            TextField("cm", value: $participants[index].height, format: .number)
+                            TextField(commonString("unitCm"), value: $participants[index].height, format: .number)
                                 .keyboardType(.decimalPad)
                                 .frame(width: 80)
-                            Text("cm")
+                            Text(commonString("unitCm"))
                         }
                         
                         HStack {
                             Text(localizationService.localizedString("weight", table: "trips"))
                             Spacer()
-                            TextField("kg", value: $participants[index].weight, format: .number)
+                            TextField(commonString("unitKg"), value: $participants[index].weight, format: .number)
                                 .keyboardType(.decimalPad)
                                 .frame(width: 80)
-                            Text("kg")
+                            Text(commonString("unitKg"))
                         }
                         
                         Picker(localizationService.localizedString("instructorLanguage", table: "trips"), selection: Binding(
                             get: { participants[index].instructorLanguage ?? "ru" },
                             set: { participants[index].instructorLanguage = $0 }
                         )) {
-                            Text("Русский").tag("ru")
-                            Text("English").tag("en")
-                            Text("Español").tag("es")
-                            Text("Français").tag("fr")
+                            Text(tripsString("langRussian")).tag("ru")
+                            Text(tripsString("langEnglish")).tag("en")
+                            Text(tripsString("langSpanish")).tag("es")
+                            Text(tripsString("langFrench")).tag("fr")
                         }
                     }
                     .padding(.vertical, 4)

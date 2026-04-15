@@ -16,7 +16,7 @@ struct AchievementsView: View {
                 VStack(spacing: 24) {
                     // Progress Overview
                     VStack(spacing: 16) {
-                        Text("\(viewModel.unlockedCount) / \(viewModel.totalCount) Achievements")
+                        Text("ui_achievements_value_value_achievements".localized)
                             .font(.title2)
                             .fontWeight(.bold)
                         
@@ -37,7 +37,7 @@ struct AchievementsView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("Achievements")
+            .navigationTitle("ui_achievements_achievements".localized)
             .diveHubNavigationChrome()
             .task {
                 await viewModel.loadAchievements()

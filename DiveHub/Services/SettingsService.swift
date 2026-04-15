@@ -25,6 +25,25 @@ enum AppThemePreference: String, Codable, CaseIterable {
     }
 }
 
+/// Глобальный масштаб интерфейса (корневой `scaleEffect` в `DiveHubApp`).
+enum InterfaceScalePreset: String, Codable, CaseIterable, Identifiable {
+    case compact
+    case standard
+    case comfortable
+    case large
+
+    var id: String { rawValue }
+
+    var factor: CGFloat {
+        switch self {
+        case .compact: return 0.9
+        case .standard: return 1.0
+        case .comfortable: return 1.1
+        case .large: return 1.25
+        }
+    }
+}
+
 enum MeasurementUnit: String, Codable, CaseIterable {
     case metric = "metric"
     case imperial = "imperial"
@@ -67,11 +86,13 @@ class SettingsService: ObservableObject {
     @Published var privacySettings = PrivacySettings()
     @Published var measurementUnits = MeasurementUnits.metric
     @Published var themePreference: AppThemePreference = .system
+    @Published var interfaceScalePreset: InterfaceScalePreset = .standard
 
     private let notificationSettingsKey = "notification_settings"
     private let privacySettingsKey = "privacy_settings"
     private let measurementUnitsKey = "measurement_units"
     private let themePreferenceKey = "app_theme_preference"
+    private let interfaceScalePresetKey = "interface_scale_preset"
     
     private init() {
         loadSettings()
@@ -98,11 +119,26 @@ class SettingsService: ObservableObject {
            let pref = AppThemePreference(rawValue: raw) {
             themePreference = pref
         }
+
+        if let raw = UserDefaults.standard.string(forKey: interfaceScalePresetKey),
+           let preset = InterfaceScalePreset(rawValue: raw) {
+            interfaceScalePreset = preset
+        }
+    }
+
+    /// Значение для корневого масштаба (с ограничением).
+    var interfaceScale: CGFloat {
+        min(max(interfaceScalePreset.factor, 0.8), 1.35)
     }
 
     func saveThemePreference(_ value: AppThemePreference) {
         themePreference = value
         UserDefaults.standard.set(value.rawValue, forKey: themePreferenceKey)
+    }
+
+    func saveInterfaceScalePreset(_ value: InterfaceScalePreset) {
+        interfaceScalePreset = value
+        UserDefaults.standard.set(value.rawValue, forKey: interfaceScalePresetKey)
     }
     
     func saveNotificationSettings() {

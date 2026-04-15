@@ -123,7 +123,7 @@ struct PhotoProcessingView: View {
                             Text(localizationService.localizedString("depthHintMetersLabel", table: "imageEditing"))
                             Spacer()
                             Stepper(value: $depthMeters, in: 0...60, step: 1) {
-                                Text("\(Int(depthMeters)) m")
+                                Text("ui_photoprocessing_value_m".localized)
                             }
                         }
                     }

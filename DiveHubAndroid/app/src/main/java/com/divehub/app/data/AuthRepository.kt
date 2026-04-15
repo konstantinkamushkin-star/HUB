@@ -2,6 +2,7 @@ package com.divehub.app.data
 
 import com.divehub.app.AppGraph
 import com.divehub.app.data.remote.dto.ChangePasswordBody
+import com.divehub.app.data.remote.dto.DeleteMyAccountRequest
 import com.divehub.app.data.remote.dto.ForgotPasswordRequest
 import com.divehub.app.data.remote.dto.LoginRequest
 import com.divehub.app.data.remote.dto.RegisterRequest
@@ -11,6 +12,12 @@ import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.data.remote.dto.VerifyResetCodeRequest
 import com.divehub.app.util.ConsentTexts
 import com.google.gson.JsonParser
+import com.divehub.app.R
+import java.io.IOException
+import java.net.ConnectException
+import java.net.SocketTimeoutException
+import java.net.UnknownHostException
+import java.util.Locale
 import retrofit2.HttpException
 
 class AuthRepository(private val graph: AppGraph) {
@@ -29,19 +36,20 @@ class AuthRepository(private val graph: AppGraph) {
     suspend fun register(
         email: String,
         password: String,
-        displayName: String,
         personalDataConsent: Boolean,
     ) {
-        val parts = displayName.trim().split(Regex("\\s+"), limit = 2)
-        val first = parts.firstOrNull().orEmpty().ifEmpty { "User" }
-        val last = parts.getOrNull(1).orEmpty()
+        val local = email.trim()
+            .substringBefore('@')
+            .replace(Regex("[^a-zA-Z0-9._-]"), "")
+            .ifBlank { "diver" }
+            .take(80)
         val api = graph.authApi()
         val res = api.register(
             RegisterRequest(
                 email = email.trim().lowercase(),
                 password = password,
-                firstName = first,
-                lastName = last,
+                firstName = local,
+                lastName = local,
                 phone = null,
                 personalDataConsent = personalDataConsent,
                 personalDataConsentText = ConsentTexts.registrationConsentText(),
@@ -85,22 +93,26 @@ class AuthRepository(private val graph: AppGraph) {
     }
 
     suspend fun updateProfile(
-        firstName: String,
-        lastName: String,
-        phone: String?,
-        bio: String?,
-        language: String,
-        avatarUrl: String?,
+        firstName: String? = null,
+        lastName: String? = null,
+        phone: String? = null,
+        bio: String? = null,
+        language: String? = null,
+        avatarUrl: String? = null,
+        countryCode: String? = null,
+        diverProfile: Map<String, Any?>? = null,
     ): UserDto {
         val api = graph.authApi()
         val user = api.patchMe(
             UpdateProfileRequest(
-                firstName = firstName.trim(),
-                lastName = lastName.trim(),
+                firstName = firstName?.trim()?.takeIf { it.isNotEmpty() },
+                lastName = lastName?.trim()?.takeIf { it.isNotEmpty() },
                 phone = phone?.trim()?.takeIf { it.isNotEmpty() },
                 bio = bio?.trim()?.takeIf { it.isNotEmpty() },
-                language = language.trim().lowercase().ifBlank { "en" },
+                language = language?.trim()?.lowercase()?.ifBlank { null },
                 avatarUrl = avatarUrl?.trim()?.takeIf { it.isNotEmpty() },
+                countryCode = countryCode?.trim()?.uppercase()?.takeIf { it.isNotEmpty() },
+                diverProfile = diverProfile,
             ),
         )
         graph.tokenStore.updateUserJson(graph.gson.toJson(user))
@@ -121,6 +133,15 @@ class AuthRepository(private val graph: AppGraph) {
         graph.resetApiClient()
     }
 
+    suspend fun deleteMyAccount(currentPassword: String?) {
+        val api = graph.usersApi()
+        val body = DeleteMyAccountRequest(
+            confirmation = "DELETE",
+            currentPassword = currentPassword?.trim()?.takeIf { it.isNotEmpty() },
+        )
+        api.deleteMyAccount(body = body).close()
+    }
+
     suspend fun cachedUser(): UserDto? {
         val json = graph.tokenStore.getUserJson() ?: return null
         return try {
@@ -130,24 +151,92 @@ class AuthRepository(private val graph: AppGraph) {
         }
     }
 
-    fun parseErrorMessage(t: Throwable): String {
-        if (t is HttpException) {
-            val raw = t.response()?.errorBody()?.string().orEmpty()
-            try {
-                val el = JsonParser.parseString(raw).asJsonObject
-                when {
-                    el.has("message") && el.get("message").isJsonPrimitive ->
-                        return el.get("message").asString
-                    el.has("message") && el.get("message").isJsonArray -> {
-                        val arr = el.getAsJsonArray("message")
-                        return (0 until arr.size()).joinToString("; ") { arr[it].asString }
-                    }
+    suspend fun persistCachedUser(user: UserDto) {
+        graph.tokenStore.updateUserJson(graph.gson.toJson(user))
+    }
+
+    private fun extractApiMessage(raw: String): String? {
+        if (raw.isBlank()) return null
+        return try {
+            val el = JsonParser.parseString(raw).asJsonObject
+            when {
+                el.has("message") && el.get("message").isJsonPrimitive ->
+                    el.get("message").asString
+                el.has("message") && el.get("message").isJsonArray -> {
+                    val arr = el.getAsJsonArray("message")
+                    (0 until arr.size()).joinToString("; ") { arr[it].asString }
                 }
-            } catch (_: Exception) {
-                // fall through
+                else -> null
             }
-            return t.message ?: "HTTP ${t.code()}"
+        } catch (_: Exception) {
+            null
         }
-        return t.message ?: t.javaClass.simpleName
+    }
+
+    private fun stripHttpFromMessage(message: String): String {
+        return message
+            .replace(Regex("\\s*\\(HTTP\\s*\\d+\\)\\s*$", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("^HTTP\\s*\\d+\\s*[–—:\\-]\\s*", RegexOption.IGNORE_CASE), "")
+            .trim()
+    }
+
+    private fun isOfflineLike(t: Throwable): Boolean {
+        when (t) {
+            is UnknownHostException -> return true
+            is SocketTimeoutException -> return true
+            is ConnectException -> return true
+        }
+        if (t is IOException) {
+            val m = t.message?.lowercase(Locale.ROOT).orEmpty()
+            if (m.contains("unable to resolve host")) return true
+            if (m.contains("network is unreachable")) return true
+            if (m.contains("failed to connect")) return true
+            if (m.contains("no route to host")) return true
+            if (m.contains("connection reset")) return true
+            if (m.contains("broken pipe")) return true
+        }
+        val c = t.cause
+        return c != null && isOfflineLike(c)
+    }
+
+    fun parseErrorMessage(t: Throwable): String {
+        val res = graph.application.resources
+        if (isOfflineLike(t)) {
+            return res.getString(R.string.api_error_no_internet)
+        }
+        if (t is HttpException) {
+            val code = t.code()
+            val raw = t.response()?.errorBody()?.string().orEmpty()
+            val apiRaw = extractApiMessage(raw)?.trim().orEmpty()
+            val cleaned = stripHttpFromMessage(apiRaw)
+            val lower = cleaned.lowercase(Locale.ROOT)
+            when {
+                code == 401 ||
+                    lower.contains("invalid email") ||
+                    lower.contains("invalid password") ||
+                    lower.contains("invalid credentials") ->
+                    return res.getString(R.string.api_error_invalid_login)
+                code == 403 -> return res.getString(R.string.api_error_forbidden)
+                code == 404 -> return res.getString(R.string.api_error_not_found)
+                code == 409 -> return res.getString(R.string.api_error_conflict)
+                code == 400 &&
+                    (
+                        lower.contains("already exists") ||
+                            lower.contains("user with this email")
+                        ) ->
+                    return res.getString(R.string.api_error_email_registered)
+                code == 429 -> return res.getString(R.string.api_error_too_many_requests)
+                code in 500..599 -> return res.getString(R.string.api_error_server)
+            }
+            val hasHttpCode = Regex("HTTP\\s*\\d+", RegexOption.IGNORE_CASE).containsMatchIn(cleaned)
+            if (cleaned.isNotEmpty() && !hasHttpCode) {
+                return cleaned
+            }
+            return res.getString(R.string.api_error_generic)
+        }
+        val msg = t.message?.trim().orEmpty()
+        val msgHasHttpCode = Regex("HTTP\\s*\\d+", RegexOption.IGNORE_CASE).containsMatchIn(msg)
+        if (msg.isNotEmpty() && !msgHasHttpCode) return msg
+        return res.getString(R.string.api_error_generic)
     }
 }

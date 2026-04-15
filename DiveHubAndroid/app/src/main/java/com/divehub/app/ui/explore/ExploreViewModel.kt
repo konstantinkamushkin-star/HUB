@@ -30,6 +30,7 @@ data class ExploreUiState(
 
 class ExploreViewModel(
     private val repo: ExploreRepository,
+    private val graph: AppGraph,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ExploreUiState())
     val state: StateFlow<ExploreUiState> = _state.asStateFlow()
@@ -38,12 +39,16 @@ class ExploreViewModel(
         refresh()
     }
 
+    private suspend fun resolvedLanguage(): String =
+        graph.tokenStore.getAppLanguageTag().ifBlank { "en" }
+
     fun refresh() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
             runCatching {
+                val lang = resolvedLanguage()
                 when (_state.value.selectedCategory) {
-                    ExploreCategory.DIVE_SITES -> repo.getDiveSites(language = "en", page = 1, limit = 120)
+                    ExploreCategory.DIVE_SITES -> repo.getDiveSites(language = lang, page = 1, limit = 120)
                     // Backend popular endpoints validate limit max 100
                     ExploreCategory.DIVE_CENTERS -> repo.getDiveCenters(limit = 100)
                     ExploreCategory.SHOPS -> repo.getShops(limit = 100)
@@ -193,7 +198,7 @@ class ExploreViewModel(
         fun factory(graph: AppGraph) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return ExploreViewModel(ExploreRepository(graph)) as T
+                return ExploreViewModel(ExploreRepository(graph), graph) as T
             }
         }
     }

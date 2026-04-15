@@ -262,15 +262,15 @@ struct CreateTripView: View {
             .sheet(isPresented: $showImportFromSiteSheet) {
                 NavigationStack {
                     Form {
-                        Section("URL поездки") {
-                            TextField("https://example.com/trips/...", text: $importUrl)
+                        Section("ui_url_34_o".localized) {
+                            TextField("ui_trips_https_example_com_trips".localized, text: $importUrl)
                                 .keyboardType(.URL)
                                 .autocapitalization(.none)
                                 .disableAutocorrection(true)
                                 .onChange(of: importUrl) { _, _ in
                                     importSheetError = nil
                                 }
-                            Text("Поддерживаются публичные страницы http/https.")
+                            Text("ui_trips_supports_public_http_https".localized)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             if let importSheetError, !importSheetError.isEmpty {
@@ -281,12 +281,12 @@ struct CreateTripView: View {
                             if isImportingFromSite {
                                 HStack {
                                     ProgressView()
-                                    Text("Импорт…")
+                                    Text("ui_trips_import_loading".localized)
                                 }
                             }
                         }
                     }
-                    .navigationTitle("Импорт с сайта")
+                    .navigationTitle("ui_trips_import_from_site".localized)
                     .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
                             Button(localizationService.localizedString("cancel", table: "common")) {
@@ -295,7 +295,7 @@ struct CreateTripView: View {
                             }
                         }
                         ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("Импортировать") {
+                            Button("ui_1434nn_n342nn".localized) {
                                 Task { await importTripFromWebsite() }
                             }
                             .disabled(importUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isImportingFromSite)
@@ -370,22 +370,22 @@ struct CreateTripView: View {
     }
 
     private var importFromWebsiteSection: some View {
-        Section("Импорт с сайта") {
+        Section("ui_trips_import_from_site".localized) {
             if trip == nil, let user = authService.currentUser, let dcId = user.diveCenterId, !dcId.isEmpty {
                 Button {
                     importUrl = ""
                     importSheetError = nil
                     showImportFromSiteSheet = true
                 } label: {
-                    Label("Добавить поездку по ссылке", systemImage: "link.badge.plus")
+                    Label("ui_trips_add_trip_by_link".localized, systemImage: "link.badge.plus")
                 }
                 .buttonStyle(.borderless)
                 .disabled(isLoading || isImportingFromSite)
-                Text("Откроется форма с URL страницы поездки. Фото и описание подгрузятся автоматически.")
+                Text("ui_trips_open_trip_url_form_hint".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
             } else if trip == nil {
-                Text("Импорт по ссылке доступен при создании поездки, если в профиле указан дайв-центр.")
+                Text("ui_trips_import_link_available_hint".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -412,13 +412,13 @@ struct CreateTripView: View {
             }
             
             if tripType == .daily {
-                TextField("Название отеля *", text: $hotelName)
-                TextField("Ссылка на отель (опционально)", text: $hotelUrl)
+                TextField("ui_trips_hotel_name_required".localized, text: $hotelName)
+                TextField("ui_trips_hotel_link_optional".localized, text: $hotelUrl)
                     .keyboardType(.URL)
                     .autocapitalization(.none)
             } else {
-                TextField("Название яхты *", text: $yachtName)
-                TextField("Ссылка на яхту (опционально)", text: $yachtUrl)
+                TextField("ui_trips_yacht_name_required".localized, text: $yachtName)
+                TextField("ui_trips_yacht_link_optional".localized, text: $yachtUrl)
                     .keyboardType(.URL)
                     .autocapitalization(.none)
             }
@@ -930,7 +930,7 @@ struct CreateTripView: View {
                             .foregroundColor(.secondary)
                     }
                     Spacer()
-                    Text("\(expense.cost, format: .currency(code: expense.currency))")
+                    Text("ui_trips_value".localized)
                 }
                 .onTapGesture {
                     editingExpense = expense

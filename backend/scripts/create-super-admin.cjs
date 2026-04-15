@@ -3,14 +3,15 @@
 /**
  * Create or update SUPER_ADMIN user.
  *
- * Usage:
- *   node scripts/create-super-admin.cjs --email=admin@example.com --password=StrongPass123! --first-name=Super --last-name=Admin
+ * Usage (пароль приложения с `!` — в одинарных кавычках, иначе bash съест `!`):
+ *   node scripts/create-super-admin.cjs --email=admin@example.com --password='StrongPass123!' --first-name=Super --last-name=Admin
  */
 
 const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const { Client } = require('pg');
+const { parse: parseConnectionString } = require('pg-connection-string');
 
 function parseArgs(argv) {
   const args = {};
@@ -22,10 +23,18 @@ function parseArgs(argv) {
   return args;
 }
 
+function readEnvFileUtf8(filePath) {
+  let text = fs.readFileSync(filePath, 'utf8');
+  if (text.charCodeAt(0) === 0xfeff) {
+    text = text.slice(1);
+  }
+  return text;
+}
+
 function loadEnv(filePath) {
   if (!fs.existsSync(filePath)) return;
 
-  const lines = fs.readFileSync(filePath, 'utf8').split('\n');
+  const lines = readEnvFileUtf8(filePath).split('\n');
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -47,6 +56,37 @@ function loadEnv(filePath) {
   }
 }
 
+/** Перезаписать DB_* из `backend/.env`, чтобы пустой/битый `DB_PASSWORD` из окружения shell не ломал `pg`. */
+function loadEnvForceDbKeys(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const keys = new Set([
+    'DB_HOST',
+    'DB_PORT',
+    'DB_USERNAME',
+    'DB_PASSWORD',
+    'DB_DATABASE',
+    'POSTGRES_PASSWORD',
+    'DATABASE_URL',
+  ]);
+  const lines = readEnvFileUtf8(filePath).split('\n');
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf('=');
+    if (idx === -1) continue;
+    const key = trimmed.slice(0, idx).trim();
+    if (!keys.has(key)) continue;
+    let value = trimmed.slice(idx + 1).trim();
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1);
+    }
+    process.env[key] = value;
+  }
+}
+
 function required(name, value) {
   if (!value || !String(value).trim()) {
     throw new Error(`Missing required parameter: ${name}`);
@@ -54,9 +94,47 @@ function required(name, value) {
   return String(value).trim();
 }
 
+/** `pg` + SCRAM требуют строковый пароль; из .env / Docker иногда приходит нестроковое значение. */
+function strEnv(name, fallback = '') {
+  const v = process.env[name];
+  if (v === undefined || v === null) return fallback;
+  return String(v);
+}
+
+/** Пароль из DATABASE_URL в .env, если отдельный DB_PASSWORD не задан. */
+function passwordFromDatabaseUrl() {
+  const raw = strEnv('DATABASE_URL', '').trim();
+  if (!raw) return '';
+  try {
+    const c = parseConnectionString(raw);
+    if (c.password != null && String(c.password).length > 0) {
+      return String(c.password);
+    }
+  } catch (_) {
+    /* ignore */
+  }
+  return '';
+}
+
+/**
+ * Подключение только через URL: обходит баг `pg`, когда `password: ''` в объекте
+ * игнорируется (`if (config.password)` → null).
+ */
+function buildPostgresConnectionString(host, port, user, password, database) {
+  const enc = encodeURIComponent;
+  let h = String(host || 'localhost');
+  if (h.includes(':') && !h.startsWith('/') && !h.startsWith('[')) {
+    h = `[${h}]`;
+  }
+  const p = parseInt(String(port || 5432), 10) || 5432;
+  return `postgres://${enc(String(user || 'postgres'))}:${enc(String(password))}@${h}:${p}/${enc(String(database || 'divehub'))}`;
+}
+
 async function main() {
   const backendRoot = path.join(__dirname, '..');
-  loadEnv(path.join(backendRoot, '.env'));
+  const envPath = path.join(backendRoot, '.env');
+  loadEnv(envPath);
+  loadEnvForceDbKeys(envPath);
 
   const args = parseArgs(process.argv.slice(2));
   const email = required('email', args.email).toLowerCase();
@@ -68,13 +146,46 @@ async function main() {
     throw new Error('Password must be at least 8 characters long');
   }
 
-  const client = new Client({
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432', 10),
-    user: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_DATABASE || 'divehub',
-  });
+  /**
+   * Пустой `password: ''` в объекте конфига `pg` игнорируется → default `null` → SCRAM:
+   * "client password must be a string". Подключаемся через `connectionString` (URL).
+   */
+  const rawDatabaseUrl = strEnv('DATABASE_URL', '').trim();
+  let client;
+  if (rawDatabaseUrl) {
+    try {
+      const parsedUrl = parseConnectionString(rawDatabaseUrl);
+      if (parsedUrl.password != null && String(parsedUrl.password).trim() !== '') {
+        client = new Client({ connectionString: rawDatabaseUrl });
+      }
+    } catch (_) {
+      /* ниже — сборка из DB_* */
+    }
+  }
+
+  if (!client) {
+    let dbPassword = strEnv('DB_PASSWORD', '').trim();
+    if (!dbPassword) {
+      dbPassword = strEnv('POSTGRES_PASSWORD', '').trim();
+    }
+    if (!dbPassword) {
+      dbPassword = passwordFromDatabaseUrl().trim();
+    }
+    if (!dbPassword) {
+      throw new Error(
+        'Postgres password is missing: set DATABASE_URL (with password), or non-empty DB_PASSWORD / POSTGRES_PASSWORD in backend/.env. Empty DB_PASSWORD causes a misleading SASL error from node-pg.',
+      );
+    }
+
+    const connStr = buildPostgresConnectionString(
+      strEnv('DB_HOST', 'localhost'),
+      strEnv('DB_PORT', '5432'),
+      strEnv('DB_USERNAME', 'postgres'),
+      dbPassword,
+      strEnv('DB_DATABASE', 'divehub'),
+    );
+    client = new Client({ connectionString: connStr });
+  }
 
   await client.connect();
   try {

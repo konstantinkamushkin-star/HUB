@@ -50,13 +50,13 @@ fun LoginRoute(nav: NavHostController, graph: AppGraph) {
         var password by remember { mutableStateOf("") }
 
         AuthScaffold(
-            title = "Добро пожаловать",
-            subtitle = "Войдите в DiveHub, чтобы продолжить.",
+            title = stringResource(R.string.auth_login_title),
+            subtitle = stringResource(R.string.auth_login_subtitle),
         ) {
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it },
-                label = { Text("Email") },
+                label = { Text(stringResource(R.string.auth_email_label)) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
                 modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
@@ -65,7 +65,7 @@ fun LoginRoute(nav: NavHostController, graph: AppGraph) {
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Пароль") },
+                label = { Text(stringResource(R.string.auth_password_label)) },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
@@ -75,7 +75,7 @@ fun LoginRoute(nav: NavHostController, graph: AppGraph) {
                 onClick = { nav.navigate(Routes.ForgotPassword) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Забыли пароль?")
+                Text(stringResource(R.string.auth_forgot_password))
             }
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -98,20 +98,26 @@ fun LoginRoute(nav: NavHostController, graph: AppGraph) {
                         .fillMaxWidth()
                         .defaultMinSize(minHeight = 50.dp),
                 ) {
-                    Text("Войти")
+                    Text(stringResource(R.string.auth_sign_in))
                 }
             }
             TextButton(
                 onClick = { nav.navigate(Routes.Register) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Создать аккаунт")
+                Text(stringResource(R.string.auth_create_account))
             }
             TextButton(
                 onClick = { nav.navigate(Routes.PartnerRegistration) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.login_partner_application))
+            }
+            TextButton(
+                onClick = { nav.navigate(Routes.DiveCenterRegistration) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.login_dive_center_registration))
             }
         }
     }

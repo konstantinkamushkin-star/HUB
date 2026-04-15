@@ -60,6 +60,7 @@ const MIGRATION_FILES = [
   '023_user_must_change_password_dive_center_owner.sql',
   '024_user_inbox_notifications.sql',
   '025_users_oauth_subs.sql',
+  '026_users_diver_profile.sql',
 ];
 
 function pick(envFile, key, fallback) {

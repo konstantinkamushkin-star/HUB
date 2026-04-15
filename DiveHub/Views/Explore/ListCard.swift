@@ -97,7 +97,7 @@ struct ListCard: View {
                         Button(action: {
                             onAddToTrip?()
                         }) {
-                            Label("Add to Trip", systemImage: "plus.circle.fill")
+                            Label("ui_explore_add_to_trip".localized, systemImage: "plus.circle.fill")
                                 .font(.caption)
                                 .foregroundColor(.blue)
                         }
@@ -137,9 +137,9 @@ struct ListCard: View {
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)
-                    Text("•")
+                    Text("ui_explore_a".localized)
                         .foregroundColor(.secondary)
-                    Label("\(Int(site.maxDepth))m", systemImage: "arrow.down")
+                    Label("ui_explore_value_m".localized, systemImage: "arrow.down")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -151,7 +151,7 @@ struct ListCard: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if let agency = center.certificationAgency {
-                        Text("•")
+                        Text("ui_explore_a".localized)
                             .foregroundColor(.secondary)
                         Text(agency)
                             .font(.caption)
@@ -166,7 +166,7 @@ struct ListCard: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if let city = shop.location.city {
-                        Text("•")
+                        Text("ui_explore_a".localized)
                             .foregroundColor(.secondary)
                         Label(city, systemImage: "location")
                             .font(.caption)
@@ -233,7 +233,7 @@ struct RatingView: View {
             Text(String(format: "%.1f", rating))
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            Text("(\(reviewCount))")
+            Text("ui_explore_value_5".localized)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -245,7 +245,7 @@ struct RecommendationBadge: View {
         HStack(spacing: 4) {
             Image(systemName: "sparkles")
                 .font(.caption2)
-            Text("Recommended")
+            Text("ui_explore_recommended".localized)
                 .font(.caption2)
                 .fontWeight(.medium)
         }
@@ -264,7 +264,7 @@ struct FriendsVisitedBadge: View {
         HStack(spacing: 4) {
             Image(systemName: "person.2.fill")
                 .font(.caption2)
-            Text("\(count) friends")
+            Text("ui_explore_value_friends".localized)
                 .font(.caption2)
                 .fontWeight(.medium)
         }

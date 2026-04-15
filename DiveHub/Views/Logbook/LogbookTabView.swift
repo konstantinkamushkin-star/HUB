@@ -229,7 +229,7 @@ struct DiveLogRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(formatDepth(log.maxDepth))
                     .font(.headline)
-                Text("\(log.bottomTime) min")
+                Text("ui_logbook_value_min".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

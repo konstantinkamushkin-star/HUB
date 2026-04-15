@@ -3,7 +3,9 @@ package com.divehub.app
 import android.app.Application
 import com.divehub.app.data.local.TokenStore
 import com.divehub.app.data.remote.ApiClientFactory
+import com.divehub.app.data.remote.AdminDashboardApi
 import com.divehub.app.data.remote.AuthApi
+import com.divehub.app.data.remote.BookingApi
 import com.divehub.app.data.remote.ChatApi
 import com.divehub.app.data.remote.CoursesApi
 import com.divehub.app.data.remote.DiveLogsApi
@@ -36,6 +38,14 @@ class AppGraph(application: Application) {
 
     suspend fun authApi(): AuthApi {
         return api(AuthApi::class.java)
+    }
+
+    suspend fun adminDashboardApi(): AdminDashboardApi {
+        return api(AdminDashboardApi::class.java)
+    }
+
+    suspend fun bookingApi(): BookingApi {
+        return api(BookingApi::class.java)
     }
 
     suspend fun exploreApi(): ExploreApi {
@@ -105,6 +115,42 @@ class AppGraph(application: Application) {
         mutex.withLock {
             retrofit = null
             cachedRoot = null
+        }
+    }
+
+    /** Handoff after [com.divehub.app.ui.chat.BusinessChatOpenRoute] — consumed when chat tab opens. */
+    private val pendingChatLock = Any()
+    private var pendingChatConversationJson: String? = null
+
+    fun setPendingChatConversationJson(json: String?) {
+        synchronized(pendingChatLock) {
+            pendingChatConversationJson = json
+        }
+    }
+
+    fun consumePendingChatConversationJson(): String? {
+        synchronized(pendingChatLock) {
+            val v = pendingChatConversationJson
+            pendingChatConversationJson = null
+            return v
+        }
+    }
+
+    /** `divehub://search?q=…` — consumed when [com.divehub.app.ui.search.GlobalSearchRoute] opens. */
+    private val pendingSearchLock = Any()
+    private var pendingGlobalSearchQuery: String? = null
+
+    fun setPendingGlobalSearchQuery(query: String?) {
+        synchronized(pendingSearchLock) {
+            pendingGlobalSearchQuery = query?.trim()?.takeIf { it.isNotEmpty() }
+        }
+    }
+
+    fun consumePendingGlobalSearchQuery(): String? {
+        synchronized(pendingSearchLock) {
+            val v = pendingGlobalSearchQuery
+            pendingGlobalSearchQuery = null
+            return v
         }
     }
 }

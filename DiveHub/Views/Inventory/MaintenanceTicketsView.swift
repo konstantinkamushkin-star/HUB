@@ -26,8 +26,8 @@ struct MaintenanceTicketsView: View {
         List {
             // Filter
             Section {
-                Picker("Status", selection: $selectedStatus) {
-                    Text("All").tag(nil as MaintenanceTicket.TicketStatus?)
+                Picker("ui_profile_status".localized, selection: $selectedStatus) {
+                    Text("ui_inventory_all".localized).tag(nil as MaintenanceTicket.TicketStatus?)
                     ForEach(MaintenanceTicket.TicketStatus.allCases, id: \.self) { status in
                         Text(status.displayName).tag(status as MaintenanceTicket.TicketStatus?)
                     }
@@ -43,7 +43,7 @@ struct MaintenanceTicketsView: View {
                 }
             }
         }
-        .navigationTitle("Maintenance Tickets")
+        .navigationTitle("ui_inventory_maintenance_tickets".localized)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showCreateTicket = true }) {
@@ -140,7 +140,7 @@ struct MaintenanceTicketDetailView: View {
             }
             .padding()
         }
-        .navigationTitle("Ticket Details")
+        .navigationTitle("ui_inventory_ticket_details".localized)
         .navigationBarTitleDisplayMode(.inline)
     }
     
@@ -183,38 +183,38 @@ struct CreateMaintenanceTicketView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Equipment") {
-                    Picker("Item", selection: $gearItemId) {
-                        Text("Select item").tag("")
+                Section("ui_equipment".localized) {
+                    Picker("ui_inventory_item".localized, selection: $gearItemId) {
+                        Text("ui_inventory_select_item".localized).tag("")
                         ForEach(viewModel.gearItems.filter { !$0.isDeleted }) { item in
                             Text(item.displayName).tag(item.id)
                         }
                     }
                 }
                 
-                Section("Ticket Details") {
-                    TextField("Title", text: $title)
+                Section("ui_inventory_ticket_details".localized) {
+                    TextField("ui_inventory_title".localized, text: $title)
                     TextEditor(text: $description)
                         .frame(height: 100)
                     
-                    Picker("Priority", selection: $priority) {
+                    Picker("ui_inventory_priority".localized, selection: $priority) {
                         ForEach(MaintenanceTicket.Priority.allCases, id: \.self) { prio in
                             Text(prio.displayName).tag(prio)
                         }
                     }
                 }
             }
-            .navigationTitle("New Ticket")
+            .navigationTitle("ui_inventory_new_ticket".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("ui_cancel".localized) {
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Create") {
+                    Button("ui_create".localized) {
                         createTicket()
                     }
                     .disabled(title.isEmpty || gearItemId.isEmpty)

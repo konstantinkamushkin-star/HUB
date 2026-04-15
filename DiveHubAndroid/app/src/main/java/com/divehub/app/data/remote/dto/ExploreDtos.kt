@@ -46,6 +46,23 @@ data class DiveCenterItemDto(
     @SerializedName("average_rating") val averageRating: Double? = null,
     @SerializedName("review_count") val reviewCount: Int? = null,
     @SerializedName("nitrox_available") val nitroxAvailable: Boolean? = null,
+    @SerializedName("description") val description: String? = null,
+    @SerializedName("photos") val photos: List<String>? = null,
+    @SerializedName("thumbnail_url") val thumbnailUrl: String? = null,
+)
+
+data class DiveCenterPublicEnvelopeDto(
+    @SerializedName("success") val success: Boolean = false,
+    @SerializedName("data") val data: DiveCenterItemDto? = null,
+)
+
+/** GET `v1/dive-centers/{id}/instructors` (public list). */
+data class DiveCenterInstructorDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("name") val name: String? = null,
+    @SerializedName("avatarURL") val avatarURL: String? = null,
+    @SerializedName("photoURL") val photoURL: String? = null,
+    @SerializedName("bio") val bio: String? = null,
 )
 
 data class ShopSearchResultDto(

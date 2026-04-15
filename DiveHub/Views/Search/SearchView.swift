@@ -26,20 +26,20 @@ struct SearchView: View {
             VStack(spacing: 0) {
                 // Search Bar
                 HStack {
-                    TextField("Search...", text: $searchText)
+                    TextField("ui_search_search_3".localized, text: $searchText)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .onSubmit {
                             viewModel.search(query: searchText, category: searchCategory)
                         }
                     
-                    Button("Cancel") {
+                    Button("ui_cancel".localized) {
                         dismiss()
                     }
                 }
                 .padding()
                 
                 // Category Picker
-                Picker("Category", selection: $searchCategory) {
+                Picker("ui_profile_category".localized, selection: $searchCategory) {
                     ForEach(SearchCategory.allCases, id: \.self) { category in
                         Text(category.rawValue).tag(category)
                     }
@@ -58,7 +58,7 @@ struct SearchView: View {
                         Image(systemName: "magnifyingglass")
                             .font(.system(size: 50))
                             .foregroundColor(.secondary)
-                        Text("No results found")
+                        Text("ui_search_no_results_found".localized)
                             .font(.headline)
                             .foregroundColor(.secondary)
                     }
@@ -66,7 +66,7 @@ struct SearchView: View {
                 } else {
                     List {
                         if !viewModel.diveSites.isEmpty {
-                            Section("Dive Sites") {
+                            Section("ui_dive_sites".localized) {
                                 ForEach(viewModel.diveSites) { site in
                                     NavigationLink(destination: DiveSiteDetailView(site: site)) {
                                         SearchResultRow(title: site.displayName, subtitle: site.siteType.displayName, icon: "divehub.logo")
@@ -76,7 +76,7 @@ struct SearchView: View {
                         }
                         
                         if !viewModel.diveCenters.isEmpty {
-                            Section("Dive Centers") {
+                            Section("ui_dive_centers".localized) {
                                 ForEach(viewModel.diveCenters) { center in
                                     NavigationLink(destination: DiveCenterDetailView(center: center)) {
                                         SearchResultRow(title: center.name, subtitle: center.location.city, icon: "building.2")
@@ -86,7 +86,7 @@ struct SearchView: View {
                         }
                         
                         if !viewModel.instructors.isEmpty {
-                            Section("Instructors") {
+                            Section("ui_profile_instructors".localized) {
                                 ForEach(viewModel.instructors) { instructor in
                                     NavigationLink(destination: InstructorDetailView(instructor: instructor)) {
                                         SearchResultRow(title: instructor.name, subtitle: instructor.certifications.joined(separator: ", "), icon: "person.circle")
@@ -98,7 +98,7 @@ struct SearchView: View {
                     .listStyle(.insetGrouped)
                 }
             }
-            .navigationTitle("Search")
+            .navigationTitle("ui_search_search".localized)
             .navigationBarTitleDisplayMode(.inline)
         }
     }

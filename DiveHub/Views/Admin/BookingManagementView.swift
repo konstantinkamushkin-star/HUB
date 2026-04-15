@@ -28,7 +28,7 @@ struct BookingManagementView: View {
             Section {
                 Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
                     Text(localizationService.localizedString("all", table: "common")).tag("all")
-                    ForEach([Booking.BookingStatus.pending, .confirmed, .completed, .cancelled], id: \.self) { status in
+                    ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
                         Text(status.rawValue.capitalized).tag(status.rawValue)
                     }
                 }
@@ -67,7 +67,7 @@ struct BookingRowView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if !booking.serviceId.isEmpty {
-                        Text("Service: \(booking.serviceId)")
+                        Text("ui_admin_service_value".localized)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -113,6 +113,8 @@ struct BookingRowView: View {
         switch status {
         case .pending:
             return Color.orange
+        case .quoted:
+            return Color.purple
         case .confirmed:
             return Color.blue
         case .completed:
@@ -129,6 +131,9 @@ struct BookingDetailView: View {
     let booking: Booking
     @ObservedObject var viewModel: AdminViewModel
     @Environment(\.dismiss) var dismiss
+    @State private var finalPriceInput = ""
+    @State private var finalCurrencyInput = "USD"
+    @State private var manualNoteInput = ""
     
     var body: some View {
         NavigationView {
@@ -161,7 +166,27 @@ struct BookingDetailView: View {
                 Section(header: Text(LocalizationService.shared.localizedString("actions", table: "admin"))) {
                     if booking.status == .pending {
                         ActionButton(
+                            title: "Send quote (manual verification)",
+                            action: {
+                                handleQuote()
+                            }
+                        )
+                        ActionButton(
                             title: LocalizationService.shared.localizedString("confirmBooking", table: "booking"),
+                            action: {
+                                handleConfirm()
+                            }
+                        )
+                        ActionButton(
+                            title: LocalizationService.shared.localizedString("cancelBooking", table: "admin"),
+                            isDestructive: true,
+                            action: {
+                                handleCancel()
+                            }
+                        )
+                    } else if booking.status == .quoted {
+                        ActionButton(
+                            title: "Confirm final price",
                             action: {
                                 handleConfirm()
                             }
@@ -175,6 +200,18 @@ struct BookingDetailView: View {
                         )
                     }
                 }
+
+                Section(header: Text("ui_admin_manual_price_verification".localized)) {
+                    TextField("ui_admin_final_amount".localized, text: $finalPriceInput)
+                        .keyboardType(.decimalPad)
+                    TextField("ui_admin_currency".localized, text: $finalCurrencyInput)
+                        .textInputAutocapitalization(.characters)
+                    TextField("ui_admin_note_for_diver_optional".localized, text: $manualNoteInput, axis: .vertical)
+                        .lineLimit(2...4)
+                    Text("ui_admin_if_amount_is_empty_status_change_will_not_overwrite_curr".localized)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
             }
             .navigationTitle(LocalizationService.shared.localizedString("bookingDetails", table: "admin"))
             .navigationBarTitleDisplayMode(.inline)
@@ -185,6 +222,10 @@ struct BookingDetailView: View {
                     }
                 }
             }
+        }
+        .onAppear {
+            finalPriceInput = booking.payment.amount > 0 ? String(format: "%.2f", booking.payment.amount) : ""
+            finalCurrencyInput = booking.payment.currency.isEmpty ? "USD" : booking.payment.currency
         }
     }
     
@@ -201,16 +242,47 @@ struct BookingDetailView: View {
     
     private func handleConfirm() {
         Task {
-            try? await viewModel.updateBookingStatus(booking.id, status: .confirmed)
+            let amount = parseAmount(finalPriceInput)
+            let currency = finalCurrencyInput.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            let note = manualNoteInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            try? await viewModel.updateBookingStatus(
+                booking.id,
+                status: .confirmed,
+                finalPriceAmount: amount,
+                finalPriceCurrency: currency.isEmpty ? nil : currency,
+                manualVerificationNote: note.isEmpty ? nil : note
+            )
             dismiss()
         }
     }
     
+    private func handleQuote() {
+        Task {
+            let amount = parseAmount(finalPriceInput)
+            let currency = finalCurrencyInput.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+            let note = manualNoteInput.trimmingCharacters(in: .whitespacesAndNewlines)
+            try? await viewModel.updateBookingStatus(
+                booking.id,
+                status: .quoted,
+                finalPriceAmount: amount,
+                finalPriceCurrency: currency.isEmpty ? nil : currency,
+                manualVerificationNote: note.isEmpty ? nil : note
+            )
+            dismiss()
+        }
+    }
+
     private func handleCancel() {
         Task {
             try? await viewModel.updateBookingStatus(booking.id, status: .cancelled)
             dismiss()
         }
+    }
+
+    private func parseAmount(_ raw: String) -> Double? {
+        let normalized = raw.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return nil }
+        return Double(normalized)
     }
 }
 

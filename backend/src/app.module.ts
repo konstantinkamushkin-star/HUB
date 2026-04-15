@@ -29,6 +29,8 @@ import { WebhooksModule } from './webhooks/webhooks.module';
 import { PartnerModule } from './partner/partner.module';
 import { TripImportModule } from './trip-import/trip-import.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { BookingsModule } from './bookings/bookings.module';
+import { CenterServicesModule } from './center-services/center-services.module';
 
 @Module({
   controllers: [AppController, LegalPagesController],
@@ -132,6 +134,8 @@ import { NotificationsModule } from './notifications/notifications.module';
     PartnerModule,
     TripImportModule,
     NotificationsModule,
+    BookingsModule,
+    CenterServicesModule,
   ],
   providers: [
     {

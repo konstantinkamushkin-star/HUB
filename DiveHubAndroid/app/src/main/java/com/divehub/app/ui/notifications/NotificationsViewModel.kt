@@ -27,13 +27,21 @@ class NotificationsViewModel(private val repo: NotificationsRepository) : ViewMo
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = NotificationsUiState(loading = true)
+            val prev = _state.value
+            _state.value = prev.copy(loading = true, error = null)
             runCatching { repo.list() }
                 .onSuccess { list ->
-                    _state.value = NotificationsUiState(loading = false, notifications = list)
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        error = null,
+                        notifications = list,
+                    )
                 }
                 .onFailure { e ->
-                    _state.value = NotificationsUiState(loading = false, error = e.message ?: "Error")
+                    _state.value = prev.copy(
+                        loading = false,
+                        error = e.message ?: "Error",
+                    )
                 }
         }
     }

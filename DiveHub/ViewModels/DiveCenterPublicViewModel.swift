@@ -210,7 +210,10 @@ class DiveCenterPublicViewModel: ObservableObject {
     }
     
     func getCoursesForInstructor(instructorId: String) -> [Course] {
-        return courses.filter { $0.instructorId == instructorId }
+        courses.filter { course in
+            let ids = course.assignedInstructorUserIds
+            return ids.contains(instructorId)
+        }
     }
     
     func enrollInCourse(courseId: String) async throws {

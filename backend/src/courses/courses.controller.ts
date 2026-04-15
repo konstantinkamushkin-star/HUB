@@ -1,12 +1,20 @@
 import {
   Controller,
   Get,
+  Post,
+  Patch,
+  Put,
+  Delete,
   Query,
   Param,
+  Body,
   HttpCode,
   HttpStatus,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { CoursesService } from './courses.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('courses')
 export class CoursesController {
@@ -24,6 +32,13 @@ export class CoursesController {
     }
   }
 
+  @Post()
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.CREATED)
+  async createCourse(@Request() req: any, @Body() body: any) {
+    return this.coursesService.createCourse(req.user.sub, body);
+  }
+
   @Get(':id')
   @HttpCode(HttpStatus.OK)
   async getCourse(@Param('id') id: string) {
@@ -34,5 +49,34 @@ export class CoursesController {
       console.error('Error in getCourse endpoint:', error);
       throw error;
     }
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async patchCourse(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return this.coursesService.updateCourse(req.user.sub, id, body);
+  }
+
+  @Put(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async putCourse(
+    @Request() req: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    return this.coursesService.updateCourse(req.user.sub, id, body);
+  }
+
+  @Delete(':id')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteCourse(@Request() req: any, @Param('id') id: string) {
+    await this.coursesService.deleteCourse(req.user.sub, id);
   }
 }

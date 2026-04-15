@@ -18,6 +18,7 @@ class CourseViewModel: ObservableObject {
         case notAuthenticated
         case missingDiveCenter
         case emptyParticipants
+        case instructorRequired
         
         var errorDescription: String? {
             switch self {
@@ -27,6 +28,8 @@ class CourseViewModel: ObservableObject {
                 return "Course is not linked to a dive center."
             case .emptyParticipants:
                 return "At least one participant is required."
+            case .instructorRequired:
+                return NSLocalizedString("mustSelectInstructor", tableName: "courses", comment: "")
             }
         }
     }
@@ -77,7 +80,8 @@ class CourseViewModel: ObservableObject {
         preferredDate: Date,
         participants: [Booking.Participant],
         paymentMethod: Booking.Payment.PaymentMethod,
-        notes: String?
+        notes: String?,
+        instructorUserId: String? = nil
     ) async throws -> Booking {
         guard let user = AuthenticationService.shared.currentUser else {
             throw CourseBookingError.notAuthenticated
@@ -89,13 +93,26 @@ class CourseViewModel: ObservableObject {
             throw CourseBookingError.emptyParticipants
         }
         
+        let assigned = course.assignedInstructorUserIds
+        let resolvedInstructor: String?
+        if assigned.count > 1 {
+            guard let picked = instructorUserId, assigned.contains(picked) else {
+                throw CourseBookingError.instructorRequired
+            }
+            resolvedInstructor = picked
+        } else if assigned.count == 1 {
+            resolvedInstructor = assigned[0]
+        } else {
+            resolvedInstructor = instructorUserId ?? course.instructorId
+        }
+        
         let booking = Booking(
             id: UUID().uuidString,
             userId: user.id,
             diveCenterId: diveCenterId,
             serviceId: course.id,
             diveSiteId: nil,
-            instructorId: course.instructorId,
+            instructorId: resolvedInstructor,
             date: preferredDate,
             startTime: "09:00",
             participants: participants,

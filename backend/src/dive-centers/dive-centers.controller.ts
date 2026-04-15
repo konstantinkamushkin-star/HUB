@@ -83,6 +83,16 @@ export class DiveCentersController {
     }
   }
 
+  @Get(':id')
+  @HttpCode(HttpStatus.OK)
+  async getPublicById(@Param('id') id: string): Promise<{
+    success: boolean;
+    data: DiveCenterListItemDto;
+  }> {
+    const data = await this.diveCentersService.getPublicById(id);
+    return { success: true, data };
+  }
+
   @Get(':id/instructors')
   @HttpCode(HttpStatus.OK)
   async getInstructors(@Param('id') id: string) {

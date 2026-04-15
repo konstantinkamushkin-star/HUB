@@ -11,6 +11,7 @@ import MapKit
 struct ExploreView: View {
     @StateObject private var viewModel = GenericExploreViewModel()
     @StateObject private var localizationService = LocalizationService.shared
+    @StateObject private var authService = AuthenticationService.shared
     @State private var showFilters = false
     @State private var selectedItem: (any ExploreItem)?
     @State private var mapRegion = MapRegion(
@@ -18,10 +19,55 @@ struct ExploreView: View {
         span: MKCoordinateSpan(latitudeDelta: 0.5, longitudeDelta: 0.5)
     )
     @State private var didCenterExploreMapOnUser = false
+    /// Пока `Date() < значения`, баннер «завершите профиль» скрыт (см. `UserDefaults`).
+    @State private var completeProfileBannerHiddenUntil: Date?
     
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
+                if let u = authService.currentUser,
+                   u.diverProfile?.onboardingCompleted == true,
+                   u.profileCompletionFraction() < 0.7,
+                   !isCompleteProfileBannerCurrentlySuppressed
+                {
+                    HStack(alignment: .top, spacing: 10) {
+                        NavigationLink {
+                            EditProfileView()
+                        } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(localizationService.localizedString("completeProfileBannerTitle", table: "onboarding"))
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundStyle(.primary)
+                                Text(localizationService.localizedString("completeProfileBannerBody", table: "onboarding"))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityAddTraits(.isButton)
+                        
+                        Button {
+                            suppressCompleteProfileBanner(forUserId: u.id)
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .font(.title3)
+                                .symbolRenderingMode(.hierarchical)
+                                .foregroundStyle(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel(localizationService.localizedString("completeProfileBannerDismiss", table: "onboarding"))
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.divePrimary.opacity(0.12))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .padding(.horizontal)
+                    .padding(.top, 4)
+                }
                 // Segmented Control
                 categorySegmentedControl
                     .padding(.horizontal)
@@ -83,7 +129,49 @@ struct ExploreView: View {
             .task {
                 await viewModel.loadData()
             }
+            .onAppear {
+                refreshCompleteProfileBannerSuppressionState()
+            }
+            .onChange(of: authService.currentUser?.id) { _, _ in
+                refreshCompleteProfileBannerSuppressionState()
+            }
         }
+    }
+    
+    private var isCompleteProfileBannerCurrentlySuppressed: Bool {
+        guard let until = completeProfileBannerHiddenUntil else { return false }
+        return Date() < until
+    }
+    
+    private static let completeProfileBannerSuppressionSeconds: TimeInterval = 2 * 24 * 60 * 60
+    
+    private func completeProfileBannerUserDefaultsKey(userId: String) -> String {
+        "explore_complete_profile_banner_hidden_until_\(userId)"
+    }
+    
+    private func refreshCompleteProfileBannerSuppressionState() {
+        guard let id = authService.currentUser?.id else {
+            completeProfileBannerHiddenUntil = nil
+            return
+        }
+        let raw = UserDefaults.standard.double(forKey: completeProfileBannerUserDefaultsKey(userId: id))
+        guard raw > 0 else {
+            completeProfileBannerHiddenUntil = nil
+            return
+        }
+        let until = Date(timeIntervalSince1970: raw)
+        if Date() >= until {
+            UserDefaults.standard.removeObject(forKey: completeProfileBannerUserDefaultsKey(userId: id))
+            completeProfileBannerHiddenUntil = nil
+        } else {
+            completeProfileBannerHiddenUntil = until
+        }
+    }
+    
+    private func suppressCompleteProfileBanner(forUserId userId: String) {
+        let until = Date().addingTimeInterval(Self.completeProfileBannerSuppressionSeconds)
+        UserDefaults.standard.set(until.timeIntervalSince1970, forKey: completeProfileBannerUserDefaultsKey(userId: userId))
+        completeProfileBannerHiddenUntil = until
     }
 
     private func applyInitialMapRegionIfNeeded(location: CLLocation?) {
@@ -96,12 +184,12 @@ struct ExploreView: View {
     }
     
     private var categorySegmentedControl: some View {
-        Picker("Category", selection: $viewModel.selectedCategory) {
+        Picker("ui_profile_category".localized, selection: $viewModel.selectedCategory) {
             ForEach(ExploreCategory.allCases) { category in
-                HStack(spacing: 4) {
-                    DiveHubSystemIcon(name: category.iconName, color: .divePrimary, size: 14)
-                    Text(category.displayName)
-                }
+                // Один `Label` на сегмент: `HStack(Image+Text)` даёт в `.segmented` отдельную «пилюлю»
+                // под иконку и обрезанный текст — выглядит как пустой «Dive Sites».
+                Label(category.displayName, systemImage: category.iconName)
+                    .labelStyle(.titleAndIcon)
                     .tag(category)
             }
         }
@@ -297,7 +385,7 @@ struct ExploreView: View {
                     .font(.title3)
                 
                 if viewModel.activeFilterCount > 0 {
-                    Text("\(viewModel.activeFilterCount)")
+                    Text("ui_explore_value_7".localized)
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
@@ -461,35 +549,39 @@ struct ExploreView: View {
     }
     
     private var mapView: some View {
-        ZStack {
-            ExploreMapView(
-                category: viewModel.selectedCategory,
-                diveSites: viewModel.diveSites,
-                diveCenters: viewModel.diveCenters,
-                shops: viewModel.shops,
-                onItemTapped: { item in
-                    selectedItem = item
-                },
-                region: $mapRegion,
-                showsUserLocation: .constant(viewModel.userLocation != nil)
-            )
-            .ignoresSafeArea()
-            
-            VStack {
-                Spacer()
-                HStack {
+        GeometryReader { geo in
+            // `geo.safeAreaInsets` учитывает системный таб-бар; запас — над картой с `ignoresSafeArea`.
+            let mapChromeBottom = max(geo.safeAreaInsets.bottom + 12, 64)
+            ZStack {
+                ExploreMapView(
+                    category: viewModel.selectedCategory,
+                    diveSites: viewModel.diveSites,
+                    diveCenters: viewModel.diveCenters,
+                    shops: viewModel.shops,
+                    onItemTapped: { item in
+                        selectedItem = item
+                    },
+                    region: $mapRegion,
+                    showsUserLocation: .constant(viewModel.userLocation != nil)
+                )
+
+                VStack {
                     Spacer()
-                    VStack(spacing: 10) {
-                        MapChromeZoomCluster(onZoomIn: zoomIn, onZoomOut: zoomOut)
-                        MapChromeLocateButton(action: centerOnUserLocation)
+                    HStack {
+                        Spacer()
+                        VStack(spacing: 10) {
+                            MapChromeZoomCluster(onZoomIn: zoomIn, onZoomOut: zoomOut)
+                            MapChromeLocateButton(action: centerOnUserLocation)
+                        }
+                        .padding(.trailing, 16)
+                        .padding(.bottom, mapChromeBottom)
                     }
-                    .padding(.trailing, 16)
-                    .padding(.bottom, 20)
+                }
+                .onAppear {
+                    applyInitialMapRegionIfNeeded(location: viewModel.userLocation)
                 }
             }
-            .onAppear {
-                applyInitialMapRegionIfNeeded(location: viewModel.userLocation)
-            }
+            .frame(width: geo.size.width, height: geo.size.height)
         }
     }
     
@@ -667,15 +759,15 @@ struct DiveCenterFilterView: View {
                     }
                 }
                 
-                Section("Rating") {
+                Section("ui_rating".localized) {
                     Stepper("Min Rating: \(filters.minRating ?? 0, specifier: "%.1f")", value: Binding(
                         get: { filters.minRating ?? 0 },
                         set: { filters.minRating = $0 }
                     ), in: 0...5, step: 0.5)
                 }
                 
-                Section("Services") {
-                    Toggle("Nitrox Available", isOn: Binding(
+                Section("ui_admin_services".localized) {
+                    Toggle("ui_explore_nitrox_available".localized, isOn: Binding(
                         get: { filters.nitroxAvailable ?? false },
                         set: { filters.nitroxAvailable = $0 }
                     ))
@@ -711,7 +803,7 @@ struct ShopFilterView: View {
         NavigationView {
             Form {
                 Section(localizationService.localizedString("type")) {
-                    Picker("Shop Type", selection: Binding(
+                    Picker("ui_explore_shop_type".localized, selection: Binding(
                         get: { filters.shopType },
                         set: { filters.shopType = $0 }
                     )) {

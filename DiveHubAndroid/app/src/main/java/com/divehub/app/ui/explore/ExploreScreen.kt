@@ -28,7 +28,6 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,6 +40,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Badge
 import androidx.compose.material3.Button
@@ -52,7 +52,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,15 +78,35 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.data.ReviewsRepository
-import com.divehub.app.data.remote.dto.CreateReviewRequest
 import com.divehub.app.data.remote.dto.ExploreDiveSite
 import com.divehub.app.data.remote.dto.ExploreItemKind
 import com.divehub.app.data.remote.dto.ReviewDto
 import com.divehub.app.ui.components.DiveHubLogoMark
+import com.divehub.app.ui.reviews.AddReviewableDialog
 import com.divehub.app.ui.theme.IosDesign
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
-import retrofit2.HttpException
-import java.util.Locale
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+private fun distanceMeters(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
+    val r = 6371000.0
+    val p1 = Math.toRadians(lat1)
+    val p2 = Math.toRadians(lat2)
+    val dLat = Math.toRadians(lat2 - lat1)
+    val dLon = Math.toRadians(lon2 - lon1)
+    val a = sin(dLat / 2) * sin(dLat / 2) +
+        cos(p1) * cos(p2) * sin(dLon / 2) * sin(dLon / 2)
+    val c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return r * c
+}
+
+private fun formatDistanceMeters(m: Double): String =
+    if (m < 1000) "%.0f m".format(m) else "%.1f km".format(m / 1000.0)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,7 +118,30 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
     var pendingCenterOnUser by remember { mutableStateOf(false) }
     var showSortSheet by remember { mutableStateOf(false) }
     var showFilterSheet by remember { mutableStateOf(false) }
+    var mapFocusLatLngZoom by remember { mutableStateOf<Triple<Double, Double, Double>?>(null) }
     val context = androidx.compose.ui.platform.LocalContext.current
+    var userGeo by remember { mutableStateOf<Pair<Double, Double>?>(null) }
+    LaunchedEffect(context) {
+        if (hasLocationPermission(context)) {
+            userGeo = getLastKnownLocation(context)
+        }
+    }
+
+    LaunchedEffect(graph.tokenStore) {
+        graph.tokenStore.appLanguageTagFlow
+            .drop(1)
+            .distinctUntilChanged()
+            .collect { vm.refresh() }
+    }
+
+    LaunchedEffect(mapFocusLatLngZoom, mapActions, state.viewMode) {
+        val t = mapFocusLatLngZoom ?: return@LaunchedEffect
+        if (state.viewMode != ExploreViewMode.MAP) return@LaunchedEffect
+        val ma = mapActions ?: return@LaunchedEffect
+        delay(280)
+        ma.centerOnZoom(t.first, t.second, t.third)
+        mapFocusLatLngZoom = null
+    }
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions(),
@@ -109,6 +151,7 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
         if (granted && pendingCenterOnUser) {
             pendingCenterOnUser = false
             getLastKnownLocation(context)?.let { (lat, lng) ->
+                userGeo = lat to lng
                 mapActions?.centerOn?.invoke(lat, lng)
             }
         }
@@ -128,6 +171,7 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
                 onGlobalSearch = { innerNav.navigate(InnerRoutes.Search) },
                 onSortTap = { showSortSheet = true },
                 onFilterTap = { showFilterSheet = true },
+                onFullscreenMap = { innerNav.navigate(InnerRoutes.MapFullscreen) },
             )
             CategoryToggle(state.selectedCategory, onCategory = vm::setCategory)
             SearchBar(state.searchQuery, onChange = vm::setSearch)
@@ -142,14 +186,14 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
         }
 
         when {
-            state.loading -> Box(
+            state.loading && state.allSites.isEmpty() -> Box(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .background(IosDesign.Explore.listBackground),
                 contentAlignment = Alignment.Center,
             ) { CircularProgressIndicator() }
-            state.error != null -> Box(
+            state.error != null && state.allSites.isEmpty() -> Box(
                 Modifier
                     .weight(1f)
                     .fillMaxWidth()
@@ -157,13 +201,20 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
             ) {
                 ErrorView(state.error ?: stringResource(R.string.common_error), onRetry = vm::refresh)
             }
-            state.viewMode == ExploreViewMode.LIST -> ExploreList(
-                sites = state.filteredSites,
-                onTap = { selectedSite = it },
+            state.viewMode == ExploreViewMode.LIST -> PullToRefreshBox(
+                isRefreshing = state.loading && state.allSites.isNotEmpty(),
+                onRefresh = { vm.refresh() },
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth(),
-            )
+            ) {
+                ExploreList(
+                    sites = state.filteredSites,
+                    userLatLng = userGeo,
+                    onTap = { selectedSite = it },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             else -> Box(
                 Modifier
                     .weight(1f)
@@ -182,6 +233,7 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
                     onCenterOnUser = {
                         if (hasLocationPermission(context)) {
                             getLastKnownLocation(context)?.let { (lat, lng) ->
+                                userGeo = lat to lng
                                 mapActions?.centerOn?.invoke(lat, lng)
                             }
                         } else {
@@ -210,6 +262,25 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
                 onReviewSubmitted = { vm.refresh() },
                 innerNav = innerNav,
                 onRequestClose = { selectedSite = null },
+                onShowOnMap = {
+                    val lat = site.latitude
+                    val lng = site.longitude
+                    selectedSite = null
+                    vm.setViewMode(ExploreViewMode.MAP)
+                    mapFocusLatLngZoom = Triple(lat, lng, 12.0)
+                },
+                onBusinessChat = when (site.kind) {
+                    ExploreItemKind.DIVE_CENTER, ExploreItemKind.SHOP -> fun() {
+                        selectedSite = null
+                        innerNav.navigate(
+                            InnerRoutes.businessChatOpen(
+                                exploreKindToChatPeerType(site.kind),
+                                site.id,
+                            ),
+                        )
+                    }
+                    else -> null
+                },
             )
         }
     }
@@ -245,6 +316,7 @@ private fun ExploreHeader(
     onGlobalSearch: () -> Unit,
     onSortTap: () -> Unit,
     onFilterTap: () -> Unit,
+    onFullscreenMap: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -286,6 +358,22 @@ private fun ExploreHeader(
                         Icon(
                             Icons.Default.FilterList,
                             contentDescription = null,
+                            tint = IosDesign.Explore.navBarIconTint,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(IosDesign.Explore.navBarButtonFill),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    IconButton(onClick = onFullscreenMap, modifier = Modifier.size(44.dp)) {
+                        Icon(
+                            Icons.Default.Map,
+                            contentDescription = stringResource(R.string.explore_action_open_map),
                             tint = IosDesign.Explore.navBarIconTint,
                             modifier = Modifier.size(22.dp),
                         )
@@ -796,10 +884,11 @@ private fun getLastKnownLocation(context: Context): Pair<Double, Double>? {
 @Composable
 private fun ExploreList(
     sites: List<ExploreDiveSite>,
+    userLatLng: Pair<Double, Double>?,
     onTap: (ExploreDiveSite) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val bottomBarClearance = 88.dp
+    val bottomBarClearance = 72.dp
     LazyColumn(
         modifier = modifier.background(IosDesign.Explore.listBackground),
         contentPadding = PaddingValues(
@@ -811,13 +900,13 @@ private fun ExploreList(
         verticalArrangement = Arrangement.spacedBy(IosDesign.SectionSpacing),
     ) {
         items(sites, key = { it.id }) { site ->
-            SiteCard(site, onTap = { onTap(site) })
+            SiteCard(site, userLatLng = userLatLng, onTap = { onTap(site) })
         }
     }
 }
 
 @Composable
-private fun SiteCard(site: ExploreDiveSite, onTap: () -> Unit) {
+private fun SiteCard(site: ExploreDiveSite, userLatLng: Pair<Double, Double>?, onTap: () -> Unit) {
     Card(
         shape = IosDesign.CardCorner,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -847,13 +936,34 @@ private fun SiteCard(site: ExploreDiveSite, onTap: () -> Unit) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Star, null, tint = Color(0xFFF2C94C))
-                    Text(
-                        "${"%.1f".format(site.rating)} (${site.reviewCount})",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                Column(horizontalAlignment = Alignment.End) {
+                    userLatLng?.let { (ulat, ulng) ->
+                        val d = distanceMeters(ulat, ulng, site.latitude, site.longitude)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                Icons.Default.LocationOn,
+                                contentDescription = null,
+                                tint = IosDesign.Explore.filterActiveBlue,
+                                modifier = Modifier.size(14.dp),
+                            )
+                            Spacer(Modifier.width(2.dp))
+                            Text(
+                                formatDistanceMeters(d),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                                color = IosDesign.Explore.filterActiveBlue,
+                                fontWeight = FontWeight.Medium,
+                            )
+                        }
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Star, null, tint = Color(0xFFF2C94C))
+                        Text(
+                            "${"%.1f".format(site.rating)} (${site.reviewCount})",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -869,6 +979,12 @@ private fun SiteCard(site: ExploreDiveSite, onTap: () -> Unit) {
     }
 }
 
+private fun exploreKindToChatPeerType(kind: ExploreItemKind): String = when (kind) {
+    ExploreItemKind.DIVE_CENTER -> "dive_center"
+    ExploreItemKind.SHOP -> "shop"
+    ExploreItemKind.DIVE_SITE -> "user"
+}
+
 @Composable
 private fun DiveSiteDetailSheet(
     site: ExploreDiveSite,
@@ -876,6 +992,8 @@ private fun DiveSiteDetailSheet(
     onReviewSubmitted: () -> Unit,
     innerNav: NavController,
     onRequestClose: () -> Unit,
+    onShowOnMap: () -> Unit = {},
+    onBusinessChat: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -905,13 +1023,66 @@ private fun DiveSiteDetailSheet(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
             Text(site.name, style = MaterialTheme.typography.titleLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                TextButton(onClick = onShowOnMap) {
+                    Text(stringResource(R.string.explore_show_on_map))
+                }
+                OutlinedButton(
+                    onClick = {
+                        onRequestClose()
+                        val route = when (site.kind) {
+                            ExploreItemKind.DIVE_CENTER ->
+                                InnerRoutes.bookingWizard(centerId = site.id, siteId = null, instructorId = null)
+                            ExploreItemKind.DIVE_SITE ->
+                                InnerRoutes.bookingWizard(centerId = null, siteId = site.id, instructorId = null)
+                            ExploreItemKind.SHOP ->
+                                InnerRoutes.bookingWizard(centerId = null, siteId = null, instructorId = null)
+                        }
+                        innerNav.navigate(route)
+                    },
+                ) {
+                    Text(stringResource(R.string.explore_book))
+                }
+            }
+        }
+        if (onBusinessChat != null && loggedIn) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    onBusinessChat.invoke()
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    when (site.kind) {
+                        ExploreItemKind.SHOP -> stringResource(R.string.explore_message_shop)
+                        else -> stringResource(R.string.explore_message_center)
+                    },
+                )
+            }
+        }
+        if (site.kind == ExploreItemKind.DIVE_CENTER) {
+            Spacer(Modifier.height(8.dp))
             OutlinedButton(
                 onClick = {
                     onRequestClose()
-                    innerNav.navigate(InnerRoutes.Trips)
+                    innerNav.navigate(InnerRoutes.diveCenterPublic(site.id))
                 },
+                modifier = Modifier.fillMaxWidth(),
             ) {
-                Text(stringResource(R.string.explore_book))
+                Text(stringResource(R.string.dive_center_public_open_profile))
+            }
+        }
+        if (site.kind == ExploreItemKind.SHOP) {
+            Spacer(Modifier.height(8.dp))
+            OutlinedButton(
+                onClick = {
+                    onRequestClose()
+                    innerNav.navigate(InnerRoutes.shopPublic(site.id))
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.shop_public_open_profile))
             }
         }
         if (site.kind != ExploreItemKind.DIVE_SITE) {
@@ -1003,8 +1174,9 @@ private fun DiveSiteDetailSheet(
     }
 
     if (showReviewDialog) {
-        AddReviewDialog(
-            site = site,
+        AddReviewableDialog(
+            reviewableType = site.kind.toApiReviewType(),
+            reviewableId = site.id,
             graph = graph,
             onDismiss = { showReviewDialog = false },
             onSuccess = {
@@ -1035,104 +1207,6 @@ private fun ReviewListItem(r: ReviewDto) {
             }
         }
         Text(r.text, style = MaterialTheme.typography.bodyMedium)
-    }
-}
-
-@Composable
-private fun AddReviewDialog(
-    site: ExploreDiveSite,
-    graph: AppGraph,
-    onDismiss: () -> Unit,
-    onSuccess: () -> Unit,
-) {
-    val scope = rememberCoroutineScope()
-    val context = LocalContext.current
-    var rating by remember { mutableIntStateOf(5) }
-    var text by remember { mutableStateOf("") }
-    var busy by remember { mutableStateOf(false) }
-    var err by remember { mutableStateOf<String?>(null) }
-
-    AlertDialog(
-        onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(R.string.review_dialog_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                StarRatingPicker(rating = rating, onRating = { rating = it })
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.review_comment_hint)) },
-                    minLines = 3,
-                    maxLines = 6,
-                )
-                err?.let {
-                    Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = {
-                    if (text.trim().isEmpty()) return@Button
-                    busy = true
-                    err = null
-                    scope.launch {
-                        runCatching {
-                            ReviewsRepository(graph).createReview(
-                                CreateReviewRequest(
-                                    reviewableType = site.kind.toApiReviewType(),
-                                    reviewableId = site.id,
-                                    rating = rating.coerceIn(1, 5),
-                                    text = text.trim(),
-                                    language = Locale.getDefault().language.takeIf { it.length == 2 } ?: "en",
-                                ),
-                            )
-                        }.onSuccess {
-                            busy = false
-                            onSuccess()
-                        }.onFailure { e ->
-                            busy = false
-                            err = when (e) {
-                                is HttpException -> when (e.code()) {
-                                    401 -> context.getString(R.string.review_login_required)
-                                    else -> context.getString(R.string.review_failed)
-                                }
-                                else -> e.message ?: context.getString(R.string.review_failed)
-                            }
-                        }
-                    }
-                },
-                enabled = !busy && text.trim().isNotEmpty(),
-            ) {
-                if (busy) {
-                    CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
-                } else {
-                    Text(stringResource(R.string.review_send))
-                }
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) {
-                Text(stringResource(R.string.common_close))
-            }
-        },
-    )
-}
-
-@Composable
-private fun StarRatingPicker(rating: Int, onRating: (Int) -> Unit) {
-    Row(horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
-        (1..5).forEach { star ->
-            IconButton(onClick = { onRating(star) }, modifier = Modifier.size(40.dp)) {
-                Icon(
-                    Icons.Default.Star,
-                    contentDescription = null,
-                    tint = if (star <= rating) Color(0xFFF2C94C) else Color(0x33000000),
-                    modifier = Modifier.size(28.dp),
-                )
-            }
-        }
     }
 }
 

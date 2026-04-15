@@ -23,17 +23,17 @@ struct NotificationsView: View {
                             await viewModel.deleteNotification(notification.id)
                         }
                     }) {
-                        Label("Delete", systemImage: "trash")
+                        Label("ui_inventory_delete".localized, systemImage: "trash")
                     }
                 }
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Notifications")
+        .navigationTitle("ui_notifications_notifications".localized)
         .diveHubNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Mark All Read") {
+                Button("ui_mark_all_read".localized) {
                     Task {
                         await viewModel.markAllAsRead()
                     }

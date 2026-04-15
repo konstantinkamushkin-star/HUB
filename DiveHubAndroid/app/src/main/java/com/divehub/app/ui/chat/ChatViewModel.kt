@@ -18,6 +18,7 @@ import java.time.Instant
 data class ChatUiState(
     val loading: Boolean = true,
     val error: String? = null,
+    val openConversationError: String? = null,
     val conversations: List<ChatConversationDto> = emptyList(),
     val selectedConversation: ChatConversationDto? = null,
     val messages: List<ChatMessageDto> = emptyList(),
@@ -50,14 +51,24 @@ class ChatViewModel(private val repo: ChatRepository) : ViewModel() {
         }
     }
 
+    fun clearOpenConversationError() {
+        _state.value = _state.value.copy(openConversationError = null)
+    }
+
     fun openOrCreateConversation(friendId: String) {
         viewModelScope.launch {
-            runCatching { repo.openUserConversation(friendId) }
+            _state.value = _state.value.copy(openConversationError = null)
+            runCatching { repo.openConversation(friendId, peerType = "user") }
                 .onSuccess { conv ->
-                    _state.value = _state.value.copy(selectedConversation = conv)
+                    _state.value = _state.value.copy(selectedConversation = conv, openConversationError = null)
                     loadMessages(conv.id, reset = true)
                     startPolling(conv.id)
                     refreshConversations()
+                }
+                .onFailure { e ->
+                    _state.value = _state.value.copy(
+                        openConversationError = e.message ?: e::class.java.simpleName,
+                    )
                 }
         }
     }

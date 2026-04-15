@@ -46,6 +46,7 @@ class LogbookViewModel(
                     val sorted = logs.sortedByDescending { it.date }
                     _state.value = LogbookUiState(
                         loading = false,
+                        error = null,
                         logs = sorted,
                         stats = LogbookStats(
                             totalDives = sorted.size,

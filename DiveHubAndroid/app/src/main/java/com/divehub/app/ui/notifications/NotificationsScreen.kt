@@ -19,6 +19,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -63,6 +65,15 @@ fun NotificationsRoute(graph: AppGraph, innerNav: NavController) {
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { vm.refresh() },
+                        enabled = !state.loading,
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.common_refresh_list),
+                        )
+                    }
                     TextButton(
                         onClick = { vm.markAllRead() },
                         enabled = state.notifications.any { !it.isRead },
@@ -80,7 +91,7 @@ fun NotificationsRoute(graph: AppGraph, innerNav: NavController) {
             ) {
                 CircularProgressIndicator()
             }
-            state.error != null && state.notifications.isEmpty() -> Column(
+            state.error != null && state.notifications.isEmpty() && !state.loading -> Column(
                 Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -101,17 +112,33 @@ fun NotificationsRoute(graph: AppGraph, innerNav: NavController) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            else -> LazyColumn(
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading && state.notifications.isNotEmpty(),
+                onRefresh = { vm.refresh() },
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(state.notifications, key = { it.id }) { n ->
-                    NotificationRow(
-                        notification = n,
-                        onDelete = { vm.delete(n.id) },
-                        onOpenAction = { context.handleAppActionUrl(n.actionUrl) },
-                    )
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    if (state.error != null) {
+                        item {
+                            Text(
+                                state.error ?: "",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
+                    }
+                    items(state.notifications, key = { it.id }) { n ->
+                        NotificationRow(
+                            notification = n,
+                            onDelete = { vm.delete(n.id) },
+                            onOpenAction = { context.handleAppActionUrl(n.actionUrl) },
+                        )
+                    }
                 }
             }
         }

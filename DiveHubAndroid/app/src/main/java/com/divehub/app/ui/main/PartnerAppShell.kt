@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.MenuBook
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MoreHoriz
-import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -49,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.diveHubApp
 import com.divehub.app.data.remote.dto.DiveCenterBriefDto
 import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.data.remote.dto.ShopV1DetailDto
@@ -57,6 +61,11 @@ import com.divehub.app.data.repository.TripsRepository
 import com.divehub.app.ui.navigation.AppShellKind
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.Routes
+import com.divehub.app.ui.partner.InstructorPhotoTab
+import com.divehub.app.ui.partner.InstructorScheduleTab
+import com.divehub.app.ui.partner.PartnerAnalyticsTab
+import com.divehub.app.ui.partner.PartnerCoursesTab
+import com.divehub.app.ui.partner.ShopSellTab
 import com.divehub.app.ui.trips.TripsListTabContent
 import kotlinx.coroutines.launch
 
@@ -72,9 +81,7 @@ fun PartnerAppShell(
     onLoggedOut: () -> Unit,
 ) {
     val user by sessionVm.user.collectAsState()
-    val scope = rememberCoroutineScope()
-    val ctx = LocalContext.current
-    var tab by remember { mutableIntStateOf(0) }
+    var tab by remember(kind) { mutableIntStateOf(0) }
 
     val title = when (kind) {
         AppShellKind.ADMIN -> stringResource(R.string.partner_portal_admin_title)
@@ -82,42 +89,117 @@ fun PartnerAppShell(
         AppShellKind.INSTRUCTOR -> stringResource(R.string.partner_portal_instructor_title)
         AppShellKind.DIVER -> stringResource(R.string.app_name)
     }
-    val secondTabLabel = if (kind == AppShellKind.INSTRUCTOR) {
-        stringResource(R.string.partner_tab_schedule)
-    } else {
-        stringResource(R.string.partner_tab_trips)
-    }
     val showCreateTripFab = kind == AppShellKind.ADMIN || kind == AppShellKind.INSTRUCTOR
+
+    val app = LocalContext.current.diveHubApp()
+    LaunchedEffect(Unit) {
+        app.innerNavDeepLinkRequests.collect { route ->
+            innerNav.navigate(route) {
+                launchSingleTop = true
+            }
+        }
+    }
 
     Scaffold(
         containerColor = IosScreenBg,
         contentColor = Color.Black,
         bottomBar = {
-            NavigationBar {
-                NavigationBarItem(
-                    selected = tab == 0,
-                    onClick = { tab = 0 },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                    label = { Text(stringResource(R.string.partner_tab_home)) },
-                )
-                NavigationBarItem(
-                    selected = tab == 1,
-                    onClick = { tab = 1 },
-                    icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                    label = { Text(secondTabLabel) },
-                )
-                NavigationBarItem(
-                    selected = tab == 2,
-                    onClick = { tab = 2 },
-                    icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
-                    label = { Text(stringResource(R.string.partner_tab_alerts)) },
-                )
-                NavigationBarItem(
-                    selected = tab == 3,
-                    onClick = { tab = 3 },
-                    icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
-                    label = { Text(stringResource(R.string.partner_tab_more)) },
-                )
+            if (kind != AppShellKind.DIVER) {
+                NavigationBar {
+                when (kind) {
+                    AppShellKind.ADMIN -> {
+                        NavigationBarItem(
+                            selected = tab == 0,
+                            onClick = { tab = 0 },
+                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_home)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 1,
+                            onClick = { tab = 1 },
+                            icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_courses)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 2,
+                            onClick = { tab = 2 },
+                            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_trips)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 3,
+                            onClick = { tab = 3 },
+                            icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_analytics)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 4,
+                            onClick = { tab = 4 },
+                            icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_more)) },
+                        )
+                    }
+                    AppShellKind.INSTRUCTOR -> {
+                        NavigationBarItem(
+                            selected = tab == 0,
+                            onClick = { tab = 0 },
+                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_home)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 1,
+                            onClick = { tab = 1 },
+                            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_schedule)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 2,
+                            onClick = { tab = 2 },
+                            icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_photo)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 3,
+                            onClick = { tab = 3 },
+                            icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_more)) },
+                        )
+                    }
+                    AppShellKind.SHOP -> {
+                        NavigationBarItem(
+                            selected = tab == 0,
+                            onClick = { tab = 0 },
+                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_home)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 1,
+                            onClick = { tab = 1 },
+                            icon = { Icon(Icons.Default.Store, contentDescription = null) },
+                            label = { Text(stringResource(R.string.shop_tab_store)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 2,
+                            onClick = { tab = 2 },
+                            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
+                            label = { Text(stringResource(R.string.shop_tab_sell)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 3,
+                            onClick = { tab = 3 },
+                            icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_analytics)) },
+                        )
+                        NavigationBarItem(
+                            selected = tab == 4,
+                            onClick = { tab = 4 },
+                            icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
+                            label = { Text(stringResource(R.string.partner_tab_more)) },
+                        )
+                    }
+                    else -> Unit
+                }
+                }
             }
         },
     ) { padding ->
@@ -126,54 +208,82 @@ fun PartnerAppShell(
                 .fillMaxSize()
                 .padding(padding),
         ) {
-            when (tab) {
-                0 -> {
-                    when (kind) {
-                        AppShellKind.INSTRUCTOR -> InstructorHomeTab(
-                            portalTitle = title,
-                            user = user,
-                            onOpenSchedule = { tab = 1 },
-                        )
-                        AppShellKind.ADMIN -> AdminHomeTab(
-                            graph = graph,
-                            portalTitle = title,
-                            user = user,
-                            onOpenTrips = { tab = 1 },
-                            onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
-                            onOpenCenterInstructors = { c ->
-                                innerNav.navigate(InnerRoutes.centerInstructors(c.id))
-                            },
-                            onOpenCenterTrips = { c ->
-                                innerNav.navigate(InnerRoutes.centerTrips(c.id))
-                            },
-                        )
-                        AppShellKind.SHOP -> ShopHomeTab(
-                            graph = graph,
-                            shopId = user?.shopId,
-                            portalTitle = title,
-                            user = user,
-                            onOpenTrips = { tab = 1 },
-                        )
-                        AppShellKind.DIVER -> PartnerDashboardTab(
-                            portalTitle = title,
-                            user = user,
-                        )
-                    }
+            when (kind) {
+                AppShellKind.ADMIN -> when (tab) {
+                    0 -> AdminHomeTab(
+                        graph = graph,
+                        portalTitle = title,
+                        user = user,
+                        onOpenTrips = { tab = 2 },
+                        onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
+                        onOpenCenterInstructors = { c ->
+                            innerNav.navigate(InnerRoutes.centerInstructors(c.id))
+                        },
+                        onOpenCenterTrips = { c ->
+                            innerNav.navigate(InnerRoutes.centerTrips(c.id))
+                        },
+                    )
+                    1 -> PartnerCoursesTab(graph = graph)
+                    2 -> TripsListTabContent(
+                        graph = graph,
+                        innerNav = innerNav,
+                        showCreateFab = showCreateTripFab,
+                        onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
+                    )
+                    3 -> PartnerAnalyticsTab(graph = graph)
+                    4 -> PartnerMoreTab(
+                        kind = kind,
+                        graph = graph,
+                        innerNav = innerNav,
+                        rootNav = rootNav,
+                        sessionVm = sessionVm,
+                        onLoggedOut = onLoggedOut,
+                    )
                 }
-                1 -> TripsListTabContent(
-                    graph = graph,
-                    innerNav = innerNav,
-                    showCreateFab = showCreateTripFab,
-                    onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
-                )
-                2 -> PartnerAlertsTab(innerNav = innerNav)
-                3 -> PartnerMoreTab(
-                    graph = graph,
-                    innerNav = innerNav,
-                    rootNav = rootNav,
-                    sessionVm = sessionVm,
-                    onLoggedOut = onLoggedOut,
-                )
+                AppShellKind.INSTRUCTOR -> when (tab) {
+                    0 -> InstructorHomeTab(
+                        portalTitle = title,
+                        user = user,
+                        onOpenSchedule = { tab = 1 },
+                    )
+                    1 -> InstructorScheduleTab()
+                    2 -> InstructorPhotoTab(innerNav = innerNav)
+                    3 -> PartnerMoreTab(
+                        kind = kind,
+                        graph = graph,
+                        innerNav = innerNav,
+                        rootNav = rootNav,
+                        sessionVm = sessionVm,
+                        onLoggedOut = onLoggedOut,
+                    )
+                }
+                AppShellKind.SHOP -> when (tab) {
+                    0 -> ShopHomeTab(
+                        graph = graph,
+                        shopId = user?.shopId,
+                        portalTitle = title,
+                        user = user,
+                        onOpenTrips = { tab = 2 },
+                    )
+                    1 -> ShopHomeTab(
+                        graph = graph,
+                        shopId = user?.shopId,
+                        portalTitle = stringResource(R.string.shop_tab_store_title),
+                        user = user,
+                        onOpenTrips = { tab = 2 },
+                    )
+                    2 -> ShopSellTab(graph = graph, innerNav = innerNav)
+                    3 -> PartnerAnalyticsTab(graph = graph)
+                    4 -> PartnerMoreTab(
+                        kind = kind,
+                        graph = graph,
+                        innerNav = innerNav,
+                        rootNav = rootNav,
+                        sessionVm = sessionVm,
+                        onLoggedOut = onLoggedOut,
+                    )
+                }
+                AppShellKind.DIVER -> PartnerDashboardTab(portalTitle = title, user = user)
             }
         }
     }
@@ -551,31 +661,8 @@ private fun PartnerDashboardTab(
 }
 
 @Composable
-private fun PartnerAlertsTab(innerNav: NavController) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Text(
-            stringResource(R.string.partner_alerts_body),
-            style = MaterialTheme.typography.bodyLarge,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(20.dp))
-        Button(
-            onClick = { innerNav.navigate(InnerRoutes.Notifications) },
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text(stringResource(R.string.partner_open_notifications))
-        }
-    }
-}
-
-@Composable
 private fun PartnerMoreTab(
+    kind: AppShellKind,
     graph: AppGraph,
     innerNav: NavController,
     rootNav: NavController,
@@ -598,10 +685,72 @@ private fun PartnerMoreTab(
             color = MaterialTheme.colorScheme.primary,
         )
         OutlinedButton(
+            onClick = { innerNav.navigate(InnerRoutes.Notifications) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.screen_notifications))
+        }
+        OutlinedButton(
+            onClick = { innerNav.navigate(InnerRoutes.DiveEditor) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.partner_photo_open_editor))
+        }
+        OutlinedButton(
+            onClick = { innerNav.navigate(InnerRoutes.EditProfile) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.profile_edit_title))
+        }
+        OutlinedButton(
+            onClick = { innerNav.navigate(InnerRoutes.Statistics) },
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Text(stringResource(R.string.screen_statistics))
+        }
+        OutlinedButton(
             onClick = { innerNav.navigate(InnerRoutes.TripCreate) },
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(stringResource(R.string.trip_create_title))
+        }
+        if (kind == AppShellKind.ADMIN) {
+            OutlinedButton(
+                onClick = { innerNav.navigate(InnerRoutes.Inventory) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.inventory_title))
+            }
+            OutlinedButton(
+                onClick = { innerNav.navigate(InnerRoutes.AdminBookingCalendar) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.admin_booking_calendar_title))
+            }
+            OutlinedButton(
+                onClick = { innerNav.navigate(InnerRoutes.AdminBookingManagement) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.admin_bookings_title))
+            }
+            OutlinedButton(
+                onClick = { innerNav.navigate(InnerRoutes.AdminAffiliatedSites) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.admin_affiliated_sites_title))
+            }
+            OutlinedButton(
+                onClick = { innerNav.navigate(InnerRoutes.AdminShopsManagement) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.admin_shops_title))
+            }
+            OutlinedButton(
+                onClick = { innerNav.navigate(InnerRoutes.AdminGearManagement) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.admin_gear_title))
+            }
         }
         OutlinedButton(
             onClick = { innerNav.navigate(InnerRoutes.Settings) },

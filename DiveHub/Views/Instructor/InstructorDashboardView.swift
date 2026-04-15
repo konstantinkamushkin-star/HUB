@@ -150,6 +150,7 @@ struct ScheduleItemRow: View {
     private func statusColor(for status: Booking.BookingStatus) -> Color {
         switch status {
         case .pending: return .orange
+        case .quoted: return .purple
         case .confirmed: return .blue
         case .completed: return .green
         case .cancelled: return .red

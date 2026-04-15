@@ -14,6 +14,68 @@ export type ApiResult<T = unknown> = {
   errorMessage: string | null;
 };
 
+/** Сообщение для человека: по-русски, без кодов HTTP и без «(HTTP 401)» из Nest. */
+function userFacingApiErrorMessage(status: number, raw: string | null): string {
+  const stripHttp = (s: string) =>
+    s
+      .replace(/\s*\(HTTP\s*\d+\)\s*$/i, "")
+      .replace(/^HTTP\s*\d+\s*[–—:\-]\s*/i, "")
+      .trim();
+
+  const cleaned = stripHttp((raw ?? "").trim());
+  const lower = cleaned.toLowerCase();
+
+  if (
+    lower.includes("invalid email") ||
+    lower.includes("invalid password") ||
+    lower.includes("invalid credentials")
+  ) {
+    return "Неверный email или пароль";
+  }
+  if (lower.includes("unauthorized") && cleaned.length < 80) {
+    return "Нужно войти в систему";
+  }
+  if (lower.includes("forbidden") || lower.includes("not allowed")) {
+    return "Недостаточно прав для этого действия";
+  }
+  if (lower.includes("not found")) {
+    return "Данные не найдены";
+  }
+  if (lower.includes("too many requests") || lower.includes("throttl")) {
+    return "Слишком много запросов. Подождите немного и повторите.";
+  }
+
+  if (cleaned.length > 0 && !/\bHTTP\s*\d+\b/i.test(cleaned)) {
+    return cleaned;
+  }
+
+  if (status === 400) return "Некорректный запрос";
+  if (status === 401) return "Неверный email или пароль";
+  if (status === 403) return "Недостаточно прав для этого действия";
+  if (status === 404) return "Данные не найдены";
+  if (status === 409) return "Конфликт данных. Обновите страницу и попробуйте снова.";
+  if (status === 429) return "Слишком много запросов. Подождите немного и повторите.";
+  if (status >= 500) return "Ошибка на сервере. Попробуйте позже.";
+  if (status === 0) {
+    return "Нет подключения к интернету. Проверьте сеть и попробуйте снова.";
+  }
+  return "Операция не выполнена";
+}
+
+function isLikelyNoInternet(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const m = (err.message || "").toLowerCase();
+  if (err.name === "TypeError") {
+    return (
+      m.includes("failed to fetch") ||
+      m.includes("load failed") ||
+      m.includes("networkerror") ||
+      m.includes("fetch failed")
+    );
+  }
+  return false;
+}
+
 /**
  * В браузере ходим на тот же origin (`/api-proxy/...`) — Next переписывает запрос на Nest.
  * Так Safari не делает cross-origin fetch на другой порт (меньше «Load failed» / CORS).
@@ -93,19 +155,21 @@ function parseApiResult<T>(res: Response, text: string): ApiResult<T> {
 
   let errorMessage: string | null = null;
   if (!res.ok) {
+    let raw: string | null = null;
     if (data && typeof data === "object" && "message" in data) {
       const m = (data as { message?: unknown }).message;
-      errorMessage =
+      raw =
         typeof m === "string"
           ? m
           : Array.isArray(m)
             ? m.join(", ")
-            : res.statusText;
+            : res.statusText || null;
     } else if (typeof data === "string" && data.length > 0 && data.length < 500) {
-      errorMessage = data;
+      raw = data;
     } else {
-      errorMessage = res.statusText || `HTTP ${res.status}`;
+      raw = res.statusText || null;
     }
+    errorMessage = userFacingApiErrorMessage(res.status, raw);
   }
 
   return { ok: res.ok, status: res.status, data, errorMessage };
@@ -125,6 +189,15 @@ export async function apiRequest<T = unknown>(
   try {
     res = await fetch(buildUrl(apiPath), { ...init, headers });
   } catch (e) {
+    if (isLikelyNoInternet(e)) {
+      return {
+        ok: false,
+        status: 0,
+        data: null,
+        errorMessage:
+          "Нет подключения к интернету. Проверьте Wi‑Fi или кабель и попробуйте снова.",
+      };
+    }
     const hint =
       typeof window !== "undefined"
         ? " Нет ответа от API: запущен ли backend (npm run start:dev в папке backend)?"

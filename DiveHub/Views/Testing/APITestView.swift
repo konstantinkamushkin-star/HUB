@@ -8,6 +8,7 @@
 import SwiftUI
 import UIKit
 
+#if DEBUG
 struct APITestView: View {
     @State private var testResults: [TestResult] = []
     @State private var isRunning = false
@@ -15,31 +16,31 @@ struct APITestView: View {
     var body: some View {
         NavigationView {
             List {
-                Section("Нейросеть подводы (Nest → Python ONNX)") {
-                    Text("Mac: backend/start-neural-test-stack.sh — или ai-service/start.sh и Nest с AI_UNDERWATER_SERVICE_URL в .env. iPhone: в профиле укажите http://IP_Mac:3000")
+                Section("ui_1n34nnn_34_234_n_nest_a_python_onnx".localized) {
+                    Text("ui_testing_mac_backend_start_neural_test_stack_sh_a_ai_service_star".localized)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Button("AI health (Nest)") {
+                    Button("ui_ai_health_nest".localized) {
                         testUnderwaterAIHealth()
                     }
                     .disabled(isRunning)
-                    Button("AI process (мини-JPEG → сервер)") {
+                    Button("ui_ai_process_14_12_jpeg_a_nn2n".localized) {
                         testUnderwaterAIProcess()
                     }
                     .disabled(isRunning)
                 }
-                Section("API Tests") {
-                    Button("Test Backend Connection") {
+                Section("ui_api_tests".localized) {
+                    Button("ui_test_backend_connection".localized) {
                         testBackendConnection()
                     }
                     .disabled(isRunning)
                     
-                    Button("Test Authentication") {
+                    Button("ui_test_authentication".localized) {
                         testAuthentication()
                     }
                     .disabled(isRunning)
                     
-                    Button("Test Get Dive Sites") {
+                    Button("ui_test_get_dive_sites".localized) {
                         testGetDiveSites()
                     }
                     .disabled(isRunning)
@@ -47,14 +48,14 @@ struct APITestView: View {
                     if isRunning {
                         HStack {
                             ProgressView()
-                            Text("Testing...")
+                            Text("ui_testing_testing".localized)
                         }
                     }
                 }
                 
-                Section("Results") {
+                Section("ui_results".localized) {
                     if testResults.isEmpty {
-                        Text("No tests run yet")
+                        Text("ui_testing_no_tests_run_yet".localized)
                             .foregroundColor(.secondary)
                     } else {
                         ForEach(testResults) { result in
@@ -73,7 +74,7 @@ struct APITestView: View {
                     }
                 }
             }
-            .navigationTitle("API Testing")
+            .navigationTitle("ui_testing_api_testing".localized)
         }
     }
     
@@ -260,3 +261,4 @@ struct TestResult: Identifiable {
 #Preview {
     APITestView()
 }
+#endif

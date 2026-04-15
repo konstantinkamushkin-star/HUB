@@ -171,7 +171,7 @@ struct UnderwaterPhotoEditorView: View {
             HStack {
                 Text(label).font(.caption).foregroundColor(.diveTextSecondary)
                 Spacer()
-                Text("\(Int(value.wrappedValue))").font(.caption2).foregroundColor(.diveText)
+                Text("ui_imageediting_value_3".localized).font(.caption2).foregroundColor(.diveText)
             }
             Slider(value: value, in: range, step: step).tint(.divePrimary).onChange(of: value.wrappedValue) { _, _ in onChange() }
         }
@@ -202,16 +202,16 @@ struct SavePhotoSheet: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Format") {
-                    Picker("Format", selection: $format) {
+                Section("ui_imageediting_format".localized) {
+                    Picker("ui_imageediting_format".localized, selection: $format) {
                         ForEach(ExportFormat.allCases, id: \.self) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
                 }
                 if format == .jpg || format == .heic {
-                    Section("Quality") {
+                    Section("ui_quality".localized) {
                         Slider(value: $quality, in: 0.8...1.0, step: 0.05)
-                        Text("\(Int(quality * 100))%").font(.caption).foregroundColor(.secondary)
+                        Text("ui_imageediting_value".localized).font(.caption).foregroundColor(.secondary)
                     }
                 }
                 Section {
@@ -228,7 +228,7 @@ struct SavePhotoSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button("ui_feed_done".localized) {
                         onDismiss()
                         envDismiss()
                     }

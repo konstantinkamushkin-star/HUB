@@ -85,8 +85,20 @@ class AdminViewModel: ObservableObject {
         }
     }
     
-    func updateBookingStatus(_ bookingId: String, status: Booking.BookingStatus) async throws {
-        let updatedBooking = try await NetworkService.shared.updateBookingStatus(bookingId: bookingId, status: status)
+    func updateBookingStatus(
+        _ bookingId: String,
+        status: Booking.BookingStatus,
+        finalPriceAmount: Double? = nil,
+        finalPriceCurrency: String? = nil,
+        manualVerificationNote: String? = nil
+    ) async throws {
+        let updatedBooking = try await NetworkService.shared.updateBookingStatus(
+            bookingId: bookingId,
+            status: status,
+            finalPriceAmount: finalPriceAmount,
+            finalPriceCurrency: finalPriceCurrency,
+            manualVerificationNote: manualVerificationNote
+        )
         if let index = bookings.firstIndex(where: { $0.id == bookingId }) {
             bookings[index] = updatedBooking
         }

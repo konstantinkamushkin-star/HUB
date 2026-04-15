@@ -772,7 +772,8 @@ struct TestData {
                 duration: 3,
                 prerequisites: nil,
                 diveCenterId: testDiveCenterId,
-                instructorId: testInstructorId,
+                instructorId: nil,
+                instructorIds: [testInstructorId, "test-instructor-2"],
                 photos: ["https://images.unsplash.com/photo-1583212292454-1fe6229603b7?w=800"],
                 createdAt: calendar.date(byAdding: .month, value: -6, to: today) ?? today,
                 updatedAt: today

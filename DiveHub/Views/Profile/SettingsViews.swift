@@ -62,6 +62,27 @@ struct AppearanceSettingsView: View {
                     }
                 }
             }
+            Section {
+                Text(localizationService.localizedString("interfaceScaleFooter", table: "settings"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Section(localizationService.localizedString("interfaceScale", table: "settings")) {
+                ForEach(InterfaceScalePreset.allCases) { preset in
+                    Button {
+                        settingsService.saveInterfaceScalePreset(preset)
+                    } label: {
+                        HStack {
+                            Text(interfaceScaleTitle(for: preset))
+                            Spacer()
+                            if settingsService.interfaceScalePreset == preset {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(.divePrimary)
+                            }
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle(localizationService.localizedString("appearance", table: "settings"))
         .navigationBarTitleDisplayMode(.inline)
@@ -76,6 +97,10 @@ struct AppearanceSettingsView: View {
         case .dark:
             return localizationService.localizedString("appearanceDark", table: "settings")
         }
+    }
+
+    private func interfaceScaleTitle(for preset: InterfaceScalePreset) -> String {
+        localizationService.localizedString("interfaceScale_\(preset.rawValue)", table: "settings")
     }
 }
 
@@ -255,7 +280,7 @@ struct PaymentFormView: View {
                         TextField(localizationService.localizedString("cardHolderName", table: "settings"), text: $cardHolderName)
                         TextField(localizationService.localizedString("expiryDate", table: "settings"), text: $expiryDate)
                             .keyboardType(.numberPad)
-                        TextField("CVV", text: $cvv)
+                        TextField("ui_profile_cvv".localized, text: $cvv)
                             .keyboardType(.numberPad)
                     } else {
                         Text(localizationService.localizedString("applePayDescription", table: "settings"))
@@ -369,13 +394,13 @@ struct CertificationsView: View {
                         Image(systemName: "exclamationmark.triangle")
                             .font(.largeTitle)
                             .foregroundColor(.orange)
-                        Text("Session Expired")
+                        Text("ui_profile_session_expired".localized)
                             .font(.headline)
                         Text(error)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                             .multilineTextAlignment(.center)
-                        Button("Sign Out and Sign In") {
+                        Button("ui_sign_out_and_sign_in".localized) {
                             authService.signOut()
                         }
                         .buttonStyle(.borderedProminent)
@@ -422,8 +447,8 @@ struct CertificationsView: View {
         .task {
             await loadCertifications()
         }
-        .alert("Error", isPresented: .constant(errorMessage != nil && !(errorMessage?.contains("sign out") ?? false) && !(errorMessage?.contains("session") ?? false))) {
-            Button("OK") {
+        .alert("ui_logbook_error".localized, isPresented: .constant(errorMessage != nil && !(errorMessage?.contains("sign out") ?? false) && !(errorMessage?.contains("session") ?? false))) {
+            Button("ok".localized) {
                 errorMessage = nil
             }
         } message: {
@@ -802,14 +827,14 @@ struct GearProfilesView: View {
                 }) {
                     HStack {
                         Image(systemName: "plus.circle.fill")
-                        Text("Add Gear Profile")
+                        Text("ui_profile_add_gear_profile".localized)
                     }
                 }
             }
             
-            Section("Gear Profiles") {
+            Section("ui_gear_profiles".localized) {
                 if gearProfiles.isEmpty {
-                    Text("No gear profiles yet. Create one to save your gear sizes.")
+                    Text("ui_profile_no_gear_profiles_yet_create_one_to_save_your_gear_sizes".localized)
                         .foregroundColor(.secondary)
                         .font(.caption)
                 } else {
@@ -861,7 +886,7 @@ struct GearProfileRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(profile.name)
                 .font(.headline)
-            Text("\(profile.items.count) items")
+            Text("ui_profile_value_items".localized)
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -875,16 +900,16 @@ struct GearProfileDetailView: View {
     
     var body: some View {
         List {
-            Section("Profile Name") {
+            Section("ui_profile_name".localized) {
                 Text(profile.name)
             }
             
-            Section("Gear Items") {
+            Section("ui_gear_items".localized) {
                 ForEach(profile.items) { item in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.category.rawValue.capitalized)
                             .font(.headline)
-                        Text("Size: \(item.size)")
+                        Text("ui_profile_size_value".localized)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         if let notes = item.notes, !notes.isEmpty {
@@ -916,16 +941,16 @@ struct AddGearProfileView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Profile Name") {
-                    TextField("Enter profile name", text: $profileName)
+                Section("ui_profile_name".localized) {
+                    TextField("ui_profile_enter_profile_name".localized, text: $profileName)
                 }
                 
-                Section("Gear Items") {
+                Section("ui_gear_items".localized) {
                     ForEach(items) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.category.rawValue.capitalized)
                                 .font(.headline)
-                            Text("Size: \(item.size)")
+                            Text("ui_profile_size_value".localized)
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -937,21 +962,21 @@ struct AddGearProfileView: View {
                     }) {
                         HStack {
                             Image(systemName: "plus.circle")
-                            Text("Add Gear Item")
+                            Text("ui_profile_add_gear_item".localized)
                         }
                     }
                 }
             }
-            .navigationTitle("New Gear Profile")
+            .navigationTitle("ui_profile_new_gear_profile".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("ui_cancel".localized) {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
+                    Button("ui_save".localized) {
                         let profile = GearProfile(
                             id: UUID().uuidString,
                             name: profileName.isEmpty ? "Untitled Profile" : profileName,
@@ -989,34 +1014,34 @@ struct AddGearItemView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Category") {
-                    Picker("Category", selection: $selectedCategory) {
+                Section("ui_profile_category".localized) {
+                    Picker("ui_profile_category".localized, selection: $selectedCategory) {
                         ForEach(GearItem.GearCategory.allCases, id: \.self) { category in
                             Text(category.rawValue.capitalized).tag(category)
                         }
                     }
                 }
                 
-                Section("Size") {
-                    TextField("Enter size (e.g., M, L, XL, 10, 12)", text: $size)
+                Section("ui_size".localized) {
+                    TextField("ui_profile_enter_size_placeholder".localized, text: $size)
                         .keyboardType(.default)
                 }
                 
-                Section("Notes (Optional)") {
+                Section("ui_notes_optional".localized) {
                     TextEditor(text: $notes)
                         .frame(height: 100)
                 }
             }
-            .navigationTitle("Add Gear Item")
+            .navigationTitle("ui_profile_add_gear_item".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("ui_cancel".localized) {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add") {
+                    Button("ui_add".localized) {
                         let item = GearProfile.GearProfileItem(
                             id: UUID().uuidString,
                             category: selectedCategory,
@@ -1192,9 +1217,11 @@ struct MeasurementUnitsSettingsView: View {
 }
 
 /// Связка приложения с NestJS и (опционально) Python AI: Dive Editor → `/api/v1/image/*` и `/api/v1/underwater-ai/process`.
+#if DEBUG
 struct DeveloperBackendSettingsView: View {
     @StateObject private var localizationService = LocalizationService.shared
     @State private var nestBaseURL: String = ""
+    @State private var adminWebBaseURLField: String = ""
     @State private var visionBaseURL: String = ""
     @State private var statusText: String?
 
@@ -1204,12 +1231,25 @@ struct DeveloperBackendSettingsView: View {
                 Text(localizationService.localizedString("devBackendConnectionHint", table: "settings"))
                     .font(.caption)
                     .foregroundColor(.secondary)
-                Text("Тест нейросети на Mac: в терминале из папки backend выполните ./start-neural-test-stack.sh затем в приложении Профиль → API Testing.")
+                Text("ui_profile_neural_test_mac_instructions".localized)
                     .font(.caption2)
                     .foregroundColor(.secondary)
             }
             Section(localizationService.localizedString("devNestBaseURL", table: "settings")) {
-                TextField("http://192.168.1.10:3000", text: $nestBaseURL)
+                TextField("ui_profile_lan_url_placeholder".localized, text: $nestBaseURL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    #if os(iOS)
+                    .keyboardType(.URL)
+                    #endif
+            }
+            Section {
+                Text(localizationService.localizedString("devAdminWebURLHint", table: "settings"))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Section(localizationService.localizedString("devAdminWebURL", table: "settings")) {
+                TextField("ui_profile_https_dive_hub_ru".localized, text: $adminWebBaseURLField)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     #if os(iOS)
@@ -1222,7 +1262,7 @@ struct DeveloperBackendSettingsView: View {
                     .foregroundColor(.secondary)
             }
             Section(localizationService.localizedString("devVisionModuleURL", table: "settings")) {
-                TextField("http://127.0.0.1:8010", text: $visionBaseURL)
+                TextField("ui_profile_localhost_url_placeholder".localized, text: $visionBaseURL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     #if os(iOS)
@@ -1249,34 +1289,44 @@ struct DeveloperBackendSettingsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             nestBaseURL = UserDefaults.standard.string(forKey: NetworkService.apiBaseURLUserDefaultsKey) ?? ""
+            adminWebBaseURLField = UserDefaults.standard.string(forKey: NetworkService.adminWebBaseURLUserDefaultsKey) ?? ""
             visionBaseURL = UserDefaults.standard.string(forKey: NetworkService.underwaterVisionModuleBaseURLKey) ?? ""
         }
     }
 
     private func save() {
         let nest = nestBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
+        let adminWeb = adminWebBaseURLField.trimmingCharacters(in: .whitespacesAndNewlines)
         let vis = visionBaseURL.trimmingCharacters(in: .whitespacesAndNewlines)
         if nest.isEmpty {
             UserDefaults.standard.removeObject(forKey: NetworkService.apiBaseURLUserDefaultsKey)
         } else {
             UserDefaults.standard.set(nest, forKey: NetworkService.apiBaseURLUserDefaultsKey)
         }
+        if adminWeb.isEmpty {
+            UserDefaults.standard.removeObject(forKey: NetworkService.adminWebBaseURLUserDefaultsKey)
+        } else {
+            UserDefaults.standard.set(adminWeb, forKey: NetworkService.adminWebBaseURLUserDefaultsKey)
+        }
         if vis.isEmpty {
             UserDefaults.standard.removeObject(forKey: NetworkService.underwaterVisionModuleBaseURLKey)
         } else {
             UserDefaults.standard.set(vis, forKey: NetworkService.underwaterVisionModuleBaseURLKey)
         }
-        statusText = "Saved. API: \(NetworkService.shared.baseURL)"
+        statusText = "Saved. API: \(NetworkService.shared.baseURL) · Admin web: \(NetworkService.shared.adminWebBaseURL)"
     }
 
     private func reset() {
         nestBaseURL = ""
+        adminWebBaseURLField = ""
         visionBaseURL = ""
         UserDefaults.standard.removeObject(forKey: NetworkService.apiBaseURLUserDefaultsKey)
+        UserDefaults.standard.removeObject(forKey: NetworkService.adminWebBaseURLUserDefaultsKey)
         UserDefaults.standard.removeObject(forKey: NetworkService.underwaterVisionModuleBaseURLKey)
         statusText = "Reset. API: \(NetworkService.shared.baseURL)"
     }
 }
+#endif
 
 #Preview {
     NavigationView {

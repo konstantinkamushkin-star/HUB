@@ -32,6 +32,15 @@ class TokenStore(private val context: Context) {
         val LAST_REGISTERED_FCM_TOKEN = stringPreferencesKey("last_registered_fcm_token")
         /** INSTRUCTOR: use diver shell (map, logs, social) instead of partner portal */
         val PREFER_DIVER_SHELL = booleanPreferencesKey("prefer_diver_shell")
+        val NOTIFICATION_PREFS_JSON = stringPreferencesKey("notification_prefs_json")
+        val PRIVACY_PREFS_JSON = stringPreferencesKey("privacy_prefs_json")
+        val MEASUREMENT_PREFS_JSON = stringPreferencesKey("measurement_prefs_json")
+        val GEAR_PROFILES_JSON = stringPreferencesKey("gear_profiles_json")
+        val ADMIN_GEAR_ITEMS_JSON = stringPreferencesKey("admin_gear_items_json")
+        val ADMIN_BOOKINGS_JSON = stringPreferencesKey("admin_bookings_json")
+        val ADMIN_AFFILIATED_SITES_JSON = stringPreferencesKey("admin_affiliated_sites_json")
+        val INVENTORY_ITEMS_JSON = stringPreferencesKey("inventory_items_json")
+        val INVENTORY_TICKETS_JSON = stringPreferencesKey("inventory_tickets_json")
     }
 
     val accessToken: Flow<String?> = store.data.map { it[Keys.ACCESS] }
@@ -114,6 +123,11 @@ class TokenStore(private val context: Context) {
     suspend fun getAppLanguageTag(): String =
         store.data.map { it[Keys.APP_LANGUAGE]?.trim().orEmpty() }.first()
 
+    /** Emits BCP-47 tag or empty when user clears app language (follow system). */
+    val appLanguageTagFlow: Flow<String> = store.data.map { prefs ->
+        prefs[Keys.APP_LANGUAGE]?.trim().orEmpty()
+    }
+
     suspend fun setAppLanguageTag(tag: String?) {
         store.edit { prefs ->
             if (tag.isNullOrBlank()) {
@@ -142,5 +156,95 @@ class TokenStore(private val context: Context) {
 
     suspend fun setPreferDiverShell(value: Boolean) {
         store.edit { prefs -> prefs[Keys.PREFER_DIVER_SHELL] = value }
+    }
+
+    suspend fun getNotificationPrefsJson(): String? =
+        store.data.map { it[Keys.NOTIFICATION_PREFS_JSON] }.first()
+
+    suspend fun setNotificationPrefsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.NOTIFICATION_PREFS_JSON)
+            else prefs[Keys.NOTIFICATION_PREFS_JSON] = json
+        }
+    }
+
+    suspend fun getPrivacyPrefsJson(): String? =
+        store.data.map { it[Keys.PRIVACY_PREFS_JSON] }.first()
+
+    suspend fun setPrivacyPrefsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.PRIVACY_PREFS_JSON)
+            else prefs[Keys.PRIVACY_PREFS_JSON] = json
+        }
+    }
+
+    suspend fun getMeasurementPrefsJson(): String? =
+        store.data.map { it[Keys.MEASUREMENT_PREFS_JSON] }.first()
+
+    suspend fun setMeasurementPrefsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.MEASUREMENT_PREFS_JSON)
+            else prefs[Keys.MEASUREMENT_PREFS_JSON] = json
+        }
+    }
+
+    suspend fun getGearProfilesJson(): String? =
+        store.data.map { it[Keys.GEAR_PROFILES_JSON] }.first()
+
+    suspend fun setGearProfilesJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.GEAR_PROFILES_JSON)
+            else prefs[Keys.GEAR_PROFILES_JSON] = json
+        }
+    }
+
+    suspend fun getAdminGearItemsJson(): String? =
+        store.data.map { it[Keys.ADMIN_GEAR_ITEMS_JSON] }.first()
+
+    suspend fun setAdminGearItemsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.ADMIN_GEAR_ITEMS_JSON)
+            else prefs[Keys.ADMIN_GEAR_ITEMS_JSON] = json
+        }
+    }
+
+    suspend fun getAdminBookingsJson(): String? =
+        store.data.map { it[Keys.ADMIN_BOOKINGS_JSON] }.first()
+
+    suspend fun setAdminBookingsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.ADMIN_BOOKINGS_JSON)
+            else prefs[Keys.ADMIN_BOOKINGS_JSON] = json
+        }
+    }
+
+    suspend fun getAdminAffiliatedSitesJson(): String? =
+        store.data.map { it[Keys.ADMIN_AFFILIATED_SITES_JSON] }.first()
+
+    suspend fun setAdminAffiliatedSitesJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.ADMIN_AFFILIATED_SITES_JSON)
+            else prefs[Keys.ADMIN_AFFILIATED_SITES_JSON] = json
+        }
+    }
+
+    suspend fun getInventoryItemsJson(): String? =
+        store.data.map { it[Keys.INVENTORY_ITEMS_JSON] }.first()
+
+    suspend fun setInventoryItemsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.INVENTORY_ITEMS_JSON)
+            else prefs[Keys.INVENTORY_ITEMS_JSON] = json
+        }
+    }
+
+    suspend fun getInventoryTicketsJson(): String? =
+        store.data.map { it[Keys.INVENTORY_TICKETS_JSON] }.first()
+
+    suspend fun setInventoryTicketsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.INVENTORY_TICKETS_JSON)
+            else prefs[Keys.INVENTORY_TICKETS_JSON] = json
+        }
     }
 }

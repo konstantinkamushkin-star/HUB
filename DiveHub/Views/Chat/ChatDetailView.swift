@@ -25,7 +25,7 @@ struct ChatDetailView: View {
                         if viewModel.hasMoreMessages {
                             HStack {
                                 Spacer()
-                                Button("Load older messages") {
+                                Button("ui_load_older_messages".localized) {
                                     Task {
                                         await viewModel.loadOlderMessages(conversationId: conversation.id)
                                     }
@@ -66,7 +66,7 @@ struct ChatDetailView: View {
                         .foregroundColor(.divePrimary)
                 }
                 
-                TextField("Type a message...", text: $messageText, axis: .vertical)
+                TextField("ui_chat_type_a_message".localized, text: $messageText, axis: .vertical)
                     .textFieldStyle(RoundedBorderTextFieldStyle())
                     .focused($isInputFocused)
                     .lineLimit(1...5)
@@ -108,16 +108,16 @@ struct ChatDetailView: View {
                 }
             ))
         }
-        .alert("Voice Messages", isPresented: $showVoiceRecorder) {
-            Button("OK", role: .cancel) {}
+        .alert("ui_chat_voice_messages".localized, isPresented: $showVoiceRecorder) {
+            Button("ok".localized, role: .cancel) {}
         } message: {
-            Text("Voice message recording will be available in a future update.")
+            Text("ui_chat_voice_message_recording_will_be_available_in_a_future_up".localized)
         }
-        .alert("Chat", isPresented: Binding(
+        .alert("ui_chat_chat".localized, isPresented: Binding(
             get: { viewModel.error != nil },
             set: { if !$0 { viewModel.error = nil } }
         ), actions: {
-            Button("OK", role: .cancel) { viewModel.error = nil }
+            Button("ok".localized, role: .cancel) { viewModel.error = nil }
         }, message: {
             Text(viewModel.error?.localizedDescription ?? "")
         })

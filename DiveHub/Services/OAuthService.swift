@@ -88,13 +88,14 @@ enum OAuthError: LocalizedError {
     case unknown(Error)
     
     var errorDescription: String? {
+        let L = LocalizationService.shared
         switch self {
         case .googleSignInNotConfigured:
-            return "Google Sign In is not configured. Please add GoogleSignIn SDK."
+            return L.localizedString("oauthGoogleNotConfigured", table: "errors")
         case .invalidCredentials:
-            return "Invalid OAuth credentials"
+            return L.localizedString("oauthInvalidCredentials", table: "errors")
         case .cancelled:
-            return "Sign in was cancelled"
+            return L.localizedString("oauthCancelled", table: "errors")
         case .unknown(let error):
             return error.localizedDescription
         }

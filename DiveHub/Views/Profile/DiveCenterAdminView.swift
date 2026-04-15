@@ -18,8 +18,8 @@ struct DiveCenterAdminView: View {
         List {
             if isLoading {
                 ProgressView()
-            } else if let error = errorMessage {
-                Text("Error: \(error)")
+            } else if errorMessage != nil {
+                Text("ui_profile_error_value".localized)
                     .foregroundColor(.red)
             } else if let center = diveCenter {
                 Section {
@@ -27,13 +27,13 @@ struct DiveCenterAdminView: View {
                         Text(center.name)
                             .font(.title2)
                             .fontWeight(.bold)
-                        Text("\(center.location.city), \(center.location.country)")
+                        Text("ui_logbook_value_value".localized)
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                     }
                 }
                 
-                Section("Contact Information") {
+                Section("ui_contact_information".localized) {
                     InfoRow(icon: "phone", text: "Phone: \(center.contactInfo.phone)")
                     InfoRow(icon: "envelope", text: "Email: \(center.contactInfo.email)")
                     if let website = center.contactInfo.website {
@@ -41,9 +41,9 @@ struct DiveCenterAdminView: View {
                     }
                 }
                 
-                Section("Statistics") {
+                Section("ui_statistics_statistics".localized) {
                     HStack {
-                        Text("Average Rating")
+                        Text("ui_profile_average_rating".localized)
                         Spacer()
                         HStack {
                             Image(systemName: "star.fill")
@@ -52,63 +52,63 @@ struct DiveCenterAdminView: View {
                         }
                     }
                     HStack {
-                        Text("Total Reviews")
+                        Text("ui_profile_total_reviews".localized)
                         Spacer()
-                        Text("\(center.reviewCount)")
+                        Text("ui_profile_value_6".localized)
                     }
                     HStack {
-                        Text("Instructors")
+                        Text("ui_profile_instructors".localized)
                         Spacer()
-                        Text("\(center.instructors.count)")
+                        Text("ui_profile_value_5".localized)
                     }
                     HStack {
-                        Text("Affiliated Sites")
+                        Text("ui_profile_affiliated_sites".localized)
                         Spacer()
-                        Text("\(center.affiliatedSites.count)")
+                        Text("ui_profile_value".localized)
                     }
                 }
                 
-                Section("Instructors") {
+                Section("ui_profile_instructors".localized) {
                     NavigationLink(destination: ManageInstructorsView(center: center)) {
-                        Label("Manage Instructors", systemImage: "person.2")
+                        Label("ui_profile_manage_instructors".localized, systemImage: "person.2")
                     }
                     if center.instructors.isEmpty {
-                        Text("No instructors added yet")
+                        Text("ui_profile_no_instructors_added_yet".localized)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
-                        Text("\(center.instructors.count) instructor(s) configured")
+                        Text("ui_profile_value_instructor_s_configured".localized)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
                 
-                Section("Affiliated Dive Sites") {
+                Section("ui_affiliated_dive_sites".localized) {
                     NavigationLink(destination: ManageAffiliatedSitesView(center: center)) {
-                        Label("Manage Dive Sites", systemImage: "map")
+                        Label("ui_profile_manage_dive_sites".localized, systemImage: "map")
                     }
                     if center.affiliatedSites.isEmpty {
-                        Text("No dive sites added yet")
+                        Text("ui_profile_no_dive_sites_added_yet".localized)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     } else {
-                        Text("\(center.affiliatedSites.count) dive site(s) configured")
+                        Text("ui_profile_value_dive_site_s_configured".localized)
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
                 }
                 
-                Section("Management") {
+                Section("ui_management".localized) {
                     NavigationLink(destination: AdminTabView()) {
-                        Label("Admin Dashboard", systemImage: "chart.bar")
+                        Label("ui_profile_admin_dashboard".localized, systemImage: "chart.bar")
                     }
                 }
             } else {
-                Text("No dive center associated with your account")
+                Text("ui_profile_no_dive_center_associated_with_your_account".localized)
                     .foregroundColor(.secondary)
             }
         }
-        .navigationTitle("Dive Center Profile")
+        .navigationTitle("ui_profile_dive_center_profile".localized)
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await loadDiveCenter()

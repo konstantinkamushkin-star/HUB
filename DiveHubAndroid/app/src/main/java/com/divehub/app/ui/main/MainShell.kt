@@ -6,7 +6,18 @@ import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.ui.res.stringResource
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -29,11 +40,22 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.push.PushTokenRegistrar
 import com.divehub.app.ui.admin.CenterInstructorsRoute
+import com.divehub.app.ui.admin.AdminGearManagementRoute
+import com.divehub.app.ui.admin.AdminShopsManagementRoute
+import com.divehub.app.ui.admin.AdminBookingManagementRoute
+import com.divehub.app.ui.admin.AdminBookingCalendarRoute
+import com.divehub.app.ui.admin.AdminAffiliatedSitesRoute
+import com.divehub.app.ui.inventory.InventoryRoute
 import com.divehub.app.ui.achievements.AchievementsRoute
 import com.divehub.app.ui.notifications.NotificationsRoute
+import com.divehub.app.ui.profile.CertificationsRoute
 import com.divehub.app.ui.profile.EditProfileRoute
-import com.divehub.app.ui.profile.FeaturePlaceholderRoute
+import com.divehub.app.ui.profile.GearProfilesRoute
 import com.divehub.app.ui.profile.HelpRoute
+import com.divehub.app.ui.profile.MeasurementUnitsRoute
+import com.divehub.app.ui.profile.NotificationSettingsRoute
+import com.divehub.app.ui.profile.PrivacySettingsRoute
+import com.divehub.app.ui.profile.SubscriptionRoute
 import com.divehub.app.ui.profile.SettingsRoute
 import com.divehub.app.ui.profile.UserProfileRoute
 import com.divehub.app.ui.search.GlobalSearchRoute
@@ -41,11 +63,18 @@ import com.divehub.app.ui.statistics.StatisticsRoute
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.Routes
 import com.divehub.app.ui.navigation.resolveShellKind
+import com.divehub.app.ui.booking.BookingWizardRoute
+import com.divehub.app.ui.centers.DiveCenterPublicRoute
+import com.divehub.app.ui.shops.ShopPublicRoute
+import com.divehub.app.ui.chat.BusinessChatOpenRoute
+import com.divehub.app.ui.diveeditor.DiveEditorRoute
+import com.divehub.app.ui.explore.MapFullscreenRoute
 import com.divehub.app.ui.trips.CenterManagedTripsRoute
 import com.divehub.app.ui.trips.CreateTripRoute
 import com.divehub.app.ui.trips.TripDetailRoute
 import com.divehub.app.ui.trips.TripsRoute
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainShell(
     graph: AppGraph,
@@ -142,6 +171,30 @@ fun MainShell(
             }
         }
         composable(
+            route = InnerRoutes.DiveCenterPublic,
+            arguments = listOf(navArgument("centerId") { type = NavType.StringType }),
+        ) { entry ->
+            val centerId = entry.arguments?.getString("centerId").orEmpty()
+            if (centerId.isNotEmpty()) {
+                DiveCenterPublicRoute(graph = graph, centerId = centerId, innerNav = innerNav)
+            } else {
+                LaunchedEffect(Unit) { innerNav.popBackStack() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
+            }
+        }
+        composable(
+            route = InnerRoutes.ShopPublic,
+            arguments = listOf(navArgument("shopId") { type = NavType.StringType }),
+        ) { entry ->
+            val shopId = entry.arguments?.getString("shopId").orEmpty()
+            if (shopId.isNotEmpty()) {
+                ShopPublicRoute(graph = graph, shopId = shopId, innerNav = innerNav)
+            } else {
+                LaunchedEffect(Unit) { innerNav.popBackStack() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
+            }
+        }
+        composable(
             route = InnerRoutes.TripDetail,
             arguments = listOf(navArgument("tripId") { type = NavType.StringType }),
         ) { entry ->
@@ -172,46 +225,22 @@ fun MainShell(
             }
         }
         composable(InnerRoutes.Subscription) {
-            FeaturePlaceholderRoute(
-                titleRes = R.string.screen_subscription,
-                bodyRes = R.string.feature_placeholder_body,
-                innerNav = innerNav,
-            )
+            SubscriptionRoute(graph = graph, sessionVm = vm, innerNav = innerNav)
         }
         composable(InnerRoutes.Certifications) {
-            FeaturePlaceholderRoute(
-                titleRes = R.string.screen_certifications,
-                bodyRes = R.string.feature_placeholder_body,
-                innerNav = innerNav,
-            )
+            CertificationsRoute(graph = graph, sessionVm = vm, innerNav = innerNav)
         }
         composable(InnerRoutes.GearProfiles) {
-            FeaturePlaceholderRoute(
-                titleRes = R.string.screen_gear_profiles,
-                bodyRes = R.string.feature_placeholder_body,
-                innerNav = innerNav,
-            )
+            GearProfilesRoute(graph = graph, innerNav = innerNav)
         }
         composable(InnerRoutes.PrivacySettings) {
-            FeaturePlaceholderRoute(
-                titleRes = R.string.screen_privacy_settings,
-                bodyRes = R.string.feature_placeholder_body,
-                innerNav = innerNav,
-            )
+            PrivacySettingsRoute(graph = graph, innerNav = innerNav)
         }
         composable(InnerRoutes.NotificationSettings) {
-            FeaturePlaceholderRoute(
-                titleRes = R.string.screen_notification_settings,
-                bodyRes = R.string.feature_placeholder_body,
-                innerNav = innerNav,
-            )
+            NotificationSettingsRoute(graph = graph, innerNav = innerNav)
         }
         composable(InnerRoutes.MeasurementUnits) {
-            FeaturePlaceholderRoute(
-                titleRes = R.string.screen_measurement_units,
-                bodyRes = R.string.feature_placeholder_body,
-                innerNav = innerNav,
-            )
+            MeasurementUnitsRoute(graph = graph, innerNav = innerNav)
         }
         composable(InnerRoutes.Help) {
             HelpRoute(
@@ -230,6 +259,93 @@ fun MainShell(
         }
         composable(InnerRoutes.Achievements) {
             AchievementsRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.AdminGearManagement) {
+            AdminGearManagementRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.AdminShopsManagement) {
+            AdminShopsManagementRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.AdminBookingManagement) {
+            AdminBookingManagementRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.AdminBookingCalendar) {
+            AdminBookingCalendarRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.AdminAffiliatedSites) {
+            AdminAffiliatedSitesRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.Inventory) {
+            InventoryRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.MapFullscreen) {
+            MapFullscreenRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(
+            route = InnerRoutes.BusinessChatOpen,
+            arguments = listOf(
+                navArgument("peerType") { type = NavType.StringType },
+                navArgument("peerId") { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val peerType = entry.arguments?.getString("peerType").orEmpty()
+            val peerId = entry.arguments?.getString("peerId").orEmpty()
+            if (peerType.isNotBlank() && peerId.isNotBlank()) {
+                BusinessChatOpenRoute(
+                    graph = graph,
+                    innerNav = innerNav,
+                    peerType = peerType,
+                    peerId = peerId,
+                )
+            } else {
+                LaunchedEffect(Unit) { innerNav.popBackStack() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
+            }
+        }
+        composable(
+            route = InnerRoutes.BookingWizard,
+            arguments = listOf(
+                navArgument("centerId") { type = NavType.StringType },
+                navArgument("siteId") { type = NavType.StringType },
+                navArgument("instructorId") { type = NavType.StringType },
+                navArgument("courseId") { type = NavType.StringType },
+            ),
+        ) { entry ->
+            fun pathSeg(key: String) =
+                entry.arguments?.getString(key)?.takeIf { it.isNotBlank() && it != "-" }
+            BookingWizardRoute(
+                graph = graph,
+                innerNav = innerNav,
+                centerIdArg = pathSeg("centerId"),
+                siteIdArg = pathSeg("siteId"),
+                instructorIdArg = pathSeg("instructorId"),
+                courseIdArg = pathSeg("courseId"),
+            )
+        }
+        composable(InnerRoutes.DiveEditor) {
+            Scaffold(
+                topBar = {
+                    TopAppBar(
+                        title = { Text(stringResource(R.string.dive_editor_title)) },
+                        navigationIcon = {
+                            IconButton(onClick = { innerNav.popBackStack() }) {
+                                Icon(
+                                    Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.common_back),
+                                )
+                            }
+                        },
+                    )
+                },
+            ) { padding ->
+                Column(
+                    Modifier
+                        .fillMaxSize()
+                        .padding(padding),
+                ) {
+                    DiveEditorRoute()
+                }
+            }
         }
     }
 }

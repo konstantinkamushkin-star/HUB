@@ -20,7 +20,11 @@ enum GoogleSignInCoordinator {
     }
 
     @MainActor
-    static func signInAndAuthenticate(authService: AuthenticationService) async throws {
+    static func signInAndAuthenticate(
+        authService: AuthenticationService,
+        personalDataConsent: Bool,
+        personalDataConsentText: String
+    ) async throws {
         guard isClientIDConfigured, let clientID = configuredClientID else {
             throw AuthError.serverError
         }
@@ -46,7 +50,9 @@ enum GoogleSignInCoordinator {
             idToken: idToken,
             accessToken: accessToken,
             email: email,
-            fullName: fullName
+            fullName: fullName,
+            personalDataConsent: personalDataConsent,
+            personalDataConsentText: personalDataConsentText
         )
     }
 

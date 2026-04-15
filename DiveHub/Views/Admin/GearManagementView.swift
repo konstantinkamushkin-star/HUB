@@ -52,14 +52,10 @@ struct GearManagementView: View {
         }
         .sheet(isPresented: $showAddGear) {
             // TODO: Add gear creation view
-            Text("Add Gear Form")
+            Text("ui_admin_add_gear_form".localized)
         }
         .task {
-            do {
-                await viewModel.loadGear()
-            } catch {
-                // Error is handled by viewModel.error
-            }
+            await viewModel.loadGear()
         }
     }
 }

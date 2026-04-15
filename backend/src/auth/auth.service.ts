@@ -28,6 +28,7 @@ import {
   verifyAppleIdentityToken,
   verifyGoogleIdentityToken,
 } from './oauth-id-token.util';
+import { UserAccountStatus } from '../common/statuses';
 
 /** Убирает секретные поля перед отдачей в JSON. */
 export function serializePublicUser(user: User): Omit<User, 'password' | 'adminTotpSecret'> {
@@ -40,6 +41,29 @@ export type PublicUserWithPartners = Omit<User, 'password' | 'adminTotpSecret'> 
   diveCenterId: string | null;
   shopId: string | null;
 };
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return v !== null && typeof v === 'object' && !Array.isArray(v);
+}
+
+/** Deep-merge nested plain objects; overwrites arrays and scalars. */
+function mergeDiverProfile(
+  current: Record<string, unknown> | null | undefined,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
+  const base: Record<string, unknown> =
+    current && isPlainObject(current) ? { ...current } : {};
+  for (const key of Object.keys(patch)) {
+    const pv = patch[key];
+    const bv = base[key];
+    if (isPlainObject(pv) && isPlainObject(bv)) {
+      base[key] = mergeDiverProfile(bv, pv);
+    } else {
+      base[key] = pv;
+    }
+  }
+  return base;
+}
 
 @Injectable()
 export class AuthService {
@@ -61,6 +85,15 @@ export class AuthService {
    * Раньше только owner_id; у части аккаунтов DIVE_CENTER_ADMIN центр есть, но owner_id не выставлен
    * (ручные данные, старые сиды). Тогда ищем по instructor_ids и по email контакта центра.
    */
+  /** Для проверки прав на курсы центра и др. (в `users` поля dive_center_id нет). */
+  async getDiveCenterIdForUser(userId: string): Promise<string | null> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      return null;
+    }
+    return this.resolveDiveCenterIdForUser(user);
+  }
+
   private async resolveDiveCenterIdForUser(user: User): Promise<string | null> {
     const byOwner = await this.diveCentersRepo.findOne({
       where: { owner_id: user.id },
@@ -200,6 +233,9 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('Invalid email or password');
     }
+    if (user.accountStatus === UserAccountStatus.DELETED || user.deletedAt) {
+      throw new UnauthorizedException('Account is deleted');
+    }
     if (!user.password) {
       this.logger.warn(`User ${user.id} has empty password hash`);
       throw new UnauthorizedException('Invalid email or password');
@@ -266,6 +302,9 @@ export class AuthService {
     if (!user) {
       throw new UnauthorizedException('User not found');
     }
+    if (user.accountStatus === UserAccountStatus.DELETED || user.deletedAt) {
+      throw new UnauthorizedException('Account is deleted');
+    }
 
     return this.toPublicUserWithPartnersSafe(user);
   }
@@ -273,17 +312,36 @@ export class AuthService {
   async updateProfile(
     userId: string,
     dto: {
+      email?: string;
       firstName?: string;
       lastName?: string;
       phone?: string;
       bio?: string;
       language?: string;
       avatarUrl?: string;
+      countryCode?: string;
+      diverProfile?: Record<string, unknown>;
     },
   ): Promise<PublicUserWithPartners> {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     if (!user) {
       throw new UnauthorizedException('User not found');
+    }
+
+    if (dto.email !== undefined) {
+      const next = String(dto.email ?? '').trim().toLowerCase();
+      if (!next) {
+        throw new BadRequestException('email cannot be empty');
+      }
+      if (next !== (user.email || '').toLowerCase()) {
+        const taken = await this.userRepository.findOne({
+          where: { email: next },
+        });
+        if (taken && taken.id !== userId) {
+          throw new ConflictException('Email already registered');
+        }
+        user.email = next;
+      }
     }
 
     if (dto.firstName !== undefined) {
@@ -316,6 +374,17 @@ export class AuthService {
       const v = String(dto.avatarUrl ?? '').trim();
       user.avatarUrl = v.length > 0 ? v.slice(0, 500) : undefined;
     }
+    if (dto.countryCode !== undefined) {
+      const v = String(dto.countryCode ?? '').trim().toUpperCase();
+      user.countryCode = v.length > 0 ? v.slice(0, 8) : undefined;
+    }
+    if (dto.diverProfile !== undefined && isPlainObject(dto.diverProfile)) {
+      const prev =
+        user.diverProfile && isPlainObject(user.diverProfile)
+          ? (user.diverProfile as Record<string, unknown>)
+          : {};
+      user.diverProfile = mergeDiverProfile(prev, dto.diverProfile);
+    }
 
     await this.userRepository.save(user);
     return this.toPublicUserWithPartnersSafe(user);
@@ -329,6 +398,9 @@ export class AuthService {
       });
       if (!userRow) {
         throw new UnauthorizedException('User not found');
+      }
+      if (userRow.accountStatus === UserAccountStatus.DELETED || userRow.deletedAt) {
+        throw new UnauthorizedException('Account is deleted');
       }
       const user = await this.toPublicUserWithPartnersSafe(userRow);
       const tokens = await this.generateTokens(userRow.id);
@@ -614,6 +686,17 @@ export class AuthService {
       );
     }
 
+    if (!dto.personalDataConsent) {
+      throw new BadRequestException('Personal data processing consent is required');
+    }
+    const appleConsentText = dto.personalDataConsentText?.trim() ?? '';
+    if (appleConsentText.length < 20) {
+      throw new BadRequestException('Personal data consent text is required');
+    }
+    this.logger.log(
+      `Apple OAuth personal data consent accepted; text length=${appleConsentText.length}`,
+    );
+
     let payload: Awaited<ReturnType<typeof verifyAppleIdentityToken>>;
     try {
       payload = await verifyAppleIdentityToken(dto.idToken, audiences);
@@ -654,6 +737,17 @@ export class AuthService {
       );
     }
 
+    if (!dto.personalDataConsent) {
+      throw new BadRequestException('Personal data processing consent is required');
+    }
+    const googleConsentText = dto.personalDataConsentText?.trim() ?? '';
+    if (googleConsentText.length < 20) {
+      throw new BadRequestException('Personal data consent text is required');
+    }
+    this.logger.log(
+      `Google OAuth personal data consent accepted; text length=${googleConsentText.length}`,
+    );
+
     let payload: Awaited<ReturnType<typeof verifyGoogleIdentityToken>>;
     try {
       payload = await verifyGoogleIdentityToken(dto.idToken, audiences);
@@ -676,6 +770,7 @@ export class AuthService {
     }
 
     const emailHint = emailFromToken.toLowerCase();
+
     const fn =
       dto.firstName?.trim() ||
       payload.given_name?.trim() ||

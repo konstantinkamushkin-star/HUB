@@ -29,8 +29,8 @@ struct UserProfileView: View {
                 ProgressView()
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
-            } else if let error = errorMessage, user == nil {
-                Text("Error: \(error)")
+            } else if errorMessage != nil, user == nil {
+                Text("ui_profile_error_value".localized)
                     .foregroundColor(.red)
                     .padding()
             } else if let user = user {
@@ -43,12 +43,12 @@ struct UserProfileView: View {
                         Text(localizationService.localizedString("statistics"))
                             .font(.headline)
                         
-                        if let totalDives = user.totalDives {
+                        if user.totalDives != nil {
                             HStack {
-                                Text("Total Dives:")
+                                Text("ui_profile_total_dives".localized)
                                     .foregroundColor(.secondary)
                                 Spacer()
-                                Text("\(totalDives)")
+                                Text("ui_profile_value_7".localized)
                                     .fontWeight(.semibold)
                             }
                         }
@@ -116,7 +116,7 @@ struct UserProfileView: View {
                 set: { if !$0 { openChatAlertMessage = nil } }
             ),
             actions: {
-                Button("OK", role: .cancel) { openChatAlertMessage = nil }
+                Button("ok".localized, role: .cancel) { openChatAlertMessage = nil }
             },
             message: { Text(openChatAlertMessage ?? "") }
         )

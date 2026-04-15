@@ -29,7 +29,7 @@ struct StatisticsView: View {
                     
                     // Charts
                     VStack(alignment: .leading, spacing: 16) {
-                        Text("Dives by Month")
+                        Text("ui_statistics_dives_by_month".localized)
                             .font(.headline)
                             .padding(.horizontal)
                         
@@ -50,7 +50,7 @@ struct StatisticsView: View {
                                     }
                                     .frame(height: 20)
                                     
-                                    Text("\(viewModel.statistics.diveByMonth[month] ?? 0)")
+                                    Text("ui_statistics_value".localized)
                                         .font(.caption)
                                         .frame(width: 30, alignment: .trailing)
                                 }
@@ -64,7 +64,7 @@ struct StatisticsView: View {
                     // Milestones
                     if !viewModel.statistics.milestones.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("Recent Milestones")
+                            Text("ui_statistics_recent_milestones".localized)
                                 .font(.headline)
                                 .padding(.horizontal)
                             
@@ -77,7 +77,7 @@ struct StatisticsView: View {
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("Statistics")
+            .navigationTitle("ui_statistics_statistics".localized)
             .diveHubNavigationChrome()
             .task {
                 await viewModel.loadStatistics()

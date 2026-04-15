@@ -29,7 +29,7 @@ struct ReportsView: View {
     
     var body: some View {
         List {
-            Section("Available Reports") {
+            Section("ui_available_reports".localized) {
                 ForEach(ReportType.allCases, id: \.self) { reportType in
                     NavigationLink(destination: reportDetailView(for: reportType)) {
                         HStack {
@@ -43,17 +43,17 @@ struct ReportsView: View {
                 }
             }
             
-            Section("Export Options") {
+            Section("ui_export_options".localized) {
                 Button(action: {}) {
-                    Label("Export All Data (CSV)", systemImage: "square.and.arrow.up")
+                    Label("ui_inventory_export_all_data_csv".localized, systemImage: "square.and.arrow.up")
                 }
                 
                 Button(action: {}) {
-                    Label("Export All Data (PDF)", systemImage: "doc.fill")
+                    Label("ui_inventory_export_all_data_pdf".localized, systemImage: "doc.fill")
                 }
             }
         }
-        .navigationTitle("Reports")
+        .navigationTitle("ui_inventory_reports".localized)
     }
     
     @ViewBuilder
@@ -77,17 +77,17 @@ struct UsageReportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Usage Report")
+                Text("ui_inventory_usage_report".localized)
                     .font(.title)
                     .padding()
                 
                 // TODO: Implement usage report
-                Text("Usage report coming soon...")
+                Text("ui_inventory_usage_report_coming_soon".localized)
                     .foregroundColor(.secondary)
                     .padding()
             }
         }
-        .navigationTitle("Usage Report")
+        .navigationTitle("ui_inventory_usage_report".localized)
     }
 }
 
@@ -97,17 +97,17 @@ struct MaintenanceCostReportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Maintenance Costs")
+                Text("ui_inventory_maintenance_costs".localized)
                     .font(.title)
                     .padding()
                 
                 // TODO: Implement maintenance cost report
-                Text("Maintenance cost report coming soon...")
+                Text("ui_inventory_maintenance_cost_report_coming_soon".localized)
                     .foregroundColor(.secondary)
                     .padding()
             }
         }
-        .navigationTitle("Maintenance Costs")
+        .navigationTitle("ui_inventory_maintenance_costs".localized)
     }
 }
 
@@ -117,17 +117,17 @@ struct InspectionComplianceReportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("Inspection Compliance")
+                Text("ui_inventory_inspection_compliance".localized)
                     .font(.title)
                     .padding()
                 
                 // TODO: Implement inspection compliance report
-                Text("Inspection compliance report coming soon...")
+                Text("ui_inventory_inspection_compliance_report_coming_soon".localized)
                     .foregroundColor(.secondary)
                     .padding()
             }
         }
-        .navigationTitle("Inspection Compliance")
+        .navigationTitle("ui_inventory_inspection_compliance".localized)
     }
 }
 
@@ -137,17 +137,17 @@ struct ROIReportView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                Text("ROI Analysis")
+                Text("ui_inventory_roi_analysis".localized)
                     .font(.title)
                     .padding()
                 
                 // TODO: Implement ROI report
-                Text("ROI analysis report coming soon...")
+                Text("ui_inventory_roi_analysis_report_coming_soon".localized)
                     .foregroundColor(.secondary)
                     .padding()
             }
         }
-        .navigationTitle("ROI Analysis")
+        .navigationTitle("ui_inventory_roi_analysis".localized)
     }
 }
 

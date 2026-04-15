@@ -35,7 +35,8 @@ class SocialViewModel: ObservableObject {
         let hasRefreshToken = KeychainService.shared.getRefreshToken() != nil
         let hasValidTokens = hasAccessToken || hasRefreshToken
         guard isAuth, hasUser, hasValidTokens else {
-            error = NSError(domain: "AuthError", code: 401, userInfo: [NSLocalizedDescriptionKey: "User not authenticated"])
+            let msg = LocalizationService.shared.localizedString("pleaseSignIn", table: "errors")
+            error = NSError(domain: "AuthError", code: 401, userInfo: [NSLocalizedDescriptionKey: msg])
             isLoading = false
             return
         }

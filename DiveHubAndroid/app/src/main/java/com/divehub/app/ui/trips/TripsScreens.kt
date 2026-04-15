@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -36,6 +37,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -77,6 +79,17 @@ fun TripsRoute(graph: AppGraph, innerNav: NavController) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = { vm.refresh() },
+                        enabled = !state.loading,
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.common_refresh_list),
+                        )
+                    }
+                },
             )
         },
     ) { padding ->
@@ -98,15 +111,21 @@ fun TripsRoute(graph: AppGraph, innerNav: NavController) {
                     Text(stringResource(R.string.common_retry))
                 }
             }
-            else -> LazyColumn(
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading && state.trips.isNotEmpty(),
+                onRefresh = { vm.refresh() },
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(state.trips, key = { it.id }) { trip ->
-                    TripListCard(trip = trip, onClick = {
-                        innerNav.navigate(InnerRoutes.tripDetail(trip.id))
-                    })
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(state.trips, key = { it.id }) { trip ->
+                        TripListCard(trip = trip, onClick = {
+                            innerNav.navigate(InnerRoutes.tripDetail(trip.id))
+                        })
+                    }
                 }
             }
         }
@@ -203,6 +222,17 @@ fun CenterManagedTripsRoute(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = { vm.refresh() },
+                        enabled = !state.loading,
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.common_refresh_list),
+                        )
+                    }
+                },
             )
         },
     ) { padding ->
@@ -224,29 +254,35 @@ fun CenterManagedTripsRoute(
                     Text(stringResource(R.string.common_retry))
                 }
             }
-            else -> LazyColumn(
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading && state.trips.isNotEmpty(),
+                onRefresh = { vm.refresh() },
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(state.trips, key = { it.id }) { trip ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(Modifier.weight(1f)) {
-                            TripListCard(trip = trip, onClick = {
-                                innerNav.navigate(InnerRoutes.tripDetail(trip.id))
-                            })
-                        }
-                        IconButton(
-                            onClick = { tripPendingDelete = trip },
-                            enabled = !deleteInProgress,
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(state.trips, key = { it.id }) { trip ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Icon(
-                                Icons.Default.Delete,
-                                contentDescription = stringResource(R.string.trip_delete_cd),
-                            )
+                            Box(Modifier.weight(1f)) {
+                                TripListCard(trip = trip, onClick = {
+                                    innerNav.navigate(InnerRoutes.tripDetail(trip.id))
+                                })
+                            }
+                            IconButton(
+                                onClick = { tripPendingDelete = trip },
+                                enabled = !deleteInProgress,
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.trip_delete_cd),
+                                )
+                            }
                         }
                     }
                 }
@@ -272,7 +308,20 @@ fun TripsListTabContent(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.nav_trips)) })
+            TopAppBar(
+                title = { Text(stringResource(R.string.nav_trips)) },
+                actions = {
+                    IconButton(
+                        onClick = { vm.refresh() },
+                        enabled = !state.loading,
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.common_refresh_list),
+                        )
+                    }
+                },
+            )
         },
         floatingActionButton = {
             if (showCreateFab) {
@@ -303,15 +352,21 @@ fun TripsListTabContent(
                     Text(stringResource(R.string.common_retry))
                 }
             }
-            else -> LazyColumn(
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading && state.trips.isNotEmpty(),
+                onRefresh = { vm.refresh() },
                 modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                items(state.trips, key = { it.id }) { trip ->
-                    TripListCard(trip = trip, onClick = {
-                        innerNav.navigate(InnerRoutes.tripDetail(trip.id))
-                    })
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    items(state.trips, key = { it.id }) { trip ->
+                        TripListCard(trip = trip, onClick = {
+                            innerNav.navigate(InnerRoutes.tripDetail(trip.id))
+                        })
+                    }
                 }
             }
         }
@@ -319,7 +374,7 @@ fun TripsListTabContent(
 }
 
 @Composable
-private fun TripListCard(trip: TripListItemDto, onClick: () -> Unit) {
+fun TripListCard(trip: TripListItemDto, onClick: () -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
@@ -472,6 +527,19 @@ fun TripDetailRoute(graph: AppGraph, tripId: String, innerNav: NavController) {
                         )
                     }
                     t.startDate?.let { Text(stringResource(R.string.trip_dates, it, t.endDate ?: "—")) }
+                    val orgId = t.organizerId?.trim().orEmpty()
+                    if (t.organizerType?.equals("dive_center", ignoreCase = true) == true && orgId.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        TextButton(onClick = { innerNav.navigate(InnerRoutes.diveCenterPublic(orgId)) }) {
+                            Text(stringResource(R.string.trip_detail_open_organizer_center))
+                        }
+                    }
+                    if (t.organizerType?.equals("user", ignoreCase = true) == true && orgId.isNotEmpty()) {
+                        Spacer(Modifier.height(10.dp))
+                        TextButton(onClick = { innerNav.navigate(InnerRoutes.userProfile(orgId)) }) {
+                            Text(stringResource(R.string.trip_detail_open_organizer_profile))
+                        }
+                    }
                     Spacer(Modifier.height(12.dp))
                     t.description?.let { Text(it, style = MaterialTheme.typography.bodyLarge) }
                     Spacer(Modifier.height(16.dp))

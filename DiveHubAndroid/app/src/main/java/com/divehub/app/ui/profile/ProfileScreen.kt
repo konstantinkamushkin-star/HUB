@@ -10,9 +10,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BubbleChart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -28,11 +30,13 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.BuildConfig
 import com.divehub.app.R
+import com.divehub.app.data.AuthRepository
 import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.ui.Routes
 import com.divehub.app.ui.main.SessionViewModel
@@ -49,7 +53,13 @@ fun ProfileScreen(
     onLoggedOut: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
+    val authRepo = remember { AuthRepository(graph) }
     var overrideUrl by remember { mutableStateOf("") }
+    var showDeleteDialog by remember { mutableStateOf(false) }
+    var deleteConfirmInput by remember { mutableStateOf("") }
+    var deleteCurrentPassword by remember { mutableStateOf("") }
+    var deleteError by remember { mutableStateOf<String?>(null) }
+    var deleting by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         if (BuildConfig.DEBUG) {
             overrideUrl = graph.tokenStore.getApiBaseOverride().orEmpty()
@@ -110,6 +120,12 @@ fun ProfileScreen(
                 ) {
                     Text(stringResource(R.string.screen_certifications))
                 }
+                TextButton(
+                    onClick = { innerNav.navigate(InnerRoutes.GearProfiles) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.screen_gear_profiles))
+                }
 
                 TextButton(
                     onClick = { innerNav.navigate(InnerRoutes.Trips) },
@@ -122,6 +138,24 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.screen_notifications))
+                }
+                TextButton(
+                    onClick = { innerNav.navigate(InnerRoutes.NotificationSettings) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.screen_notification_settings))
+                }
+                TextButton(
+                    onClick = { innerNav.navigate(InnerRoutes.PrivacySettings) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.screen_privacy_settings))
+                }
+                TextButton(
+                    onClick = { innerNav.navigate(InnerRoutes.MeasurementUnits) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.screen_measurement_units))
                 }
                 TextButton(
                     onClick = { innerNav.navigate(InnerRoutes.Settings) },
@@ -155,6 +189,25 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.profile_change_password))
+                }
+                OutlinedButton(
+                    onClick = {
+                        deleteConfirmInput = ""
+                        deleteCurrentPassword = ""
+                        deleteError = null
+                        showDeleteDialog = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.profile_delete_account))
+                }
+                if (!deleteError.isNullOrBlank()) {
+                    Text(
+                        text = deleteError.orEmpty(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -207,5 +260,85 @@ fun ProfileScreen(
                 }
             }
         }
+    }
+
+    if (showDeleteDialog) {
+        AlertDialog(
+            onDismissRequest = {
+                if (!deleting) {
+                    showDeleteDialog = false
+                }
+            },
+            title = { Text(stringResource(R.string.profile_delete_dialog_title)) },
+            text = {
+                Column {
+                    Text(
+                        text = stringResource(R.string.profile_delete_dialog_message),
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = deleteConfirmInput,
+                        onValueChange = { deleteConfirmInput = it },
+                        label = { Text(stringResource(R.string.profile_delete_dialog_confirm_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = deleteCurrentPassword,
+                        onValueChange = { deleteCurrentPassword = it },
+                        label = { Text(stringResource(R.string.profile_delete_dialog_password_label)) },
+                        visualTransformation = PasswordVisualTransformation(),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = stringResource(R.string.profile_delete_dialog_reauth_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !deleting && deleteConfirmInput.trim().uppercase() == "DELETE",
+                    onClick = {
+                        scope.launch {
+                            deleting = true
+                            deleteError = null
+                            try {
+                                authRepo.deleteMyAccount(deleteCurrentPassword)
+                                sessionVm.logout()
+                                showDeleteDialog = false
+                                onLoggedOut()
+                            } catch (e: Throwable) {
+                                deleteError = authRepo.parseErrorMessage(e)
+                            } finally {
+                                deleting = false
+                            }
+                        }
+                    },
+                ) {
+                    if (deleting) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.height(16.dp),
+                            strokeWidth = 2.dp,
+                        )
+                    } else {
+                        Text(stringResource(R.string.common_delete))
+                    }
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    enabled = !deleting,
+                    onClick = { showDeleteDialog = false },
+                ) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
     }
 }

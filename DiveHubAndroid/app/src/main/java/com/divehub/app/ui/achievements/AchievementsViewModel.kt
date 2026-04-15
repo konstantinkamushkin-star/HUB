@@ -55,7 +55,8 @@ class AchievementsViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = AchievementsUiState(loading = true)
+            val prev = _state.value
+            _state.value = prev.copy(loading = true, error = null)
             val res = getApplication<Application>().resources
             runCatching {
                 val logs = logsRepo.list()
@@ -64,10 +65,17 @@ class AchievementsViewModel(
             }
                 .onSuccess { (logs, userTotal, res) ->
                     val list = buildAchievements(res, logs, userTotal)
-                    _state.value = AchievementsUiState(loading = false, achievements = list)
+                    _state.value = _state.value.copy(
+                        loading = false,
+                        error = null,
+                        achievements = list,
+                    )
                 }
                 .onFailure { e ->
-                    _state.value = AchievementsUiState(loading = false, error = e.message ?: "Error")
+                    _state.value = prev.copy(
+                        loading = false,
+                        error = e.message ?: "Error",
+                    )
                 }
         }
     }

@@ -133,11 +133,13 @@ struct CustomCalendarView: View {
         guard !dayBookings.isEmpty else { return nil }
         
         // Determine the primary status for the day
-        // Priority: cancelled > pending > confirmed > completed
+        // Priority: cancelled > pending > quoted > confirmed > completed
         if dayBookings.contains(where: { $0.status == .cancelled }) {
             return .cancelled
         } else if dayBookings.contains(where: { $0.status == .pending }) {
             return .pending
+        } else if dayBookings.contains(where: { $0.status == .quoted }) {
+            return .quoted
         } else if dayBookings.contains(where: { $0.status == .confirmed }) {
             return .confirmed
         } else if dayBookings.contains(where: { $0.status == .completed }) {
@@ -149,6 +151,7 @@ struct CustomCalendarView: View {
     
     enum BookingStatusIndicator {
         case pending
+        case quoted
         case confirmed
         case completed
         case cancelled
@@ -156,6 +159,7 @@ struct CustomCalendarView: View {
         var color: Color {
             switch self {
             case .pending: return .orange
+            case .quoted: return .purple
             case .confirmed: return .blue
             case .completed: return .green
             case .cancelled: return .red

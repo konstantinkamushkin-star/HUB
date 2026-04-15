@@ -5,6 +5,7 @@ struct CourseBookingView: View {
     @ObservedObject var courseViewModel: CourseViewModel
     @Environment(\.dismiss) private var dismiss
     
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var preferredDate = Date()
     @State private var paymentMethod: Booking.Payment.PaymentMethod = .online
     @State private var notes = ""
@@ -14,29 +15,64 @@ struct CourseBookingView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var completedBooking: Booking?
+    @State private var centerInstructors: [Instructor] = []
+    /// Выбранный инструктор (user id), если у курса несколько ведущих.
+    @State private var selectedInstructorUserId: String = ""
+    
+    private var assignedInstructorIds: [String] {
+        course.assignedInstructorUserIds
+    }
+    
+    /// (userId, displayName) для выбора; если API не вернул карточки — показываем id.
+    private var instructorPickerOptions: [(String, String)] {
+        let set = Set(assignedInstructorIds)
+        let fromApi = centerInstructors.filter { set.contains($0.id) }.map { ($0.id, $0.name) }
+        if !fromApi.isEmpty { return fromApi }
+        return assignedInstructorIds.map { ($0, $0) }
+    }
     
     var body: some View {
         NavigationView {
             Form {
-                Section("Course") {
+                Section {
                     Text(course.name)
                         .font(.headline)
                     Text(course.level.displayName)
                         .font(.caption)
                         .foregroundColor(.secondary)
+                } header: {
+                    Text(localizationService.localizedString("courseDetails", table: "courses"))
                 }
                 
-                Section("Preferred Date") {
-                    DatePicker("Start date", selection: $preferredDate, in: Date()..., displayedComponents: .date)
+                if assignedInstructorIds.count > 1 {
+                    Section {
+                        Picker(localizationService.localizedString("selectInstructorForEnrollment", table: "courses"), selection: $selectedInstructorUserId) {
+                            ForEach(instructorPickerOptions, id: \.0) { pair in
+                                Text(pair.1).tag(pair.0)
+                            }
+                        }
+                    } footer: {
+                        Text(localizationService.localizedString("mustSelectInstructor", table: "courses"))
+                            .font(.caption)
+                    }
                 }
                 
-                Section("Participants") {
-                    TextField("Name", text: $participantName)
-                    TextField("Email", text: $participantEmail)
+                Section {
+                    DatePicker(
+                        localizationService.localizedString("preferredDate", table: "courses"),
+                        selection: $preferredDate,
+                        in: Date()...,
+                        displayedComponents: .date
+                    )
+                }
+                
+                Section {
+                    TextField(localizationService.localizedString("name", table: "common"), text: $participantName)
+                    TextField(localizationService.localizedString("email", table: "common"), text: $participantEmail)
                         .keyboardType(.emailAddress)
                         .textInputAutocapitalization(.never)
                     
-                    Button("Add Participant") {
+                    Button(localizationService.localizedString("addParticipant", table: "trips")) {
                         participants.append(
                             Booking.Participant(
                                 id: UUID().uuidString,
@@ -66,20 +102,24 @@ struct CourseBookingView: View {
                     .onDelete { indexSet in
                         participants.remove(atOffsets: indexSet)
                     }
+                } header: {
+                    Text(localizationService.localizedString("participants", table: "trips"))
                 }
                 
-                Section("Payment") {
-                    Picker("Method", selection: $paymentMethod) {
-                        Text("Online").tag(Booking.Payment.PaymentMethod.online)
-                        Text("On Site").tag(Booking.Payment.PaymentMethod.onSite)
-                        Text("Apple Pay").tag(Booking.Payment.PaymentMethod.applePay)
-                        Text("Google Pay").tag(Booking.Payment.PaymentMethod.googlePay)
+                Section {
+                    Picker(localizationService.localizedString("payment", table: "booking"), selection: $paymentMethod) {
+                        Text(localizationService.localizedString("payOnline", table: "courses")).tag(Booking.Payment.PaymentMethod.online)
+                        Text(localizationService.localizedString("payOnSite", table: "courses")).tag(Booking.Payment.PaymentMethod.onSite)
+                        Text(localizationService.localizedString("payApplePay", table: "courses")).tag(Booking.Payment.PaymentMethod.applePay)
+                        Text(localizationService.localizedString("payGooglePay", table: "courses")).tag(Booking.Payment.PaymentMethod.googlePay)
                     }
                 }
                 
-                Section("Notes") {
+                Section {
                     TextEditor(text: $notes)
                         .frame(minHeight: 90)
+                } header: {
+                    Text(localizationService.localizedString("notes", table: "trips"))
                 }
                 
                 if let errorMessage {
@@ -89,13 +129,13 @@ struct CourseBookingView: View {
                     }
                 }
             }
-            .navigationTitle("Book Course")
+            .navigationTitle(localizationService.localizedString("bookCourse", table: "courses"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
+                    Button(localizationService.localizedString("cancel", table: "common")) { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Confirm") {
+                    Button(localizationService.localizedString("confirm", table: "trips")) {
                         Task { await confirmBooking() }
                     }
                     .disabled(isLoading || participants.isEmpty)
@@ -106,6 +146,27 @@ struct CourseBookingView: View {
                     BookingConfirmationView(booking: booking)
                 }
             }
+            .task {
+                await loadInstructorsForCourse()
+                let ids = assignedInstructorIds
+                if ids.count > 1, let first = instructorPickerOptions.first?.0 {
+                    selectedInstructorUserId = first
+                } else if let only = ids.first {
+                    selectedInstructorUserId = only
+                }
+            }
+        }
+    }
+    
+    private func loadInstructorsForCourse() async {
+        guard let dc = course.diveCenterId else {
+            centerInstructors = []
+            return
+        }
+        do {
+            centerInstructors = try await NetworkService.shared.getDiveCenterInstructors(diveCenterId: dc)
+        } catch {
+            centerInstructors = []
         }
     }
     
@@ -113,12 +174,14 @@ struct CourseBookingView: View {
         isLoading = true
         errorMessage = nil
         do {
+            let instructorArg: String? = assignedInstructorIds.count > 1 ? selectedInstructorUserId : nil
             let booking = try await courseViewModel.bookCourse(
                 course,
                 preferredDate: preferredDate,
                 participants: participants,
                 paymentMethod: paymentMethod,
-                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes
+                notes: notes.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : notes,
+                instructorUserId: instructorArg
             )
             completedBooking = booking
         } catch {
@@ -141,6 +204,7 @@ struct CourseBookingView: View {
             prerequisites: nil,
             diveCenterId: "dc-1",
             instructorId: nil,
+            instructorIds: [],
             photos: [],
             createdAt: Date(),
             updatedAt: Date()

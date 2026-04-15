@@ -11,6 +11,7 @@ struct AddEditItemView: View {
     let item: GearItem?
     @ObservedObject var viewModel: InventoryViewModel
     @Environment(\.dismiss) var dismiss
+    @StateObject private var localizationService = LocalizationService.shared
     
     @State private var name: String = ""
     @State private var category: GearItem.GearCategory = .other
@@ -42,37 +43,41 @@ struct AddEditItemView: View {
     var isEditMode: Bool {
         item != nil
     }
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     var body: some View {
         NavigationView {
             Form {
                 // Basic Information Section
-                Section("Basic Information") {
-                    Picker("Category", selection: $category) {
+                Section(inv("basicInformation")) {
+                    Picker(inv("category"), selection: $category) {
                         ForEach(GearItem.GearCategory.allCases, id: \.self) { cat in
                             Text(cat.displayName).tag(cat)
                         }
                     }
                     
-                    TextField("Name", text: $name)
+                    TextField(inv("name"), text: $name)
                         .validate(required: true, errors: $errors, key: "name")
                     
-                    TextField("Manufacturer", text: $manufacturer)
-                    TextField("Model", text: $model)
-                    TextField("Size", text: $size)
+                    TextField(inv("manufacturer"), text: $manufacturer)
+                    TextField(inv("model"), text: $model)
+                    TextField(inv("size"), text: $size)
                     
-                    TextField("Serial Number", text: $serialNumber)
+                    TextField(inv("serialNumber"), text: $serialNumber)
                         .validate(unique: true, existingSerial: serialNumber, items: viewModel.gearItems, errors: $errors, key: "serialNumber")
                     
-                    TextField("Barcode", text: $barcode)
+                    TextField(inv("barcode"), text: $barcode)
                     
-                    Picker("Status", selection: $status) {
+                    Picker(inv("status"), selection: $status) {
                         ForEach(GearItem.GearStatus.allCases, id: \.self) { stat in
                             Text(stat.displayName).tag(stat)
                         }
                     }
                     
-                    Picker("Condition", selection: $condition) {
+                    Picker(inv("condition"), selection: $condition) {
                         ForEach(GearItem.GearCondition.allCases, id: \.self) { cond in
                             Text(cond.displayName).tag(cond)
                         }
@@ -80,9 +85,9 @@ struct AddEditItemView: View {
                 }
                 
                 // Location & Responsibility
-                Section("Location & Responsibility") {
-                    Picker("Location", selection: $locationId) {
-                        Text("Not assigned").tag("")
+                Section(inv("locationResponsibility")) {
+                    Picker(inv("location"), selection: $locationId) {
+                        Text(inv("notAssigned")).tag("")
                         ForEach(viewModel.locations.filter { $0.isActive }) { location in
                             Text(location.name).tag(location.id)
                         }
@@ -92,37 +97,37 @@ struct AddEditItemView: View {
                 }
                 
                 // Purchase Information
-                Section("Purchase Information") {
-                    Toggle("Has purchase date", isOn: $hasPurchaseDate)
+                Section(inv("purchaseInformation")) {
+                    Toggle(inv("hasPurchaseDate"), isOn: $hasPurchaseDate)
                     
                     if hasPurchaseDate {
-                        DatePicker("Purchase Date", selection: $purchaseDate, displayedComponents: .date)
+                        DatePicker(inv("purchaseDate"), selection: $purchaseDate, displayedComponents: .date)
                     }
                     
-                    TextField("Supplier", text: $supplier)
-                    TextField("Purchase Price", text: $purchasePrice)
+                    TextField(inv("supplier"), text: $supplier)
+                    TextField(inv("purchasePrice"), text: $purchasePrice)
                         .keyboardType(.decimalPad)
                 }
                 
                 // Technical Details
-                Section("Technical Details") {
-                    TextField("Production Year", text: $productionYear)
+                Section(inv("technicalDetails")) {
+                    TextField(inv("productionYear"), text: $productionYear)
                         .keyboardType(.numberPad)
                     
-                    TextField("Max Pressure (bar)", text: $maxPressure)
+                    TextField(inv("maxPressureBar"), text: $maxPressure)
                         .keyboardType(.decimalPad)
                     
-                    TextField("Material", text: $material)
+                    TextField(inv("material"), text: $material)
                 }
                 
                 // Inspection Schedule
-                Section("Inspection Schedule") {
-                    TextField("Inspection Interval (days)", text: $inspectionIntervalDays)
+                Section(inv("inspectionSchedule")) {
+                    TextField(inv("inspectionIntervalDays"), text: $inspectionIntervalDays)
                         .keyboardType(.numberPad)
                 }
                 
                 // Tags
-                Section("Tags") {
+                Section(inv("tags")) {
                     ForEach(tags, id: \.self) { tag in
                         HStack {
                             Text(tag)
@@ -135,8 +140,8 @@ struct AddEditItemView: View {
                     }
                     
                     HStack {
-                        TextField("Add tag", text: $newTag)
-                        Button("Add") {
+                        TextField(inv("addTag"), text: $newTag)
+                        Button(inv("add")) {
                             if !newTag.isEmpty && !tags.contains(newTag) {
                                 tags.append(newTag)
                                 newTag = ""
@@ -146,7 +151,7 @@ struct AddEditItemView: View {
                 }
                 
                 // Description & Notes
-                Section("Additional Information") {
+                Section(inv("additionalInformation")) {
                     TextEditor(text: $description)
                         .frame(height: 100)
                     
@@ -165,17 +170,17 @@ struct AddEditItemView: View {
                     }
                 }
             }
-            .navigationTitle(isEditMode ? "Edit Item" : "Add Item")
+            .navigationTitle(isEditMode ? inv("editItem") : inv("addItem"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button(inv("cancel")) {
                         dismiss()
                     }
                 }
                 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
+                    Button(inv("save")) {
                         saveItem()
                     }
                     .disabled(isSaving || !isValid)
@@ -225,7 +230,7 @@ struct AddEditItemView: View {
         
         // Validate
         if name.isEmpty {
-            errors["name"] = "Name is required"
+            errors["name"] = inv("nameRequired")
         }
         
         // Check serial number uniqueness
@@ -234,7 +239,7 @@ struct AddEditItemView: View {
                 item.serialNumber == serialNumber && item.id != self.item?.id
             }
             if existing != nil {
-                errors["serialNumber"] = "Serial number already exists"
+                errors["serialNumber"] = inv("serialAlreadyExists")
             }
         }
         

@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.osmdroid.config.Configuration
 import java.util.Locale
+import com.divehub.app.ui.navigation.InnerRoutes
 
 class DiveHubApp : Application(), ImageLoaderFactory {
     lateinit var graph: AppGraph
@@ -38,6 +39,37 @@ class DiveHubApp : Application(), ImageLoaderFactory {
 
     fun emitDiverTab(tabIndex: Int) {
         _diverTabEvents.tryEmit(tabIndex)
+    }
+
+    /** `divehub://chat?peerType=dive_center&peerId=…` — open business/user chat (iOS parity). */
+    private val _businessChatOpenRequests = MutableSharedFlow<Pair<String, String>>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val businessChatOpenRequests = _businessChatOpenRequests.asSharedFlow()
+
+    fun requestBusinessChatOpen(peerType: String, peerId: String) {
+        _businessChatOpenRequests.tryEmit(peerType to peerId)
+    }
+
+    /** Full `InnerRoutes.*` destination for [MainShell] / diver + partner `innerNav`. */
+    private val _innerNavDeepLinkRequests = MutableSharedFlow<String>(
+        extraBufferCapacity = 1,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
+    val innerNavDeepLinkRequests = _innerNavDeepLinkRequests.asSharedFlow()
+
+    private fun requestInnerNavRoute(route: String) {
+        if (route.isNotBlank()) {
+            _innerNavDeepLinkRequests.tryEmit(route)
+        }
+    }
+
+    private fun firstPathOrQueryId(uri: Uri): String? {
+        val q = uri.getQueryParameter("id")?.trim().orEmpty().takeIf { it.isNotEmpty() }
+        if (q != null) return q
+        val seg = uri.pathSegments.firstOrNull()?.trim().orEmpty().takeIf { it.isNotEmpty() }
+        return seg
     }
 
     override fun newImageLoader(): ImageLoader {
@@ -66,20 +98,52 @@ class DiveHubApp : Application(), ImageLoaderFactory {
         }
     }
 
-    /** `divehub://social`, `divehub://chat`, … — см. нотификации бэкенда */
+    /**
+     * In-app `divehub://` links (notifications, share).
+     * Tabs: `social`, `chat`, `explore`/`home`, `map`, `feed`, `logbook`, `profile`.
+     * Routes (first path segment or `?id=`): `trip`/`trips`, `dive_center`/`center`, `shop`/`shops`, `user`.
+     * Search: `search?q=…` sets [AppGraph.setPendingGlobalSearchQuery] then opens Search.
+     */
     fun handleDeepLink(uri: Uri?) {
         if (uri == null || uri.scheme?.lowercase(Locale.ROOT) != "divehub") return
         val host = uri.host?.lowercase(Locale.ROOT) ?: return
         appScope.launch {
             val editorOn = graph.tokenStore.isDiveEditorEnabled()
             when (host) {
-                "social" -> emitDiverTab(3)
-                "chat" -> emitDiverTab(4)
+                "social" -> emitDiverTab(4)
+                "chat" -> {
+                    val peerId = uri.getQueryParameter("peerId")
+                    val peerType = uri.getQueryParameter("peerType") ?: "user"
+                    if (!peerId.isNullOrBlank()) {
+                        requestBusinessChatOpen(peerType, peerId)
+                    }
+                    emitDiverTab(5)
+                }
                 "explore", "home" -> emitDiverTab(0)
-                "feed" -> emitDiverTab(1)
-                "logbook" -> emitDiverTab(2)
-                "profile" -> emitDiverTab(if (editorOn) 6 else 5)
-                else -> emitDiverTab(4)
+                "map" -> emitDiverTab(1)
+                "feed" -> emitDiverTab(2)
+                "logbook" -> emitDiverTab(3)
+                "profile" -> emitDiverTab(if (editorOn) 7 else 6)
+                "trip", "trips" -> firstPathOrQueryId(uri)?.let { id ->
+                    requestInnerNavRoute(InnerRoutes.tripDetail(id))
+                }
+                "dive_center", "center" -> firstPathOrQueryId(uri)?.let { id ->
+                    requestInnerNavRoute(InnerRoutes.diveCenterPublic(id))
+                }
+                "shop", "shops" -> firstPathOrQueryId(uri)?.let { id ->
+                    requestInnerNavRoute(InnerRoutes.shopPublic(id))
+                }
+                "user" -> firstPathOrQueryId(uri)?.let { id ->
+                    requestInnerNavRoute(InnerRoutes.userProfile(id))
+                }
+                "search" -> {
+                    val q = uri.getQueryParameter("q")?.trim()?.takeIf { it.isNotEmpty() }
+                    if (q != null) {
+                        graph.setPendingGlobalSearchQuery(q)
+                    }
+                    requestInnerNavRoute(InnerRoutes.Search)
+                }
+                else -> emitDiverTab(5)
             }
         }
     }

@@ -11,6 +11,7 @@ import EventKit
 
 struct BookingConfirmationView: View {
     let booking: Booking
+    var onOpenChat: (() -> Void)? = nil
     @Environment(\.dismiss) var dismiss
     @State private var showShareSheet = false
     @State private var showCalendarAlert = false
@@ -25,11 +26,15 @@ struct BookingConfirmationView: View {
                     .foregroundColor(.green)
                     .padding(.top, 40)
                 
-                Text("Booking Confirmed!")
+                Text(booking.status == .pending ? "Booking Sent!" : "Booking Confirmed!")
                     .font(.title)
                     .fontWeight(.bold)
                 
-                Text("Your dive booking has been confirmed. We'll send you a confirmation email shortly.")
+                Text(
+                    booking.status == .pending
+                    ? "Your request has been sent to the dive center. Continue in chat to confirm details."
+                    : "Your dive booking has been confirmed. We'll send you a confirmation email shortly."
+                )
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -37,8 +42,19 @@ struct BookingConfirmationView: View {
                 
                 // Booking Details Card
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Booking Details")
+                    Text("ui_booking_booking_details".localized)
                         .font(.headline)
+
+                    if booking.isPriceVerifiedByDiveCenter {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(.green)
+                            Text("ui_booking_verified_by_dive_center".localized)
+                                .font(.subheadline)
+                                .fontWeight(.semibold)
+                                .foregroundColor(.green)
+                        }
+                    }
                     
                     DetailRow(label: "Booking ID", value: booking.id.prefix(8).uppercased())
                     DetailRow(label: "Date", value: booking.date.formatted(date: .long, time: .none))
@@ -47,8 +63,14 @@ struct BookingConfirmationView: View {
                     DetailRow(label: "Status", value: booking.status.rawValue.capitalized)
                     
                     Divider()
+                    if let verifiedPrice = booking.manualVerifiedPriceText {
+                        DetailRow(label: "Final verified price", value: verifiedPrice)
+                    }
                     DetailRow(label: "Amount", value: String(format: "%.2f %@", booking.payment.amount, booking.payment.currency))
                     DetailRow(label: "Payment Method", value: booking.payment.method.rawValue.capitalized)
+                    if let verificationNote = booking.manualVerificationNote {
+                        DetailRow(label: "Center note", value: verificationNote)
+                    }
                 }
                 .padding()
                 .cardStyle()
@@ -56,10 +78,21 @@ struct BookingConfirmationView: View {
                 
                 // Action Buttons
                 VStack(spacing: 12) {
+                    if let onOpenChat {
+                        Button(action: onOpenChat) {
+                            Label("ui_booking_open_chat".localized, systemImage: "message.fill")
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .foregroundColor(.primary)
+                                .cornerRadius(12)
+                        }
+                    }
+
                     Button(action: {
                         addToCalendar()
                     }) {
-                        Label("Add to Calendar", systemImage: "calendar")
+                        Label("ui_booking_add_to_calendar".localized, systemImage: "calendar")
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.divePrimary)
@@ -70,7 +103,7 @@ struct BookingConfirmationView: View {
                     Button(action: {
                         showShareSheet = true
                     }) {
-                        Label("Share Booking", systemImage: "square.and.arrow.up")
+                        Label("ui_booking_share_booking".localized, systemImage: "square.and.arrow.up")
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color(.systemGray6))
@@ -81,7 +114,7 @@ struct BookingConfirmationView: View {
                     Button(action: {
                         dismiss()
                     }) {
-                        Text("Done")
+                        Text("ui_feed_done".localized)
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.divePrimary.opacity(0.1))
@@ -93,13 +126,13 @@ struct BookingConfirmationView: View {
                 .padding(.bottom, 40)
             }
         }
-        .navigationTitle("Confirmation")
+        .navigationTitle("ui_booking_confirmation".localized)
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showShareSheet) {
             ShareSheet(items: [booking.id])
         }
-        .alert("Calendar", isPresented: $showCalendarAlert) {
-            Button("OK", role: .cancel) {}
+        .alert("ui_booking_calendar".localized, isPresented: $showCalendarAlert) {
+            Button("ok".localized, role: .cancel) {}
         } message: {
             Text(calendarAlertMessage)
         }
@@ -171,12 +204,13 @@ struct DetailRow: View {
     let value: String
     
     var body: some View {
-        HStack {
+        HStack(alignment: .top) {
             Text(label)
                 .foregroundColor(.secondary)
             Spacer()
             Text(value)
                 .fontWeight(.semibold)
+                .multilineTextAlignment(.trailing)
         }
     }
 }

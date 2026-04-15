@@ -40,15 +40,15 @@ struct InventoryDashboardView: View {
             }
             .padding()
         }
-        .navigationTitle("Inventory Dashboard")
+        .navigationTitle("ui_inventory_inventory_dashboard".localized)
         .refreshable {
             await viewModel.loadAllData()
         }
         .task {
             await viewModel.loadAllData()
         }
-        .alert("Error", isPresented: .constant(viewModel.error != nil)) {
-            Button("OK") {
+        .alert("ui_logbook_error".localized, isPresented: .constant(viewModel.error != nil)) {
+            Button("ok".localized) {
                 viewModel.error = nil
             }
         } message: {
@@ -61,14 +61,14 @@ struct InventoryDashboardView: View {
     // MARK: - Header Section
     private var headerSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Dive Center Inventory")
+            Text("ui_inventory_dive_center_inventory".localized)
                 .font(.largeTitle)
                 .fontWeight(.bold)
             
             // Location Picker
             if !viewModel.locations.isEmpty {
-                Picker("Location", selection: $selectedLocationId) {
-                    Text("All Locations").tag(nil as String?)
+                Picker("ui_admin_location".localized, selection: $selectedLocationId) {
+                    Text("ui_inventory_all_locations".localized).tag(nil as String?)
                     ForEach(viewModel.locations.filter { $0.isActive }) { location in
                         Text(location.name).tag(location.id as String?)
                     }
@@ -85,7 +85,7 @@ struct InventoryDashboardView: View {
     // MARK: - KPI Section
     private func kpiSection(kpis: InventoryKPIs) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Key Metrics")
+            Text("ui_inventory_key_metrics".localized)
                 .font(.title2)
                 .fontWeight(.semibold)
             
@@ -158,7 +158,7 @@ struct InventoryDashboardView: View {
     
     private var kpiLoadingSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Key Metrics")
+            Text("ui_inventory_key_metrics".localized)
                 .font(.title2)
                 .fontWeight(.semibold)
             
@@ -180,7 +180,7 @@ struct InventoryDashboardView: View {
     private var warningsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("Warnings & Alerts")
+                Text("ui_inventory_warnings_alerts".localized)
                     .font(.title2)
                     .fontWeight(.semibold)
                 
@@ -214,7 +214,7 @@ struct InventoryDashboardView: View {
     // MARK: - Quick Actions
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Quick Actions")
+            Text("ui_shop_quick_actions".localized)
                 .font(.title2)
                 .fontWeight(.semibold)
             
@@ -260,7 +260,7 @@ struct InventoryDashboardView: View {
     // MARK: - Charts Section
     private var chartsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Trends")
+            Text("ui_inventory_trends".localized)
                 .font(.title2)
                 .fontWeight(.semibold)
             
@@ -279,7 +279,7 @@ struct InventoryDashboardView: View {
                 .background(Color(.systemBackground))
                 .cornerRadius(12)
             } else {
-                Text("No data available")
+                Text("ui_inventory_no_data_available".localized)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding()
@@ -440,7 +440,7 @@ struct WarningsListView: View {
                 WarningRow(warning: warning)
             }
         }
-        .navigationTitle("All Warnings")
+        .navigationTitle("ui_inventory_all_warnings".localized)
     }
 }
 

@@ -87,27 +87,28 @@ struct LoginView: View {
                         .frame(height: 1)
                 }
                 .padding(.vertical, 8)
-                
-                // OAuth Buttons
+
+                // OAuth: галка согласия только на экране регистрации; для API при входе уходит тот же юридический текст.
                 VStack(spacing: 12) {
-                    // Apple Sign In Button
-                    SignInWithAppleButton(
-                        onRequest: { request in
-                            request.requestedScopes = [.fullName, .email]
-                        },
-                        onCompletion: { result in
-                            handleAppleSignIn(result: result)
+                    Button(action: { Task { await signInWithAppleTapped() } }) {
+                        HStack(spacing: 10) {
+                            Image(systemName: "applelogo")
+                                .font(.title3)
+                            Text(localizationService.localizedString("signInWithApple", table: "auth"))
+                                .fontWeight(.semibold)
                         }
-                    )
-                    .signInWithAppleButtonStyle(.black)
-                    .frame(height: 50)
-                    .cornerRadius(12)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 50)
+                        .foregroundColor(.white)
+                        .background(Color.black)
+                        .cornerRadius(12)
+                    }
+                    .buttonStyle(.plain)
                     .disabled(authService.isLoading)
-                    
-                    // Google Sign In Button
+
                     Button(action: signInWithGoogle) {
                         GoogleSignInBrandButtonLabel(
-                            title: localizationService.localizedString("continueWithGoogle", table: "auth")
+                            title: localizationService.localizedString("signInWithGoogle", table: "auth")
                         )
                     }
                     .buttonStyle(.plain)
@@ -181,39 +182,37 @@ struct LoginView: View {
         }
     }
     
-    private func handleAppleSignIn(result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let authorization):
-            Task {
-                do {
-                    try await authService.signInWithApple(authorization: authorization)
-                } catch {
-                    await MainActor.run {
-                        if let authError = error as? AuthError {
-                            errorMessage = authError.errorDescription
-                        } else {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                }
-            }
-        case .failure(let error):
-            // User cancelled or other error
-            if let authError = error as? ASAuthorizationError {
-                if authError.code != .canceled {
-                    errorMessage = userFriendlyAppleAuthError(authError)
-                }
+    @MainActor
+    private func signInWithAppleTapped() async {
+        errorMessage = nil
+        do {
+            let authorization = try await OAuthService.shared.signInWithApple()
+            try await authService.signInWithApple(
+                authorization: authorization,
+                personalDataConsent: true,
+                personalDataConsentText: ConsentTexts.registrationConsentText()
+            )
+        } catch {
+            if let appleErr = error as? ASAuthorizationError {
+                if appleErr.code == .canceled { return }
+                errorMessage = userFriendlyAppleAuthError(appleErr)
+            } else if let authErr = error as? AuthError {
+                errorMessage = authErr.errorDescription
             } else {
                 errorMessage = error.localizedDescription
             }
         }
     }
-    
+
     private func signInWithGoogle() {
         errorMessage = nil
         Task { @MainActor in
             do {
-                try await GoogleSignInCoordinator.signInAndAuthenticate(authService: authService)
+                try await GoogleSignInCoordinator.signInAndAuthenticate(
+                    authService: authService,
+                    personalDataConsent: true,
+                    personalDataConsentText: ConsentTexts.registrationConsentText()
+                )
             } catch {
                 if GoogleSignInCoordinator.wasUserCanceled(error) {
                     return
@@ -249,184 +248,282 @@ struct SignUpView: View {
     @Environment(\.dismiss) var dismiss
     @State private var email = ""
     @State private var password = ""
-    @State private var displayName = ""
+    @State private var showPassword = false
     @State private var personalDataConsentAccepted = false
     @State private var errorMessage: String?
-    
-    private var isCreateButtonDisabled: Bool {
-        let emailTrimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let passwordTrimmed = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayNameTrimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        return authService.isLoading
-            || emailTrimmed.isEmpty
-            || passwordTrimmed.isEmpty
-            || displayNameTrimmed.isEmpty
-            || !personalDataConsentAccepted
-    }
-    
-    var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                Form {
-                    Section {
-                        TextField(localizationService.localizedString("displayName", table: "auth"), text: $displayName)
-                        TextField(localizationService.localizedString("email", table: "common"), text: $email)
-                            .keyboardType(.emailAddress)
-                            .autocapitalization(.none)
-                        SecureField(localizationService.localizedString("password", table: "auth"), text: $password)
-                    }
+    @State private var emailFieldError: String?
+    @State private var passwordFieldError: String?
 
-                    Section("Согласие") {
-                        Toggle(isOn: $personalDataConsentAccepted) {
-                            Text("Подтверждаю ознакомление с Политикой конфиденциальности и Пользовательским соглашением DiveHub и принимаю их условия, включая обработку персональных данных.")
-                        }
-                        HStack(spacing: 16) {
-                            Link("Политика конфиденциальности", destination: ConsentTexts.privacyPolicyURL)
-                            Link("Пользовательское соглашение", destination: ConsentTexts.userAgreementURL)
-                        }
-                        .font(.caption)
-                        Text("Документы открываются в браузере.")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    if let error = errorMessage {
-                        Section {
-                            Text(error)
-                                .foregroundColor(.red)
-                        }
-                    }
-                    
-                    Section {
-                        Button(action: signUp) {
-                            if authService.isLoading {
-                                ProgressView()
-                            } else {
-                                Text(localizationService.localizedString("createAccount", table: "auth"))
-                            }
-                        }
-                        .disabled(isCreateButtonDisabled)
-                    }
-                }
-                
-                // OAuth Sign Up Section
-                VStack(spacing: 12) {
-                    // Divider
-                    HStack {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(height: 1)
-                        Text(localizationService.localizedString("or", table: "auth"))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .padding(.horizontal, 8)
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.3))
-                            .frame(height: 1)
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 8)
-                    
-                    // OAuth Buttons
+    private var emailTrimmed: String { email.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var passwordTrimmed: String { password.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    private var passwordStrengthLabel: String {
+        let p = passwordTrimmed
+        if p.count < 8 { return localizationService.localizedString("passwordStrengthWeak", table: "onboarding") }
+        let hasLetter = p.rangeOfCharacter(from: .letters) != nil
+        let hasNumber = p.rangeOfCharacter(from: .decimalDigits) != nil
+        if !hasLetter || !hasNumber { return localizationService.localizedString("passwordStrengthWeak", table: "onboarding") }
+        if p.count >= 12 { return localizationService.localizedString("passwordStrengthStrong", table: "onboarding") }
+        return localizationService.localizedString("passwordStrengthOk", table: "onboarding")
+    }
+
+    private var passwordStrengthColor: Color {
+        let p = passwordTrimmed
+        if p.count < 8 { return .red.opacity(0.8) }
+        let hasLetter = p.rangeOfCharacter(from: .letters) != nil
+        let hasNumber = p.rangeOfCharacter(from: .decimalDigits) != nil
+        if !hasLetter || !hasNumber { return .orange }
+        if p.count >= 12 { return .green }
+        return .yellow.opacity(0.9)
+    }
+
+    private var isCreateButtonDisabled: Bool {
+        if authService.isLoading || !personalDataConsentAccepted { return true }
+        if emailTrimmed.isEmpty || passwordTrimmed.isEmpty { return true }
+        let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        guard emailPredicate.evaluate(with: emailTrimmed) else { return true }
+        guard passwordTrimmed.count >= 8 else { return true }
+        let hasLetter = passwordTrimmed.rangeOfCharacter(from: .letters) != nil
+        let hasNumber = passwordTrimmed.rangeOfCharacter(from: .decimalDigits) != nil
+        return !(hasLetter && hasNumber)
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(localizationService.localizedString("registrationTitle", table: "onboarding"))
+                        .font(.largeTitle.bold())
+                    Text(localizationService.localizedString("registrationSubtitle", table: "onboarding"))
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
                     VStack(spacing: 12) {
-                        // Apple Sign In Button
-                        SignInWithAppleButton(
-                            onRequest: { request in
-                                request.requestedScopes = [.fullName, .email]
-                            },
-                            onCompletion: { result in
-                                handleAppleSignUp(result: result)
+                        Button(action: { Task { await signUpWithAppleTapped() } }) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "applelogo")
+                                    .font(.title3)
+                                Text(localizationService.localizedString("continueWithApple", table: "auth"))
+                                    .fontWeight(.semibold)
                             }
-                        )
-                        .signInWithAppleButtonStyle(.black)
-                        .frame(height: 50)
-                        .cornerRadius(12)
-                        .disabled(authService.isLoading)
-                        .padding(.horizontal)
-                        
-                        // Google Sign In Button
+                            .frame(maxWidth: .infinity)
+                            .frame(minHeight: 52)
+                            .foregroundStyle(.white)
+                            .background(Color.black)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(authService.isLoading || !personalDataConsentAccepted)
+
                         Button(action: signUpWithGoogle) {
                             GoogleSignInBrandButtonLabel(
-                                title: localizationService.localizedString("signUpWithGoogle", table: "auth")
+                                title: localizationService.localizedString("continueWithGoogle", table: "auth")
                             )
                         }
                         .buttonStyle(.plain)
-                        .disabled(authService.isLoading)
-                        .padding(.horizontal)
+                        .disabled(authService.isLoading || !personalDataConsentAccepted)
                     }
-                    .padding(.bottom, 16)
+
+                    HStack {
+                        Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1)
+                        Text(localizationService.localizedString("or", table: "auth"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Rectangle().fill(Color.gray.opacity(0.3)).frame(height: 1)
+                    }
+                    .padding(.vertical, 4)
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(localizationService.localizedString("emailLabel", table: "onboarding"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("ui_auth_name_example_com".localized, text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            .padding(12)
+                            .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.35)))
+                        if let e = emailFieldError {
+                            Text(e).font(.caption).foregroundStyle(.red)
+                        }
+                    }
+
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(localizationService.localizedString("password", table: "auth"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            Group {
+                                if showPassword {
+                                    TextField("", text: $password)
+                                        .textContentType(.newPassword)
+                                } else {
+                                    SecureField("", text: $password)
+                                        .textContentType(.newPassword)
+                                }
+                            }
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                            Button {
+                                showPassword.toggle()
+                            } label: {
+                                Image(systemName: showPassword ? "eye.slash" : "eye")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .accessibilityLabel(showPassword ? localizationService.localizedString("passwordHide", table: "onboarding") : localizationService.localizedString("passwordShow", table: "onboarding"))
+                        }
+                        .padding(12)
+                        .background(RoundedRectangle(cornerRadius: 10).stroke(Color.gray.opacity(0.35)))
+                        HStack {
+                            Text(localizationService.localizedString("passwordStrength", table: "onboarding"))
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                            Text(passwordStrengthLabel)
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(passwordStrengthColor)
+                        }
+                        if let e = passwordFieldError {
+                            Text(e).font(.caption).foregroundStyle(.red)
+                        }
+                    }
+
+                    consentRow
+
+                    if let error = errorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+
+                    Button(action: signUp) {
+                        Group {
+                            if authService.isLoading {
+                                ProgressView().tint(.white)
+                            } else {
+                                Text(localizationService.localizedString("createAccount", table: "auth"))
+                                    .font(.headline)
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .frame(minHeight: 52)
+                        .background(isCreateButtonDisabled ? Color.gray.opacity(0.45) : Color.divePrimary)
+                        .foregroundStyle(.white)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .disabled(isCreateButtonDisabled)
+
+                    HStack(spacing: 4) {
+                        Text(localizationService.localizedString("alreadyHaveAccount", table: "onboarding"))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button(localizationService.localizedString("signIn", table: "auth")) { dismiss() }
+                            .font(.footnote.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.top, 8)
                 }
-                .background(Color(.systemGroupedBackground))
+                .padding()
             }
-            .navigationTitle(localizationService.localizedString("signUp", table: "auth"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(localizationService.localizedString("cancel", table: "common")) {
-                        dismiss()
-                    }
+                ToolbarItem(placement: .principal) {
+                    Text(localizationService.localizedString("signUp", table: "auth"))
+                        .font(.headline)
+                }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(localizationService.localizedString("cancel", table: "common")) { dismiss() }
                 }
             }
         }
     }
-    
+
+    private var consentRow: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Button {
+                personalDataConsentAccepted.toggle()
+            } label: {
+                Image(systemName: personalDataConsentAccepted ? "checkmark.square.fill" : "square")
+                    .font(.title3)
+                    .foregroundStyle(personalDataConsentAccepted ? Color.divePrimary : .secondary)
+            }
+            .buttonStyle(.plain)
+            VStack(alignment: .leading, spacing: 4) {
+                if localizationService.currentLanguage == .english {
+                    Text(englishConsentAttributed)
+                        .font(.footnote)
+                } else {
+                    Text(localizationService.localizedString("consentCheckboxShort", table: "onboarding"))
+                        .font(.footnote)
+                    HStack(spacing: 10) {
+                        Link(
+                            localizationService.localizedString("privacyPolicyLinkTitle", table: "auth"),
+                            destination: ConsentTexts.privacyPolicyURL
+                        )
+                        Link(
+                            localizationService.localizedString("userAgreementLinkTitle", table: "auth"),
+                            destination: ConsentTexts.userAgreementURL
+                        )
+                    }
+                    .font(.caption)
+                }
+            }
+        }
+    }
+
+    private var englishConsentAttributed: AttributedString {
+        var a = AttributedString("I agree to the ")
+        var p = AttributedString("Privacy Policy")
+        p.link = ConsentTexts.privacyPolicyURL
+        let mid = AttributedString(" and ")
+        var t = AttributedString("Terms of Use")
+        t.link = ConsentTexts.userAgreementURL
+        a.append(p)
+        a.append(mid)
+        a.append(t)
+        return a
+    }
+
     private func signUp() {
-        // Валидация - используем trimmed значения
-        let emailTrimmed = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let passwordTrimmed = password.trimmingCharacters(in: .whitespacesAndNewlines)
-        let displayNameTrimmed = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        
-        guard !emailTrimmed.isEmpty, !passwordTrimmed.isEmpty, !displayNameTrimmed.isEmpty else {
-            errorMessage = AuthError.emptyFields.errorDescription
-            return
-        }
-        
-        // Enhanced email validation
+        emailFieldError = nil
+        passwordFieldError = nil
         let emailRegex = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPredicate = NSPredicate(format:"SELF MATCHES %@", emailRegex)
-        guard emailTrimmed.contains("@") && emailPredicate.evaluate(with: emailTrimmed) else {
-            errorMessage = AuthError.invalidEmail.errorDescription
+        let emailPredicate = NSPredicate(format: "SELF MATCHES %@", emailRegex)
+        guard emailPredicate.evaluate(with: emailTrimmed) else {
+            emailFieldError = localizationService.localizedString("pleaseEnterValidEmail", table: "auth")
+            errorMessage = nil
             return
         }
-        
-        // Enhanced password validation
         guard passwordTrimmed.count >= 8 else {
-            errorMessage = AuthError.weakPassword.errorDescription
+            passwordFieldError = localizationService.localizedString("passwordMinLength", table: "auth")
             return
         }
-        
-        // Check for at least one letter and one number
         let hasLetter = passwordTrimmed.rangeOfCharacter(from: .letters) != nil
         let hasNumber = passwordTrimmed.rangeOfCharacter(from: .decimalDigits) != nil
         guard hasLetter && hasNumber else {
-            errorMessage = AuthError.weakPassword.errorDescription
+            passwordFieldError = localizationService.localizedString("passwordLetterNumberRequired", table: "onboarding")
             return
         }
-        
-        // Validate display name (at least 2 characters)
-        guard displayNameTrimmed.count >= 2 else {
-            errorMessage = localizationService.localizedString("invalidEmail", table: "errors") // TODO: Add specific error for display name
-            return
-        }
-
         guard personalDataConsentAccepted else {
-            errorMessage = "Для регистрации нужно согласие на обработку персональных данных."
+            errorMessage = localizationService.localizedString("authConsentRequired", table: "auth")
             return
         }
-        
         errorMessage = nil
         Task {
             do {
                 try await authService.signUp(
                     email: emailTrimmed,
                     password: passwordTrimmed,
-                    displayName: displayNameTrimmed,
                     personalDataConsent: true,
                     personalDataConsentText: ConsentTexts.registrationConsentText()
                 )
                 dismiss()
             } catch {
                 if let authError = error as? AuthError {
+                    if case .emailAlreadyExists = authError {
+                        emailFieldError = localizationService.localizedString("emailAlreadyExists", table: "errors")
+                    }
                     errorMessage = authError.errorDescription
                 } else {
                     errorMessage = error.localizedDescription
@@ -435,42 +532,46 @@ struct SignUpView: View {
         }
     }
     
-    private func handleAppleSignUp(result: Result<ASAuthorization, Error>) {
-        switch result {
-        case .success(let authorization):
-            Task {
-                do {
-                    try await authService.signInWithApple(authorization: authorization)
-                    await MainActor.run {
-                        dismiss()
-                    }
-                } catch {
-                    await MainActor.run {
-                        if let authError = error as? AuthError {
-                            errorMessage = authError.errorDescription
-                        } else {
-                            errorMessage = error.localizedDescription
-                        }
-                    }
-                }
-            }
-        case .failure(let error):
-            // User cancelled or other error
-            if let authError = error as? ASAuthorizationError {
-                if authError.code != .canceled {
-                    errorMessage = userFriendlyAppleAuthError(authError)
-                }
+    @MainActor
+    private func signUpWithAppleTapped() async {
+        guard personalDataConsentAccepted else {
+            errorMessage = localizationService.localizedString("authConsentRequired", table: "auth")
+            return
+        }
+        errorMessage = nil
+        do {
+            let authorization = try await OAuthService.shared.signInWithApple()
+            try await authService.signInWithApple(
+                authorization: authorization,
+                personalDataConsent: true,
+                personalDataConsentText: ConsentTexts.registrationConsentText()
+            )
+            dismiss()
+        } catch {
+            if let appleErr = error as? ASAuthorizationError {
+                if appleErr.code == .canceled { return }
+                errorMessage = userFriendlyAppleAuthError(appleErr)
+            } else if let authErr = error as? AuthError {
+                errorMessage = authErr.errorDescription
             } else {
                 errorMessage = error.localizedDescription
             }
         }
     }
-    
+
     private func signUpWithGoogle() {
+        guard personalDataConsentAccepted else {
+            errorMessage = localizationService.localizedString("authConsentRequired", table: "auth")
+            return
+        }
         errorMessage = nil
         Task { @MainActor in
             do {
-                try await GoogleSignInCoordinator.signInAndAuthenticate(authService: authService)
+                try await GoogleSignInCoordinator.signInAndAuthenticate(
+                    authService: authService,
+                    personalDataConsent: true,
+                    personalDataConsentText: ConsentTexts.registrationConsentText()
+                )
                 dismiss()
             } catch {
                 if GoogleSignInCoordinator.wasUserCanceled(error) {

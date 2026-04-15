@@ -11,6 +11,7 @@ struct CheckoutView: View {
     let items: [GearItem]
     @ObservedObject var viewModel: InventoryViewModel
     @Environment(\.dismiss) var dismiss
+    @StateObject private var localizationService = LocalizationService.shared
     
     @State private var issuedToType: Checkout.IssuedToType = .client
     @State private var issuedToId: String = ""
@@ -22,6 +23,10 @@ struct CheckoutView: View {
     @State private var signature: UIImage?
     @State private var showSignaturePad = false
     @State private var currentStep = 0
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     var body: some View {
         NavigationView {
@@ -48,7 +53,7 @@ struct CheckoutView: View {
                 // Navigation buttons
                 HStack {
                     if currentStep > 0 {
-                        Button("Previous") {
+                        Button(inv("previous")) {
                             withAnimation {
                                 currentStep -= 1
                             }
@@ -57,7 +62,7 @@ struct CheckoutView: View {
                     
                     Spacer()
                     
-                    Button(currentStep == 2 ? "Complete" : "Next") {
+                    Button(currentStep == 2 ? inv("complete") : inv("next")) {
                         if currentStep == 2 {
                             completeCheckout()
                         } else {
@@ -70,11 +75,11 @@ struct CheckoutView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Check Out Equipment")
+            .navigationTitle(inv("checkOutEquipment"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button(inv("cancel")) {
                         dismiss()
                     }
                 }
@@ -88,27 +93,27 @@ struct CheckoutView: View {
     // MARK: - Step 1: Select Recipient
     private var selectRecipientStep: some View {
         Form {
-            Section("Recipient Type") {
-                Picker("Type", selection: $issuedToType) {
-                    Text("Client").tag(Checkout.IssuedToType.client)
-                    Text("Instructor").tag(Checkout.IssuedToType.instructor)
-                    Text("Employee").tag(Checkout.IssuedToType.employee)
+            Section(inv("recipientType")) {
+                Picker(inv("type"), selection: $issuedToType) {
+                    Text(inv("client")).tag(Checkout.IssuedToType.client)
+                    Text(inv("instructor")).tag(Checkout.IssuedToType.instructor)
+                    Text(inv("employee")).tag(Checkout.IssuedToType.employee)
                 }
             }
             
-            Section("Recipient") {
-                TextField("Name", text: $issuedToName)
+            Section(inv("recipient")) {
+                TextField(inv("name"), text: $issuedToName)
                 // TODO: Add search/select for existing users
             }
             
-            Section("Rental Details") {
-                DatePicker("Due Date", selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
+            Section(inv("rentalDetails")) {
+                DatePicker(inv("dueDate"), selection: $dueDate, displayedComponents: [.date, .hourAndMinute])
                 
-                TextField("Deposit Amount (optional)", text: $depositAmount)
+                TextField(inv("depositAmountOptional"), text: $depositAmount)
                     .keyboardType(.decimalPad)
             }
             
-            Section("Notes") {
+            Section(inv("notes")) {
                 TextEditor(text: $notes)
                     .frame(height: 100)
             }
@@ -118,28 +123,28 @@ struct CheckoutView: View {
     // MARK: - Step 2: Item Conditions
     private var itemConditionsStep: some View {
         Form {
-            Section("Items to Check Out") {
+            Section(inv("itemsToCheckOut")) {
                 ForEach(items) { item in
                     VStack(alignment: .leading, spacing: 12) {
                         Text(item.displayName)
                             .font(.headline)
                         
-                        Toggle("Has Scratches", isOn: Binding(
+                        Toggle(inv("hasScratches"), isOn: Binding(
                             get: { itemConditions[item.id]?.hasScratches ?? false },
                             set: { newValue in updateCondition(item.id) { $0.hasScratches = newValue } }
                         ))
                         
-                        Toggle("Has Punctures", isOn: Binding(
+                        Toggle(inv("hasPunctures"), isOn: Binding(
                             get: { itemConditions[item.id]?.hasPunctures ?? false },
                             set: { newValue in updateCondition(item.id) { $0.hasPunctures = newValue } }
                         ))
                         
-                        Toggle("Has Seal Issues", isOn: Binding(
+                        Toggle(inv("hasSealIssues"), isOn: Binding(
                             get: { itemConditions[item.id]?.hasSealIssues ?? false },
                             set: { newValue in updateCondition(item.id) { $0.hasSealIssues = newValue } }
                         ))
                         
-                        TextField("Other Defects", text: Binding(
+                        TextField(inv("otherDefects"), text: Binding(
                             get: { itemConditions[item.id]?.otherDefects ?? "" },
                             set: { newValue in updateCondition(item.id) { $0.otherDefects = newValue } }
                         ))
@@ -153,27 +158,27 @@ struct CheckoutView: View {
     // MARK: - Step 3: Review and Signature
     private var reviewAndSignatureStep: some View {
         Form {
-            Section("Summary") {
+            Section(inv("summary")) {
                 HStack {
-                    Text("Recipient")
+                    Text(inv("recipient"))
                     Spacer()
                     Text(issuedToName)
                 }
                 
                 HStack {
-                    Text("Items")
+                    Text(inv("items"))
                     Spacer()
-                    Text("\(items.count)")
+                    Text("ui_inventory_value".localized)
                 }
                 
                 HStack {
-                    Text("Due Date")
+                    Text(inv("dueDate"))
                     Spacer()
                     Text(formatDate(dueDate))
                 }
             }
             
-            Section("Signature") {
+            Section(inv("signature")) {
                 if let signature = signature {
                     Image(uiImage: signature)
                         .resizable()
@@ -182,13 +187,13 @@ struct CheckoutView: View {
                         .border(Color.gray, width: 1)
                 }
                 
-                Button("Add Signature") {
+                Button(inv("addSignature")) {
                     showSignaturePad = true
                 }
             }
             
             Section {
-                Text("By signing, the recipient acknowledges responsibility for the equipment and agrees to return it in the same condition.")
+                Text(inv("checkoutAgreement"))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

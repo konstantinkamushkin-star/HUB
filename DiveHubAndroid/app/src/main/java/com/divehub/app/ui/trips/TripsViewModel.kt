@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.divehub.app.AppGraph
+import com.divehub.app.R
 import com.divehub.app.data.AuthRepository
+import com.divehub.app.data.ChatRepository
 import com.divehub.app.data.repository.TripsRepository
 import com.divehub.app.data.remote.dto.TripListItemDto
 import com.divehub.app.data.remote.dto.participantUserRows
@@ -57,11 +59,14 @@ class TripsListViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = TripsListUiState(loading = true)
+            val prev = _state.value
+            _state.value = prev.copy(loading = true, error = null)
             runCatching { repo.listTrips(organizerId = organizerId) }
-                .onSuccess { _state.value = TripsListUiState(loading = false, trips = it) }
+                .onSuccess { trips ->
+                    _state.value = TripsListUiState(loading = false, trips = trips, error = null)
+                }
                 .onFailure { e ->
-                    _state.value = TripsListUiState(loading = false, error = e.message ?: "Error")
+                    _state.value = prev.copy(loading = false, error = e.message ?: "Error")
                 }
         }
     }
@@ -219,6 +224,7 @@ class TripDetailViewModel(
                         joinInProgress = false,
                         joinSuccessMessage = "${res.bookedSpots}/${res.totalSpots}",
                     )
+                    schedulePostJoinOrganizerChat(t)
                     load()
                 }
                 .onFailure { e ->
@@ -236,6 +242,31 @@ class TripDetailViewModel(
 
     fun clearJoinFeedback() {
         _state.value = _state.value.copy(joinError = null, joinSuccessMessage = null)
+    }
+
+    /**
+     * iOS `TripBookingView.createChatForBooking`: open organizer conversation and send an intro message.
+     * Best-effort; failures are ignored (same as iOS `print` on error).
+     */
+    private fun schedulePostJoinOrganizerChat(trip: TripListItemDto) {
+        val orgId = trip.organizerId?.trim().orEmpty()
+        if (orgId.isEmpty()) return
+        viewModelScope.launch {
+            val peerType = when (trip.organizerType?.trim()?.lowercase().orEmpty()) {
+                "dive_center" -> "dive_center"
+                else -> "user"
+            }
+            val place = listOfNotNull(trip.region?.trim(), trip.country?.trim())
+                .filter { it.isNotEmpty() }
+                .joinToString(", ")
+                .ifBlank { trip.tripType?.trim().orEmpty().ifBlank { trip.id } }
+            val intro = graph.application.getString(R.string.trip_booking_chat_intro, place)
+            runCatching {
+                val chatRepo = ChatRepository(graph)
+                val conv = chatRepo.openConversation(peerId = orgId, peerType = peerType)
+                chatRepo.sendText(conv.id, intro)
+            }
+        }
     }
 
     companion object {

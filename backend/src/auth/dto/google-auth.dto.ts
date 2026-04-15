@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsBoolean,
+  IsEmail,
+  IsOptional,
+  IsString,
+  MaxLength,
+  MinLength,
+  Equals,
+} from 'class-validator';
 
 export class GoogleAuthDto {
   @ApiProperty({ description: 'Google ID token from GIDGoogleUser.idToken' })
@@ -26,4 +34,22 @@ export class GoogleAuthDto {
   @IsOptional()
   @IsString()
   lastName?: string;
+
+  @ApiProperty({
+    example: true,
+    description: 'User consent to personal data processing (required)',
+  })
+  @IsBoolean()
+  @Equals(true, { message: 'Personal data processing consent is required' })
+  personalDataConsent: boolean;
+
+  @ApiProperty({
+    description: 'Consent text shown in the app before Google sign-in',
+    minLength: 20,
+    maxLength: 2000,
+  })
+  @IsString()
+  @MinLength(20)
+  @MaxLength(2000)
+  personalDataConsentText: string;
 }

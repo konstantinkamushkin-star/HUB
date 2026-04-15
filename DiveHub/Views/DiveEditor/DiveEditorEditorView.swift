@@ -259,7 +259,7 @@ struct DiveEditorEditorView: View {
                     .font(.caption)
                     .foregroundColor(disabled ? .diveTextSecondary.opacity(0.45) : .diveTextSecondary)
                 Spacer()
-                Text("\(Int(value.wrappedValue))")
+                Text("ui_imageediting_value_3".localized)
                     .font(.caption.monospacedDigit())
                     .foregroundColor(disabled ? .diveTextSecondary.opacity(0.45) : .diveTextSecondary)
             }

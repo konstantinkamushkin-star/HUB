@@ -217,8 +217,8 @@ struct ShareDiveView: View {
                             .foregroundColor(.secondary)
                         HStack {
                             Text(formatDepth(log.maxDepth))
-                            Text("•")
-                            Text("\(log.bottomTime) min")
+                            Text("ui_explore_a".localized)
+                            Text("ui_logbook_value_min".localized)
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -244,8 +244,8 @@ struct ShareDiveView: View {
                     .disabled(isSharing || shareText.isEmpty)
                 }
             }
-            .alert("Error", isPresented: $showError) {
-                Button("OK") {
+            .alert("ui_logbook_error".localized, isPresented: $showError) {
+                Button("ok".localized) {
                     showError = false
                 }
             } message: {

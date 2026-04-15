@@ -12,7 +12,7 @@ struct MainTabView: View {
     @StateObject private var localizationService = LocalizationService.shared
     @State private var selectedTab = 0
     @AppStorage("instructorModeEnabled") private var instructorModeEnabled = true
-    
+
     private func shouldUseShopInterface(for user: User) -> Bool {
         if let dc = user.diveCenterId, !dc.isEmpty {
             return false
@@ -32,17 +32,13 @@ struct MainTabView: View {
                 if shouldUseShopInterface(for: user) {
                     ShopTabView()
                 } else if user.role.canManageCenter {
-                    // Admin interface
                     AdminTabView()
                 } else if user.role == .instructor && instructorModeEnabled {
-                    // Instructor interface
                     InstructorTabView()
                 } else {
-                    // Diver interface
                     DiverTabView()
                 }
             } else {
-                // Fallback to diver interface
                 DiverTabView()
             }
         }
@@ -55,67 +51,110 @@ struct MainTabView: View {
     }
 }
 
+// MARK: - Diver tabs (carousel, full-width bar)
+
 struct DiverTabView: View {
     @StateObject private var localizationService = LocalizationService.shared
     @AppStorage(FeatureFlags.underwaterEditorKey) private var diveEditorEnabled = true
     @State private var selectedTab = 0
+    @Environment(\.displayScale) private var displayScale
 
-    /// Horizontal `ScrollView` otherwise expands vertically inside `safeAreaInset`, leaving a large empty band above the home indicator.
-    private let tabBarContentHeight: CGFloat = 48
+    private var tabContentBottomPad: CGFloat {
+        DiveHubCarouselTabBar.contentBottomInset(displayScale: displayScale)
+    }
 
-    private var tabItems: [(tag: Int, titleKey: String, table: String, systemImage: String)] {
-        var items: [(Int, String, String, String)] = [
-            (0, "explore", "common", "magnifyingglass"),
-            (1, "feed", "feed", "newspaper"),
-            (2, "logbook", "common", "book"),
-            (3, "social", "common", "person.2"),
-            (4, "messages", "common", "message"),
+    private func carouselItems() -> [CarouselTabItem] {
+        var items: [CarouselTabItem] = [
+            CarouselTabItem(
+                id: 0,
+                title: localizationService.localizedString("explore", table: "common"),
+                systemImage: "magnifyingglass",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 1,
+                title: localizationService.localizedString("feed", table: "feed"),
+                systemImage: "newspaper",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 2,
+                title: localizationService.localizedString("logbook", table: "common"),
+                systemImage: "book",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 3,
+                title: localizationService.localizedString("social", table: "common"),
+                systemImage: "person.2",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 4,
+                title: localizationService.localizedString("messages", table: "common"),
+                systemImage: "message",
+                accessibilityLabel: nil
+            )
         ]
         if diveEditorEnabled {
-            items.append((5, "diveEditorTabTitle", "imageEditing", "camera.filters"))
-            items.append((6, "profile", "common", "person.circle"))
+            items.append(
+                CarouselTabItem(
+                    id: 5,
+                    title: localizationService.localizedString("diveEditorTabShort", table: "imageEditing"),
+                    systemImage: "camera.filters",
+                    accessibilityLabel: localizationService.localizedString("diveEditorTabTitle", table: "imageEditing")
+                )
+            )
+            items.append(
+                CarouselTabItem(
+                    id: 6,
+                    title: localizationService.localizedString("profile", table: "common"),
+                    systemImage: "person.circle",
+                    accessibilityLabel: nil
+                )
+            )
         } else {
-            items.append((5, "profile", "common", "person.circle"))
+            items.append(
+                CarouselTabItem(
+                    id: 5,
+                    title: localizationService.localizedString("profile", table: "common"),
+                    systemImage: "person.circle",
+                    accessibilityLabel: nil
+                )
+            )
         }
         return items
     }
 
     var body: some View {
-        selectedRoot
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .tint(.divePrimary)
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                VStack(spacing: 0) {
-                    Divider()
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 0) {
-                            ForEach(tabItems, id: \.tag) { tab in
-                                diverTabBarButton(
-                                    tag: tab.tag,
-                                    title: localizationService.localizedString(tab.titleKey, table: tab.table),
-                                    systemImage: tab.systemImage
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 6)
-                        .frame(height: tabBarContentHeight, alignment: .center)
-                    }
-                    .frame(height: tabBarContentHeight)
-                }
-                .background(.regularMaterial)
+        ZStack(alignment: .bottom) {
+            tabContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, tabContentBottomPad)
+
+            DiveHubCarouselTabBar(
+                items: carouselItems(),
+                selectedTab: $selectedTab,
+                visibleColumnBasis: 5,
+                scrollAnchorNonce: carouselItems().count + (diveEditorEnabled ? 1 : 0)
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(edges: .bottom)
+        .tint(.divePrimary)
+        .sensoryFeedback(.selection, trigger: selectedTab)
+        .onChange(of: diveEditorEnabled) { _, on in
+            if on {
+                if selectedTab == 5 { selectedTab = 6 }
+            } else {
+                if selectedTab == 6 { selectedTab = 5 }
+                else if selectedTab == 5 { selectedTab = 0 }
             }
-            .onChange(of: diveEditorEnabled) { _, on in
-                if on {
-                    if selectedTab == 5 { selectedTab = 6 }
-                } else {
-                    if selectedTab == 6 { selectedTab = 5 }
-                    else if selectedTab == 5 { selectedTab = 0 }
-                }
-            }
+        }
     }
 
     @ViewBuilder
-    private var selectedRoot: some View {
+    private var tabContent: some View {
         switch selectedTab {
         case 0:
             ExploreView()
@@ -142,30 +181,6 @@ struct DiverTabView: View {
         default:
             ExploreView()
         }
-    }
-
-    private func diverTabBarButton(tag: Int, title: String, systemImage: String) -> some View {
-        let selected = selectedTab == tag
-        return Button {
-            selectedTab = tag
-        } label: {
-            VStack(spacing: 2) {
-                Image(systemName: systemImage)
-                    .font(.system(size: 22))
-                    .symbolRenderingMode(.monochrome)
-                Text(title)
-                    .font(.caption2)
-                    .fontWeight(selected ? .semibold : .regular)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-            .foregroundStyle(selected ? Color.divePrimary : Color.primary.opacity(0.55))
-            .frame(minWidth: 64)
-            .padding(.horizontal, 4)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 }
 

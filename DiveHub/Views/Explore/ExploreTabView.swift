@@ -301,14 +301,14 @@ struct DiveSiteRow: View {
                 HStack {
                     Label(String(format: "%.1f", site.averageRating), systemImage: "star.fill")
                         .font(.caption)
-                    Text("(\(site.reviewCount))")
+                    Text("ui_explore_value_6".localized)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
             Spacer()
             VStack(alignment: .trailing) {
-                Text("\(Int(site.maxDepth))m")
+                Text("ui_explore_value_m".localized)
                     .font(.headline)
                 Text(site.difficulty.displayName)
                     .font(.caption)
@@ -333,7 +333,7 @@ struct DiveCenterRow: View {
                 HStack {
                     Label(String(format: "%.1f", center.averageRating), systemImage: "star.fill")
                         .font(.caption)
-                    Text("(\(center.reviewCount))")
+                    Text("ui_explore_value".localized)
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

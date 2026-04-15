@@ -194,7 +194,7 @@ struct GroupTripRow: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             HStack {
-                Label("\(trip.participants.count)", systemImage: "person.2")
+                Label("ui_social_value".localized, systemImage: "person.2")
                 Spacer()
                 Text(trip.startDate, style: .date)
             }

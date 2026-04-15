@@ -40,7 +40,7 @@ struct BookingCalendarView: View {
         NavigationView {
             VStack(spacing: 0) {
                 // Mode Picker
-                Picker("View Mode", selection: $viewMode) {
+                Picker("ui_admin_view_mode".localized, selection: $viewMode) {
                     Text(localizationService.localizedString("calendar", table: "admin")).tag(ViewMode.calendar)
                     Text(localizationService.localizedString("list", table: "common")).tag(ViewMode.list)
                 }
@@ -76,7 +76,7 @@ struct BookingCalendarView: View {
             Section {
                 Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
                     Text(localizationService.localizedString("all", table: "common")).tag("all")
-                    ForEach([Booking.BookingStatus.pending, .confirmed, .completed, .cancelled], id: \.self) { status in
+                    ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
                         Text(status.rawValue.capitalized).tag(status.rawValue)
                     }
                 }
@@ -110,7 +110,7 @@ struct BookingCalendarView: View {
             Section {
                 Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
                     Text(localizationService.localizedString("all", table: "common")).tag("all")
-                    ForEach([Booking.BookingStatus.pending, .confirmed, .completed, .cancelled], id: \.self) { status in
+                    ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
                         Text(status.rawValue.capitalized).tag(status.rawValue)
                     }
                 }

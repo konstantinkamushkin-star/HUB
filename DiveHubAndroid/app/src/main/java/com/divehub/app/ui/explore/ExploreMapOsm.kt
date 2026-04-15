@@ -26,6 +26,8 @@ data class ExploreMapActions(
     val zoomIn: () -> Unit,
     val zoomOut: () -> Unit,
     val centerOn: (Double, Double) -> Unit,
+    /** lat, lng, zoomLevel — iOS “show on map” span */
+    val centerOnZoom: (Double, Double, Double) -> Unit,
 )
 
 @Composable
@@ -102,6 +104,10 @@ fun ExploreMapOsm(
                 zoomIn = { map.controller.setZoom(map.zoomLevelDouble + 1.0) },
                 zoomOut = { map.controller.setZoom(map.zoomLevelDouble - 1.0) },
                 centerOn = { lat, lng -> map.controller.animateTo(GeoPoint(lat, lng)) },
+                centerOnZoom = { lat, lng, zoom ->
+                    map.controller.setZoom(zoom)
+                    map.controller.animateTo(GeoPoint(lat, lng))
+                },
             ),
         )
     }

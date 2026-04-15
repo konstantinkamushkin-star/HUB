@@ -39,7 +39,7 @@ struct InstructorScheduleView: View {
         NavigationView {
             VStack(spacing: 0) {
                 // View Mode Picker
-                Picker("View Mode", selection: $viewMode) {
+                Picker("ui_admin_view_mode".localized, selection: $viewMode) {
                     Text(localizationService.localizedString("calendar", table: "common")).tag(ViewMode.calendar)
                     Text(localizationService.localizedString("list", table: "common")).tag(ViewMode.list)
                 }
@@ -75,7 +75,7 @@ struct InstructorScheduleView: View {
                         // Filter Picker
                         Picker(localizationService.localizedString("filterByStatus", table: "instructor"), selection: $selectedStatus) {
                             Text(localizationService.localizedString("all", table: "common")).tag("all")
-                            ForEach([Booking.BookingStatus.pending, .confirmed, .completed, .cancelled], id: \.self) { status in
+                            ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
                                 Text(status.rawValue.capitalized).tag(status.rawValue)
                             }
                         }

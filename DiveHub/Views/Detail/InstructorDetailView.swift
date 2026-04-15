@@ -37,7 +37,7 @@ struct InstructorDetailView: View {
                                 .foregroundColor(.yellow)
                             Text(String(format: "%.1f", instructor.averageRating))
                                 .fontWeight(.semibold)
-                            Text("(\(instructor.reviewCount) reviews)")
+                            Text("ui_detail_value_reviews".localized)
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -52,7 +52,7 @@ struct InstructorDetailView: View {
                 // Certifications
                 if !instructor.certifications.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Certifications")
+                        Text("ui_detail_certifications".localized)
                             .font(.headline)
                         
                         ForEach(instructor.certifications, id: \.self) { cert in
@@ -69,7 +69,7 @@ struct InstructorDetailView: View {
                 // Languages
                 if !instructor.languages.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Languages")
+                        Text("ui_detail_languages".localized)
                             .font(.headline)
                         
                         ScrollView(.horizontal, showsIndicators: false) {
@@ -91,7 +91,7 @@ struct InstructorDetailView: View {
                 // Bio
                 if let bio = instructor.bio, !bio.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("About")
+                        Text("ui_detail_about".localized)
                             .font(.headline)
                         Text(bio)
                             .font(.body)
@@ -105,7 +105,7 @@ struct InstructorDetailView: View {
                         HStack {
                             Image(systemName: "sparkles")
                                 .foregroundColor(.divePrimary)
-                            Text("AI Summary")
+                            Text("ui_detail_ai_summary".localized)
                                 .font(.headline)
                         }
                         Text(aiSummary)
@@ -128,7 +128,7 @@ struct InstructorDetailView: View {
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showBooking = true }) {
-                    Text("Book")
+                    Text("ui_detail_book".localized)
                         .fontWeight(.semibold)
                 }
             }

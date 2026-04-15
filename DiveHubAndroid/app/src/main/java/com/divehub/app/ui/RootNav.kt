@@ -6,9 +6,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.divehub.app.AppGraph
 import com.divehub.app.ui.auth.ChangePasswordRoute
+import com.divehub.app.ui.auth.DiveCenterRegistrationRoute
 import com.divehub.app.ui.auth.ForgotPasswordRoute
 import com.divehub.app.ui.auth.LoginRoute
 import com.divehub.app.ui.auth.PartnerRegistrationRoute
+import com.divehub.app.ui.auth.ProfileOnboardingRoute
 import com.divehub.app.ui.auth.RegisterRoute
 import com.divehub.app.ui.main.MainShell
 import com.divehub.app.ui.onboarding.OnboardingRoute
@@ -34,8 +36,14 @@ fun RootNav(graph: AppGraph) {
         composable(Routes.Register) {
             RegisterRoute(nav, graph)
         }
+        composable(Routes.ProfileOnboarding) {
+            ProfileOnboardingRoute(nav, graph)
+        }
         composable(Routes.PartnerRegistration) {
             PartnerRegistrationRoute(nav, graph)
+        }
+        composable(Routes.DiveCenterRegistration) {
+            DiveCenterRegistrationRoute(nav, graph)
         }
         composable(Routes.ChangePassword) {
             ChangePasswordRoute(nav, graph)

@@ -26,7 +26,7 @@ struct NewChatWithFriendView: View {
                     ContentUnavailableView(
                         "No friends yet",
                         systemImage: "person.2.slash",
-                        description: Text("Add friends in the Social tab to start a chat.")
+                        description: Text("ui_chat_add_friends_in_the_social_tab_to_start_a_chat".localized)
                     )
                 } else {
                     List(friends) { friend in
@@ -58,11 +58,11 @@ struct NewChatWithFriendView: View {
                     }
                 }
             }
-            .navigationTitle("New message")
+            .navigationTitle("ui_chat_new_message".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") { dismiss() }
+                    Button("ui_close".localized) { dismiss() }
                 }
             }
             .navigationDestination(for: ChatConversation.self) { conversation in

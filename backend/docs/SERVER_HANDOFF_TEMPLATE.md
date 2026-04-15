@@ -27,6 +27,30 @@ cd /opt/divehub-src/DivePROD && git pull origin main && cd backend && ./deploy-d
 
 ---
 
+## CI / quality gate
+
+Перед деплоем в `main` должны быть зелёные CI-задачи:
+
+- **Backend Build**: `npm ci && npm run verify:prod-build` (папка `backend`)
+- **Admin Web Build**: `npm ci && npm run build` (папка `admin-web`)
+- **Release Audit**: `./scripts/pre_release_audit.sh --skip-build` (проверки на build-артефакты, локальные секреты и запрещённые debug endpoint/header)
+
+Если CI не поднят на сервере GitHub Actions (ограничения/квоты), прогонять эти команды вручную на dev-машине перед `git push`.
+
+Полный локальный прогон перед релизом:
+
+```bash
+./scripts/pre_release_audit.sh
+```
+
+Быстрый smoke после деплоя (API + legal pages):
+
+```bash
+./scripts/post_deploy_smoke.sh "https://api.dive-hub.ru" "https://dive-hub.ru"
+```
+
+---
+
 ## Сервер (VPS)
 
 | Поле | Значение (заполнить) |

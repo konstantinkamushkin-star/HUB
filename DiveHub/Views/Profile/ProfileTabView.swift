@@ -24,6 +24,70 @@ struct ProfileTabView: View {
         }
     }
 
+    private var diverInfoSectionTitle: String {
+        localizationService.localizedString("profileOnboardingDiving", table: "onboarding")
+    }
+
+    private func onboardingCatalogLabel(prefix: String, code: String) -> String {
+        let key = "\(prefix)_\(code)"
+        let value = localizationService.localizedString(key, table: "onboarding")
+        return value == key ? code : value
+    }
+
+    private func countryName(from code: String) -> String {
+        let locale = Locale(identifier: localizationService.currentLanguage.rawValue)
+        return locale.localizedString(forRegionCode: code) ?? code
+    }
+
+    private func diverProfileRows(for user: User) -> [(label: String, value: String)] {
+        let profile = user.diverProfile
+        var rows: [(String, String)] = []
+
+        if let username = profile?.username, !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let display = username.hasPrefix("@") ? username : "@\(username)"
+            rows.append((localizationService.localizedString("profileOnboardingUsername", table: "onboarding"), display))
+        }
+        if let city = profile?.city, !city.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            rows.append((localizationService.localizedString("profileOnboardingCity", table: "onboarding"), city))
+        }
+        if let countryCode = user.countryCode, !countryCode.isEmpty {
+            rows.append((localizationService.localizedString("profileOnboardingCountry", table: "onboarding"), countryName(from: countryCode)))
+        }
+
+        if let certCode = profile?.certificationLevel ?? user.certificationLevel, !certCode.isEmpty {
+            rows.append((localizationService.localizedString("profileOnboardingCertLevel", table: "onboarding"), onboardingCatalogLabel(prefix: "diverCert", code: certCode)))
+        }
+
+        let agencies = (profile?.certifyingAgencies ?? [])
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if !agencies.isEmpty {
+            let text = agencies.map { onboardingCatalogLabel(prefix: "diverAgency", code: $0) }.joined(separator: ", ")
+            rows.append((localizationService.localizedString("profileOnboardingAgency", table: "onboarding"), text))
+        } else if let legacy = profile?.certifyingAgency, !legacy.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            let values = legacy
+                .split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+                .map { onboardingCatalogLabel(prefix: "diverAgency", code: $0) }
+                .joined(separator: ", ")
+            if !values.isEmpty {
+                rows.append((localizationService.localizedString("profileOnboardingAgency", table: "onboarding"), values))
+            }
+        }
+
+        if let divesRange = profile?.totalDivesRange, !divesRange.isEmpty {
+            rows.append((localizationService.localizedString("profileOnboardingDiveCount", table: "onboarding"), onboardingCatalogLabel(prefix: "diverRange", code: divesRange)))
+        }
+
+        let interests = (profile?.diveInterests ?? [])
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if !interests.isEmpty {
+            let text = interests.map { onboardingCatalogLabel(prefix: "diverInterest", code: $0) }.joined(separator: ", ")
+            rows.append((localizationService.localizedString("profileOnboardingInterests", table: "onboarding"), text))
+        }
+        return rows
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -31,12 +95,28 @@ struct ProfileTabView: View {
                     Section {
                         ProfileHeaderView(user: user)
                     }
+
+                    let diverRows = diverProfileRows(for: user)
+                    if !diverRows.isEmpty {
+                        Section(diverInfoSectionTitle) {
+                            ForEach(Array(diverRows.enumerated()), id: \.offset) { _, row in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(row.label)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(row.value)
+                                        .font(.subheadline)
+                                }
+                                .padding(.vertical, 2)
+                            }
+                        }
+                    }
                     
                     // Show different sections based on user role
                     if user.role == .diveCenterAdmin || user.role == .instructor {
                         Section(localizationService.localizedString("centerManagement")) {
                             NavigationLink(destination: DiveCenterAdminView()) {
-                                Label("Dive Center Management", systemImage: "building.2")
+                                Label("ui_profile_dive_center_management".localized, systemImage: "building.2")
                             }
                         }
                     }
@@ -51,6 +131,10 @@ struct ProfileTabView: View {
                     Section(localizationService.localizedString("account")) {
                         NavigationLink(destination: EditProfileView()) {
                             Label(localizationService.localizedString("editProfile"), systemImage: "pencil")
+                        }
+
+                        NavigationLink(destination: DiverProfileDetailsView()) {
+                            Label(localizationService.localizedString("profileOnboardingTitle", table: "onboarding"), systemImage: "person.text.rectangle")
                         }
                         
                         if user.role == .diverBasic {
@@ -75,6 +159,10 @@ struct ProfileTabView: View {
                         
                         NavigationLink(destination: StatisticsView()) {
                             Label(localizationService.localizedString("statistics"), systemImage: "chart.bar")
+                        }
+
+                        NavigationLink(destination: MyBookingsView()) {
+                            Label(localizationService.localizedString("bookings", table: "admin"), systemImage: "calendar.badge.clock")
                         }
                         
                         NavigationLink(destination: AchievementsView()) {

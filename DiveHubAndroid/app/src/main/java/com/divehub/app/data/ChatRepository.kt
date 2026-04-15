@@ -10,8 +10,11 @@ import com.divehub.app.data.remote.dto.UserDto
 class ChatRepository(private val graph: AppGraph) {
     suspend fun conversations(): List<ChatConversationDto> = graph.chatApi().conversations()
 
+    suspend fun openConversation(peerId: String, peerType: String = "user"): ChatConversationDto =
+        graph.chatApi().openConversation(OpenConversationRequest(peerType = peerType, peerId = peerId))
+
     suspend fun openUserConversation(userId: String): ChatConversationDto =
-        graph.chatApi().openConversation(OpenConversationRequest(peerId = userId))
+        openConversation(peerId = userId, peerType = "user")
 
     suspend fun messagesPage(
         conversationId: String,

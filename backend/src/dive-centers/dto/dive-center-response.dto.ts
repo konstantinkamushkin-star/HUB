@@ -14,6 +14,8 @@ export class DiveCenterListItemDto {
   certification_agency?: string;
   nitrox_available: boolean;
   price_from?: number;
+  /** Public profile text when loaded by id (optional on list/search payloads). */
+  description?: string;
 }
 
 export class PaginationInfoDto {

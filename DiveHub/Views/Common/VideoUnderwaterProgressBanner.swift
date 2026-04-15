@@ -13,7 +13,7 @@ struct VideoUnderwaterProgressBanner: View {
             ProgressView(value: progress.fraction01, total: 1)
                 .tint(.divePrimary)
             HStack {
-                Text("\(percentString)%")
+                Text("ui_common_value".localized)
                     .fontWeight(.medium)
                 Spacer()
                 if progress.estimatedSecondsRemaining > 0.5, progress.fraction01 < 0.995 {

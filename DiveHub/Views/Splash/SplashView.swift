@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct SplashView: View {
-    @StateObject private var authService = AuthenticationService.shared
+    @EnvironmentObject private var authService: AuthenticationService
     @State private var isActive = false
     @State private var size = 0.8
     @State private var opacity = 0.5
@@ -18,6 +18,8 @@ struct SplashView: View {
             if authService.isAuthenticated {
                 if authService.requiresPasswordReset {
                     ForcePasswordChangeView()
+                } else if authService.currentUser?.needsDiverProfileOnboarding == true {
+                    ProfileOnboardingView()
                 } else {
                     MainTabView()
                 }
@@ -37,7 +39,7 @@ struct SplashView: View {
                         .scaleEffect(size)
                         .opacity(opacity)
                     
-                    Text("DiveHub")
+                    Text("ui_splash_divehub".localized)
                         .font(.system(size: 40, weight: .bold))
                         .foregroundColor(.white)
                         .opacity(opacity)
@@ -61,4 +63,7 @@ struct SplashView: View {
 
 #Preview {
     SplashView()
+        .environmentObject(AuthenticationService.shared)
+        .environmentObject(LocalizationService.shared)
+        .environmentObject(SettingsService.shared)
 }

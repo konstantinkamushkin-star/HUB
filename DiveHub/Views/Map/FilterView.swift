@@ -101,7 +101,7 @@ struct FilterView: View {
                     HStack {
                         Text(localizationService.localizedString("maxDepth", table: "explore"))
                         Spacer()
-                        TextField("∞", value: $filters.maxDepth, format: .number)
+                        TextField("ui_map_infinity_symbol".localized, value: $filters.maxDepth, format: .number)
                             .keyboardType(.decimalPad)
                             .frame(width: 80)
                         Text(localizationService.localizedString("meters", table: "explore"))
@@ -118,8 +118,8 @@ struct FilterView: View {
                     }
                 }
                 
-                Section("Search Options") {
-                    Toggle("Show all countries (disable location-based search)", isOn: Binding(
+                Section("ui_search_options".localized) {
+                    Toggle("ui_map_show_all_countries_disable_location_based_search".localized, isOn: Binding(
                         get: { filters.maxDistance == nil },
                         set: { enabled in
                             if enabled {
@@ -138,7 +138,7 @@ struct FilterView: View {
                         HStack {
                             Text(localizationService.localizedString("searchRadius", table: "explore"))
                             Spacer()
-                            TextField("500", value: $filters.maxDistance, format: .number)
+                            TextField("ui_map_value".localized, value: $filters.maxDistance, format: .number)
                                 .keyboardType(.decimalPad)
                                 .frame(width: 80)
                             Text(localizationService.localizedString("km", table: "explore"))

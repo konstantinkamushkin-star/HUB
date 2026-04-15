@@ -323,7 +323,7 @@ struct TripRowView: View {
                 .lineLimit(2)
             
             HStack {
-                Label("\(trip.startDate.formatted(date: .abbreviated, time: .omitted)) - \(trip.endDate.formatted(date: .abbreviated, time: .omitted))", systemImage: "calendar")
+                Label("ui_admin_value_value_3".localized, systemImage: "calendar")
                     .font(.caption)
                 Spacer()
                 Label("\(trip.availableSpots) \(localizationService.localizedString("spots", table: "trips"))", systemImage: "person.2")
@@ -756,7 +756,7 @@ struct TripDetailView: View {
                                                 .font(.subheadline)
                                                 .fontWeight(.semibold)
                                             Spacer()
-                                            Text("\(expense.cost, format: .currency(code: expense.currency))")
+                                            Text("ui_trips_value".localized)
                                                 .font(.subheadline)
                                                 .fontWeight(.semibold)
                                         }

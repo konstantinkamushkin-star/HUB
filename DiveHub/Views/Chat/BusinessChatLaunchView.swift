@@ -24,7 +24,7 @@ struct BusinessChatLaunchView: View {
                         .foregroundColor(.red)
                         .multilineTextAlignment(.center)
                         .padding()
-                    Button("Close") { dismiss() }
+                    Button("ui_close".localized) { dismiss() }
                 }
             } else {
                 ProgressView("Opening chat…")

@@ -15,6 +15,10 @@ struct InventoryListView: View {
     @State private var showAddItem = false
     @State private var showBulkActions = false
     @State private var selectedItem: GearItem?
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     enum ViewMode: String, CaseIterable {
         case list = "list"
@@ -44,21 +48,21 @@ struct InventoryListView: View {
                 contentView
             }
         }
-        .navigationTitle("Equipment Inventory")
+        .navigationTitle(inv("inventoryTitle"))
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if !viewModel.selectedItems.isEmpty {
-                    Button("Actions") {
+                    Button(inv("actions")) {
                         showBulkActions = true
                     }
                 }
                 
                 Menu {
                     Button(action: { showFilters.toggle() }) {
-                        Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                        Label(inv("filters"), systemImage: "line.3.horizontal.decrease.circle")
                     }
                     
-                    Picker("View Mode", selection: $viewMode) {
+                    Picker(inv("viewMode"), selection: $viewMode) {
                         ForEach(ViewMode.allCases, id: \.self) { mode in
                             Label(mode.rawValue.capitalized, systemImage: mode.icon)
                                 .tag(mode)
@@ -66,7 +70,7 @@ struct InventoryListView: View {
                     }
                     
                     Button(action: { showAddItem = true }) {
-                        Label("Add Item", systemImage: "plus")
+                        Label(inv("addItem"), systemImage: "plus")
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
@@ -84,20 +88,20 @@ struct InventoryListView: View {
         }
         .actionSheet(isPresented: $showBulkActions) {
             ActionSheet(
-                title: Text("Bulk Actions"),
-                message: Text("\(viewModel.selectedItems.count) items selected"),
+                title: Text(inv("bulkActions")),
+                message: Text("\(viewModel.selectedItems.count) \(inv("itemsSelected"))"),
                 buttons: [
-                    .default(Text("Change Location")) {
+                    .default(Text(inv("changeLocation"))) {
                         // Show location picker
                     },
-                    .default(Text("Change Status")) {
+                    .default(Text(inv("changeStatus"))) {
                         // Show status picker
                     },
-                    .default(Text("Export")) {
+                    .default(Text(inv("export"))) {
                         // Export selected items
                     },
-                    .cancel(Text("Cancel")),
-                    .destructive(Text("Deselect All")) {
+                    .cancel(Text(inv("cancel"))),
+                    .destructive(Text(inv("deselectAll"))) {
                         viewModel.deselectAll()
                     }
                 ]
@@ -116,7 +120,7 @@ struct InventoryListView: View {
                 Image(systemName: "magnifyingglass")
                     .foregroundColor(.secondary)
                 
-                TextField("Search by ID, name, serial, barcode...", text: $viewModel.searchText)
+                TextField(inv("searchPlaceholder"), text: $viewModel.searchText)
                     .textFieldStyle(.plain)
                 
                 if !viewModel.searchText.isEmpty {
@@ -257,7 +261,7 @@ struct InventoryListView: View {
     private var loadingView: some View {
         VStack(spacing: 16) {
             ProgressView()
-            Text("Loading equipment...")
+            Text(inv("loadingEquipment"))
                 .foregroundColor(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -270,18 +274,18 @@ struct InventoryListView: View {
                 .font(.system(size: 60))
                 .foregroundColor(.secondary)
             
-            Text(hasActiveFilters ? "No items match your filters" : "No equipment yet")
+            Text(hasActiveFilters ? inv("noItemsMatchFilters") : inv("noEquipmentYet"))
                 .font(.title2)
                 .fontWeight(.semibold)
             
-            Text(hasActiveFilters ? "Try adjusting your filters" : "Add your first piece of equipment to get started")
+            Text(hasActiveFilters ? inv("tryAdjustingFilters") : inv("addFirstEquipment"))
                 .font(.subheadline)
                 .foregroundColor(.secondary)
                 .multilineTextAlignment(.center)
             
             if !hasActiveFilters {
                 Button(action: { showAddItem = true }) {
-                    Label("Add Equipment", systemImage: "plus.circle.fill")
+                    Label(inv("addEquipment"), systemImage: "plus.circle.fill")
                         .font(.headline)
                         .padding()
                         .background(Color.blue)
@@ -301,6 +305,12 @@ struct InventoryListItemRow: View {
     let isSelected: Bool
     let onSelect: () -> Void
     let onTap: () -> Void
+
+    @StateObject private var localizationService = LocalizationService.shared
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     var body: some View {
         HStack(spacing: 12) {
@@ -368,25 +378,25 @@ struct InventoryListItemRow: View {
             // Quick actions
             Menu {
                 Button(action: {}) {
-                    Label("Check Out", systemImage: "arrow.up.circle")
+                    Label(inv("checkOut"), systemImage: "arrow.up.circle")
                 }
                 
                 Button(action: {}) {
-                    Label("Inspection", systemImage: "checkmark.shield")
+                    Label(inv("inspection"), systemImage: "checkmark.shield")
                 }
                 
                 Button(action: onTap) {
-                    Label("Details", systemImage: "info.circle")
+                    Label(inv("details"), systemImage: "info.circle")
                 }
                 
                 Divider()
                 
                 Button(action: {}) {
-                    Label("Edit", systemImage: "pencil")
+                    Label(inv("edit"), systemImage: "pencil")
                 }
                 
                 Button(role: .destructive, action: {}) {
-                    Label("Delete", systemImage: "trash")
+                    Label(inv("delete"), systemImage: "trash")
                 }
             } label: {
                 Image(systemName: "ellipsis")
@@ -556,48 +566,54 @@ struct FilterChip: View {
 struct FiltersView: View {
     @ObservedObject var viewModel: InventoryViewModel
     @Environment(\.dismiss) var dismiss
+
+    @StateObject private var localizationService = LocalizationService.shared
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     var body: some View {
         NavigationView {
             Form {
-                Section("Category") {
-                    Picker("Category", selection: $viewModel.selectedCategory) {
-                        Text("All").tag(nil as GearItem.GearCategory?)
+                Section(inv("category")) {
+                    Picker(inv("category"), selection: $viewModel.selectedCategory) {
+                        Text(inv("all")).tag(nil as GearItem.GearCategory?)
                         ForEach(GearItem.GearCategory.allCases, id: \.self) { category in
                             Text(category.displayName).tag(category as GearItem.GearCategory?)
                         }
                     }
                 }
                 
-                Section("Status") {
-                    Picker("Status", selection: $viewModel.selectedStatus) {
-                        Text("All").tag(nil as GearItem.GearStatus?)
+                Section(inv("status")) {
+                    Picker(inv("status"), selection: $viewModel.selectedStatus) {
+                        Text(inv("all")).tag(nil as GearItem.GearStatus?)
                         ForEach(GearItem.GearStatus.allCases, id: \.self) { status in
                             Text(status.displayName).tag(status as GearItem.GearStatus?)
                         }
                     }
                 }
                 
-                Section("Condition") {
-                    Picker("Condition", selection: $viewModel.selectedCondition) {
-                        Text("All").tag(nil as GearItem.GearCondition?)
+                Section(inv("condition")) {
+                    Picker(inv("condition"), selection: $viewModel.selectedCondition) {
+                        Text(inv("all")).tag(nil as GearItem.GearCondition?)
                         ForEach(GearItem.GearCondition.allCases, id: \.self) { condition in
                             Text(condition.displayName).tag(condition as GearItem.GearCondition?)
                         }
                     }
                 }
                 
-                Section("Location") {
-                    Picker("Location", selection: $viewModel.selectedLocationId) {
-                        Text("All Locations").tag(nil as String?)
+                Section(inv("location")) {
+                    Picker(inv("location"), selection: $viewModel.selectedLocationId) {
+                        Text(inv("allLocations")).tag(nil as String?)
                         ForEach(viewModel.locations.filter { $0.isActive }) { location in
                             Text(location.name).tag(location.id as String?)
                         }
                     }
                 }
                 
-                Section("Sort By") {
-                    Picker("Sort", selection: $viewModel.sortOption) {
+                Section(inv("sortBy")) {
+                    Picker(inv("sort"), selection: $viewModel.sortOption) {
                         ForEach(InventoryViewModel.SortOption.allCases, id: \.self) { option in
                             Text(option.displayName).tag(option)
                         }
@@ -605,7 +621,7 @@ struct FiltersView: View {
                 }
                 
                 Section {
-                    Button("Clear All Filters", role: .destructive) {
+                    Button(inv("clearAllFilters"), role: .destructive) {
                         viewModel.selectedCategory = nil
                         viewModel.selectedStatus = nil
                         viewModel.selectedCondition = nil
@@ -613,11 +629,11 @@ struct FiltersView: View {
                     }
                 }
             }
-            .navigationTitle("Filters")
+            .navigationTitle(inv("filters"))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button(inv("done")) {
                         dismiss()
                     }
                 }

@@ -54,12 +54,12 @@ struct FishSpeciesPickerView: View {
                     }
                 }
             }
-            .navigationTitle("Select Fish Species")
+            .navigationTitle("ui_logbook_select_fish_species".localized)
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search fish species")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button("ui_feed_done".localized) {
                         dismiss()
                     }
                 }

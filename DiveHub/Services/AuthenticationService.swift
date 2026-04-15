@@ -12,6 +12,8 @@ import AuthenticationServices
 enum AuthError: LocalizedError {
     case invalidCredentials
     case networkError
+    /// Нет сети / не удаётся достучаться до сервера (URLError и т.п.).
+    case noInternetConnection
     case userNotFound
     case emailAlreadyExists
     case weakPassword
@@ -31,6 +33,8 @@ enum AuthError: LocalizedError {
             return localizationService.localizedString("invalidCredentials", table: "errors")
         case .networkError:
             return localizationService.localizedString("networkError", table: "errors")
+        case .noInternetConnection:
+            return localizationService.localizedString("noInternetConnection", table: "errors")
         case .userNotFound:
             return localizationService.localizedString("userNotFound", table: "errors")
         case .emailAlreadyExists:
@@ -58,19 +62,55 @@ enum AuthError: LocalizedError {
                 case .serverError(let code):
                     if code == 400 {
                         return localizationService.localizedString("serverError", table: "errors")
+                    } else if code == 401 {
+                        return localizationService.localizedString("pleaseSignIn", table: "errors")
+                    } else if code == 403 {
+                        return localizationService.localizedString("editProfileNoPermission", table: "errors")
                     } else if code == 404 {
                         return localizationService.localizedString("backendUnavailable", table: "errors")
+                    } else if code == 409 {
+                        return localizationService.localizedString("emailAlreadyExists", table: "errors")
+                    } else if code == 429 {
+                        return localizationService.localizedString("tooManyRequests", table: "errors")
                     }
-                    return "\(localizationService.localizedString("serverError", table: "errors")) (\(code))"
+                    return localizationService.localizedString("serverError", table: "errors")
+                case .serverErrorWithDetail(let code, _):
+                    if code == 401 {
+                        return localizationService.localizedString("pleaseSignIn", table: "errors")
+                    }
+                    if code == 403 {
+                        return localizationService.localizedString("editProfileNoPermission", table: "errors")
+                    }
+                    if code == 409 {
+                        return localizationService.localizedString("emailAlreadyExists", table: "errors")
+                    }
+                    return networkError.errorDescription ?? localizationService.localizedString("serverError", table: "errors")
                 case .networkUnavailable:
-                    return localizationService.localizedString("networkError", table: "errors")
+                    return localizationService.localizedString("noInternetConnection", table: "errors")
                 default:
-                    return error.localizedDescription
+                    return networkError.errorDescription ?? localizationService.localizedString("serverError", table: "errors")
                 }
+            }
+            if NetworkError.isTransportLikelyNoInternet(error) {
+                return localizationService.localizedString("noInternetConnection", table: "errors")
             }
             return error.localizedDescription
         }
     }
+}
+
+/// Body for `PATCH /api/auth/me` (only non-`nil` fields are encoded).
+struct AuthMePatchBody: Encodable {
+    var firstName: String?
+    var lastName: String?
+    var phone: String?
+    var bio: String?
+    var language: String?
+    var avatarUrl: String?
+    var countryCode: String?
+    var diverProfile: DiverProfilePayload?
+    /// Смена email (если поддерживается бэкендом); `nil` — не отправлять поле.
+    var email: String?
 }
 
 class AuthenticationService: ObservableObject {
@@ -149,12 +189,12 @@ class AuthenticationService: ObservableObject {
             isLoading = false
             if let networkError = error as? NetworkError {
                 switch networkError {
-                case .serverError(401):
+                case .serverError(401), .serverErrorWithDetail(401, _):
                     throw AuthError.invalidCredentials
-                case .serverError(404):
+                case .serverError(404), .serverErrorWithDetail(404, _):
                     throw AuthError.backendUnavailable
                 case .networkUnavailable:
-                    throw AuthError.networkError
+                    throw AuthError.noInternetConnection
                 default:
                     throw AuthError.unknown(error)
                 }
@@ -167,7 +207,6 @@ class AuthenticationService: ObservableObject {
     func signUp(
         email: String,
         password: String,
-        displayName: String,
         personalDataConsent: Bool,
         personalDataConsentText: String
     ) async throws {
@@ -175,7 +214,7 @@ class AuthenticationService: ObservableObject {
         error = nil
         
         // Валидация
-        guard !email.isEmpty, !password.isEmpty, !displayName.isEmpty else {
+        guard !email.isEmpty, !password.isEmpty else {
             isLoading = false
             throw AuthError.emptyFields
         }
@@ -190,18 +229,13 @@ class AuthenticationService: ObservableObject {
             throw AuthError.weakPassword
         }
         
-        // Нормализуем email и аккуратно делим displayName на имя/фамилию.
-        // Для совместимости со старым backend не отправляем пустой lastName.
+        // Плейсхолдер имени до онбординга: локальная часть email или «Diver».
         let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let nameParts = displayName
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(maxSplits: 1, omittingEmptySubsequences: true, whereSeparator: \.isWhitespace)
-            .map(String.init)
-        let firstName = (nameParts.first?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
-            ? nameParts[0]
-            : "User"
-        let rawLastName = nameParts.count > 1 ? nameParts[1].trimmingCharacters(in: .whitespacesAndNewlines) : ""
-        let lastName = rawLastName.isEmpty ? firstName : rawLastName
+        let localPart = normalizedEmail.split(separator: "@").first.map(String.init) ?? "diver"
+        let sanitizedLocal = localPart
+            .replacingOccurrences(of: "[^a-zA-Z0-9._-]", with: "", options: .regularExpression)
+        let firstName = String(sanitizedLocal.prefix(80)).isEmpty ? "Diver" : String(sanitizedLocal.prefix(80))
+        let lastName = firstName
         
         struct RegisterRequest: Codable {
             let email: String
@@ -297,7 +331,9 @@ class AuthenticationService: ObservableObject {
                     throw AuthError.emailAlreadyExists
                 case .serverErrorWithDetail(let code, let message):
                     let lower = message.lowercased()
-                    if code == 409 || (code == 400 && lower.contains("already exists")) {
+                    if code == 409
+                        || (code == 400 && (lower.contains("already exists") || lower.contains("user with this email")))
+                    {
                         throw AuthError.emailAlreadyExists
                     } else if code == 404 {
                         throw AuthError.backendUnavailable
@@ -308,7 +344,7 @@ class AuthenticationService: ObservableObject {
                 case .serverError(404):
                     throw AuthError.backendUnavailable
                 case .networkUnavailable:
-                    throw AuthError.networkError
+                    throw AuthError.noInternetConnection
                 default:
                     throw AuthError.unknown(networkError)
                 }
@@ -326,8 +362,44 @@ class AuthenticationService: ObservableObject {
     }
     
     func updateUser(_ user: User) {
-        currentUser = user
-        saveSession()
+        let apply = {
+            self.currentUser = user
+            self.saveSession()
+        }
+        if Thread.isMainThread {
+            apply()
+        } else {
+            DispatchQueue.main.async(execute: apply)
+        }
+    }
+
+    /// PATCH `/api/auth/me` — partial update; optional fields omitted when `nil`.
+    func patchAuthenticatedProfile(_ patch: AuthMePatchBody) async throws -> User {
+        isLoading = true
+        error = nil
+        defer { isLoading = false }
+        do {
+            let user: User = try await NetworkService.shared.request(
+                endpoint: "/api/auth/me",
+                method: .patch,
+                body: patch
+            )
+            await MainActor.run {
+                self.currentUser = user
+                self.saveSession()
+            }
+            return user
+        } catch {
+            if let networkError = error as? NetworkError {
+                switch networkError {
+                case .networkUnavailable:
+                    throw AuthError.noInternetConnection
+                default:
+                    throw AuthError.unknown(error)
+                }
+            }
+            throw AuthError.unknown(error)
+        }
     }
 
     /// Подтягивает профиль с сервера (в т.ч. `diveCenterId` после правок бэкенда / привязки owner).
@@ -472,7 +544,7 @@ class AuthenticationService: ObservableObject {
             if let networkError = error as? NetworkError {
                 switch networkError {
                 case .networkUnavailable:
-                    throw AuthError.networkError
+                    throw AuthError.noInternetConnection
                 default:
                     throw AuthError.unknown(error)
                 }
@@ -520,7 +592,7 @@ class AuthenticationService: ObservableObject {
                 case .serverError(410):
                     throw AuthError.verificationCodeExpired
                 case .networkUnavailable:
-                    throw AuthError.networkError
+                    throw AuthError.noInternetConnection
                 default:
                     throw AuthError.unknown(error)
                 }
@@ -575,7 +647,7 @@ class AuthenticationService: ObservableObject {
                 case .serverError(410):
                     throw AuthError.verificationCodeExpired
                 case .networkUnavailable:
-                    throw AuthError.networkError
+                    throw AuthError.noInternetConnection
                 default:
                     throw AuthError.unknown(error)
                 }
@@ -589,7 +661,11 @@ class AuthenticationService: ObservableObject {
     
     // MARK: - OAuth Authentication
     
-    func signInWithApple(authorization: ASAuthorization) async throws {
+    func signInWithApple(
+        authorization: ASAuthorization,
+        personalDataConsent: Bool,
+        personalDataConsentText: String
+    ) async throws {
         isLoading = true
         error = nil
         
@@ -620,6 +696,8 @@ class AuthenticationService: ObservableObject {
             let email: String?
             let firstName: String?
             let lastName: String?
+            let personalDataConsent: Bool
+            let personalDataConsentText: String
         }
         
         struct AppleSignInResponse: Codable {
@@ -634,7 +712,9 @@ class AuthenticationService: ObservableObject {
                 idToken: idTokenString,
                 email: email,
                 firstName: firstName.isEmpty ? nil : firstName,
-                lastName: lastName.isEmpty ? nil : lastName
+                lastName: lastName.isEmpty ? nil : lastName,
+                personalDataConsent: personalDataConsent,
+                personalDataConsentText: personalDataConsentText
             )
             
             let response: AppleSignInResponse = try await NetworkService.shared.request(
@@ -660,12 +740,12 @@ class AuthenticationService: ObservableObject {
             isLoading = false
             if let networkError = error as? NetworkError {
                 switch networkError {
-                case .serverError(401):
+                case .serverError(401), .serverErrorWithDetail(401, _):
                     throw AuthError.invalidCredentials
-                case .serverError(404):
+                case .serverError(404), .serverErrorWithDetail(404, _):
                     throw AuthError.backendUnavailable
                 case .networkUnavailable:
-                    throw AuthError.networkError
+                    throw AuthError.noInternetConnection
                 default:
                     throw AuthError.unknown(error)
                 }
@@ -675,7 +755,14 @@ class AuthenticationService: ObservableObject {
         }
     }
     
-    func signInWithGoogle(idToken: String, accessToken: String?, email: String?, fullName: String?) async throws {
+    func signInWithGoogle(
+        idToken: String,
+        accessToken: String?,
+        email: String?,
+        fullName: String?,
+        personalDataConsent: Bool,
+        personalDataConsentText: String
+    ) async throws {
         isLoading = true
         error = nil
         
@@ -695,6 +782,8 @@ class AuthenticationService: ObservableObject {
             let email: String?
             let firstName: String?
             let lastName: String?
+            let personalDataConsent: Bool
+            let personalDataConsentText: String
         }
         
         struct GoogleSignInResponse: Codable {
@@ -710,7 +799,9 @@ class AuthenticationService: ObservableObject {
                 accessToken: accessToken,
                 email: email,
                 firstName: firstName.isEmpty ? nil : firstName,
-                lastName: lastName.isEmpty ? nil : lastName
+                lastName: lastName.isEmpty ? nil : lastName,
+                personalDataConsent: personalDataConsent,
+                personalDataConsentText: personalDataConsentText
             )
             
             let response: GoogleSignInResponse = try await NetworkService.shared.request(
@@ -736,12 +827,12 @@ class AuthenticationService: ObservableObject {
             isLoading = false
             if let networkError = error as? NetworkError {
                 switch networkError {
-                case .serverError(401):
+                case .serverError(401), .serverErrorWithDetail(401, _):
                     throw AuthError.invalidCredentials
-                case .serverError(404):
+                case .serverError(404), .serverErrorWithDetail(404, _):
                     throw AuthError.backendUnavailable
                 case .networkUnavailable:
-                    throw AuthError.networkError
+                    throw AuthError.noInternetConnection
                 default:
                     throw AuthError.unknown(error)
                 }

@@ -63,7 +63,7 @@ struct DiveEditorVideoEditorView: View {
                 Toggle(localizationService.localizedString("depthHintUse", table: "imageEditing"), isOn: $useDepth)
                 if useDepth {
                     Stepper(value: $depthMeters, in: 0...60, step: 1) {
-                        Text("\(Int(depthMeters)) m")
+                        Text("ui_photoprocessing_value_m".localized)
                     }
                 }
             }

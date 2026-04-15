@@ -413,6 +413,57 @@ export class DiveCentersService {
     }
   }
 
+  /** Single public dive center (mobile detail / iOS `getDiveCenter`). */
+  async getPublicById(id: string): Promise<DiveCenterListItemDto> {
+    const results = await this.dataSource.query(
+      `
+      SELECT
+        id,
+        name,
+        latitude,
+        longitude,
+        services,
+        average_rating,
+        review_count,
+        country,
+        city,
+        photo_urls,
+        certification_agency,
+        nitrox_available,
+        price_from,
+        description
+      FROM dive_centers
+      WHERE id = $1 AND is_active = true
+      LIMIT 1
+    `,
+      [id],
+    );
+    if (!results?.length) {
+      throw new NotFoundException('Dive center not found');
+    }
+    const row = results[0];
+    return {
+      id: row.id,
+      name: row.name,
+      latitude: parseFloat(row.latitude) || 0,
+      longitude: parseFloat(row.longitude) || 0,
+      services: Array.isArray(row.services) ? row.services : [],
+      average_rating: parseFloat(row.average_rating) || 0,
+      review_count: row.review_count || 0,
+      country: row.country || undefined,
+      city: row.city || undefined,
+      thumbnail_url:
+        Array.isArray(row.photo_urls) && row.photo_urls.length > 0
+          ? row.photo_urls[0]
+          : undefined,
+      photos: Array.isArray(row.photo_urls) ? row.photo_urls : [],
+      certification_agency: row.certification_agency || undefined,
+      nitrox_available: row.nitrox_available || false,
+      price_from: row.price_from ? parseFloat(row.price_from) : undefined,
+      description: row.description || undefined,
+    };
+  }
+
   /**
    * Generate cache key from search parameters
    */

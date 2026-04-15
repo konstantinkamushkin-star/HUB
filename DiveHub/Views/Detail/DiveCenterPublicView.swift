@@ -97,7 +97,7 @@ struct DiveCenterPublicView: View {
             BookingWizardView(diveCenterId: center.id)
         }
         .sheet(item: $selectedCourse) { course in
-            CourseDetailPublicView(course: course, diveCenterId: center.id)
+            CourseDetailPublicView(course: course)
         }
         .sheet(item: $selectedInstructor) { instructor in
             InstructorDetailView(instructor: instructor)
@@ -536,7 +536,7 @@ struct TripCard: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Text("\(trip.startDate.formatted(date: .abbreviated, time: .omitted)) - \(trip.endDate.formatted(date: .abbreviated, time: .omitted))")
+                    Text("ui_admin_value_value_3".localized)
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
@@ -606,9 +606,9 @@ struct TripCard: View {
 // MARK: - Course Detail Public View
 struct CourseDetailPublicView: View {
     let course: Course
-    let diveCenterId: String
     @Environment(\.dismiss) var dismiss
     @StateObject private var localizationService = LocalizationService.shared
+    @StateObject private var courseEnrollmentViewModel = CourseViewModel()
     @State private var showEnrollment = false
     
     var body: some View {
@@ -690,7 +690,7 @@ struct CourseDetailPublicView: View {
                 }
             }
             .sheet(isPresented: $showEnrollment) {
-                BookingWizardView(diveCenterId: diveCenterId)
+                CourseBookingView(course: course, courseViewModel: courseEnrollmentViewModel)
             }
         }
     }
@@ -750,7 +750,7 @@ struct InstructorCoursesView: View {
             }
         }
         .sheet(item: $selectedCourse) { course in
-            CourseDetailPublicView(course: course, diveCenterId: instructor?.diveCenterId ?? "")
+            CourseDetailPublicView(course: course)
         }
     }
 }

@@ -48,13 +48,12 @@ class AuthViewModel(
     fun register(
         email: String,
         password: String,
-        displayName: String,
         personalDataConsent: Boolean,
         onSuccess: () -> Unit,
     ) {
         viewModelScope.launch {
             _state.value = AuthUiState(loading = true)
-            runCatching { repo.register(email, password, displayName, personalDataConsent) }
+            runCatching { repo.register(email, password, personalDataConsent) }
                 .onSuccess {
                     _state.value = AuthUiState(loading = false)
                     onSuccess()

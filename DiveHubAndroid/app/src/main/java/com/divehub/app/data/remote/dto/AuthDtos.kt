@@ -58,12 +58,19 @@ data class GenericMessageResponse(
 )
 
 data class UpdateProfileRequest(
-    @SerializedName("firstName") val firstName: String,
-    @SerializedName("lastName") val lastName: String,
+    @SerializedName("firstName") val firstName: String? = null,
+    @SerializedName("lastName") val lastName: String? = null,
     @SerializedName("phone") val phone: String? = null,
     @SerializedName("bio") val bio: String? = null,
     @SerializedName("language") val language: String? = null,
     @SerializedName("avatarUrl") val avatarUrl: String? = null,
+    @SerializedName("countryCode") val countryCode: String? = null,
+    @SerializedName("diverProfile") val diverProfile: Map<String, Any?>? = null,
+)
+
+data class DeleteMyAccountRequest(
+    @SerializedName("confirmation") val confirmation: String = "DELETE",
+    @SerializedName("currentPassword") val currentPassword: String? = null,
 )
 
 data class UserDto(
@@ -76,11 +83,15 @@ data class UserDto(
     @SerializedName("role") val role: String? = null,
     @SerializedName("subscriptionTier") val subscriptionTier: String? = null,
     @SerializedName("subscriptionExpiresAt") val subscriptionExpiresAt: String? = null,
+    /** Client-side mirror of iOS `subscriptionStatus` when server omits it. */
+    @SerializedName("subscriptionStatus") val subscriptionStatus: String? = null,
     @SerializedName("certificationLevel") val certificationLevel: String? = null,
     @SerializedName("bio") val bio: String? = null,
     @SerializedName("diveCenterId") val diveCenterId: String? = null,
     @SerializedName("shopId") val shopId: String? = null,
     @SerializedName("language") val language: String? = null,
+    @SerializedName("countryCode") val countryCode: String? = null,
+    @SerializedName("diverProfile") val diverProfile: Map<String, Any?>? = null,
     @SerializedName("totalDives") val totalDives: Int? = null,
     @SerializedName("mustChangePassword") val mustChangePassword: Boolean? = null,
     @SerializedName("createdAt") val createdAt: String? = null,

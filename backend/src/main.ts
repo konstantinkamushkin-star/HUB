@@ -7,6 +7,14 @@ import { AppModule } from './app.module';
 import { PerformanceInterceptor } from './common/interceptors/performance.interceptor';
 import { ErrorStatsService } from './admin/error-stats.service';
 
+function envBool(name: string, fallback: boolean): boolean {
+  const raw = process.env[name]?.trim().toLowerCase();
+  if (!raw) {
+    return fallback;
+  }
+  return ['1', 'true', 'yes', 'on'].includes(raw);
+}
+
 function applyTrustProxy(expressApp: Express) {
   const raw = process.env.TRUST_PROXY?.trim();
   if (!raw) {
@@ -27,9 +35,11 @@ async function bootstrap() {
   try {
     const app = await NestFactory.create(AppModule);
     app.useWebSocketAdapter(new WsAdapter(app));
+    app.enableShutdownHooks();
 
     const expressApp = app.getHttpAdapter().getInstance() as Express;
     applyTrustProxy(expressApp);
+    expressApp.disable('x-powered-by');
     app.use(
       helmet({
         contentSecurityPolicy: false,
@@ -69,11 +79,16 @@ async function bootstrap() {
     });
     
     // Global validation pipe
+    const forbidNonWhitelisted = envBool(
+      'FORBID_NON_WHITELISTED',
+      isProduction,
+    );
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
         transform: true,
-        forbidNonWhitelisted: false,
+        forbidNonWhitelisted,
+        forbidUnknownValues: true,
       }),
     );
     

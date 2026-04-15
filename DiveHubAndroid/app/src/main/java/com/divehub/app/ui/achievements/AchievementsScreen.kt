@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,6 +35,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,6 +75,17 @@ fun AchievementsRoute(graph: AppGraph, innerNav: NavController) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = { vm.refresh() },
+                        enabled = !state.loading,
+                    ) {
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.common_refresh_list),
+                        )
+                    }
+                },
             )
         },
     ) { padding ->
@@ -83,7 +96,7 @@ fun AchievementsRoute(graph: AppGraph, innerNav: NavController) {
             ) {
                 CircularProgressIndicator()
             }
-            state.error != null && state.achievements.isEmpty() -> Column(
+            state.error != null && state.achievements.isEmpty() && !state.loading -> Column(
                 Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -94,12 +107,23 @@ fun AchievementsRoute(graph: AppGraph, innerNav: NavController) {
                     Text(stringResource(R.string.common_retry))
                 }
             }
-            else -> Column(
-                Modifier
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading && state.achievements.isNotEmpty(),
+                onRefresh = { vm.refresh() },
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp),
             ) {
+                Column(Modifier.fillMaxSize()) {
+                if (state.error != null) {
+                    Text(
+                        state.error ?: "",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(bottom = 8.dp),
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -128,6 +152,7 @@ fun AchievementsRoute(graph: AppGraph, innerNav: NavController) {
                     items(state.achievements, key = { it.id }) { a ->
                         AchievementCell(a)
                     }
+                }
                 }
             }
         }

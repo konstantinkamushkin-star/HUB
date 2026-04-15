@@ -80,7 +80,7 @@ struct ChatRow: View {
                 }
                 
                 if conversation.unreadCount > 0 {
-                    Text("\(conversation.unreadCount)")
+                    Text("ui_chat_value".localized)
                         .font(.caption)
                         .foregroundColor(.white)
                         .padding(6)

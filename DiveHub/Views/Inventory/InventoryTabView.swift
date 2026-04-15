@@ -17,7 +17,7 @@ struct InventoryTabView: View {
                 InventoryDashboardView()
             }
             .tabItem {
-                Label("Dashboard", systemImage: "chart.bar.fill")
+                Label("ui_shop_dashboard".localized, systemImage: "chart.bar.fill")
             }
             .tag(0)
             
@@ -25,7 +25,7 @@ struct InventoryTabView: View {
                 InventoryListView()
             }
             .tabItem {
-                Label("Inventory", systemImage: "tray.fill")
+                Label("ui_inventory_inventory".localized, systemImage: "tray.fill")
             }
             .tag(1)
             
@@ -33,7 +33,7 @@ struct InventoryTabView: View {
                 MaintenanceTicketsView()
             }
             .tabItem {
-                Label("Maintenance", systemImage: "wrench.and.screwdriver.fill")
+                Label("ui_inventory_maintenance".localized, systemImage: "wrench.and.screwdriver.fill")
             }
             .tag(2)
             
@@ -41,7 +41,7 @@ struct InventoryTabView: View {
                 ReportsView()
             }
             .tabItem {
-                Label("Reports", systemImage: "doc.text.fill")
+                Label("ui_inventory_reports".localized, systemImage: "doc.text.fill")
             }
             .tag(3)
         }

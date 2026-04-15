@@ -11,6 +11,7 @@ struct InspectionView: View {
     let item: GearItem
     @ObservedObject var viewModel: InventoryViewModel
     @Environment(\.dismiss) var dismiss
+    @StateObject private var localizationService = LocalizationService.shared
     
     @State private var selectedTemplate: ChecklistTemplate?
     @State private var checklistItems: [Inspection.ChecklistItem] = []
@@ -19,6 +20,10 @@ struct InspectionView: View {
     @State private var signature: UIImage?
     @State private var showSignaturePad = false
     @State private var currentItemIndex = 0
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     var body: some View {
         NavigationView {
@@ -29,11 +34,11 @@ struct InspectionView: View {
                     checklistView
                 }
             }
-            .navigationTitle("Inspection: \(item.displayName)")
+            .navigationTitle("\(inv("inspection")): \(item.displayName)")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button(inv("cancel")) {
                         dismiss()
                     }
                 }
@@ -44,9 +49,9 @@ struct InspectionView: View {
     // MARK: - Template Selection
     private var templateSelectionView: some View {
         Form {
-            Section("Select Checklist Template") {
+            Section(inv("selectChecklistTemplate")) {
                 if viewModel.checklistTemplates.isEmpty {
-                    Text("No templates available")
+                    Text(inv("noTemplatesAvailable"))
                         .foregroundColor(.secondary)
                 } else {
                     ForEach(viewModel.checklistTemplates.filter { $0.category == item.category || $0.category == .other }) { template in
@@ -65,7 +70,7 @@ struct InspectionView: View {
                                         .foregroundColor(.secondary)
                                 }
                                 
-                                Text("\(template.items.count) items")
+                                Text("\(template.items.count) \(inv("items"))")
                                     .font(.caption)
                                     .foregroundColor(.secondary)
                             }
@@ -75,7 +80,7 @@ struct InspectionView: View {
             }
             
             Section {
-                Button("Start Without Template") {
+                Button(inv("startWithoutTemplate")) {
                     startWithoutTemplate()
                 }
             }
@@ -108,7 +113,7 @@ struct InspectionView: View {
             // Navigation
             HStack {
                 if currentItemIndex > 0 {
-                    Button("Previous") {
+                    Button(inv("previous")) {
                         withAnimation {
                             currentItemIndex -= 1
                         }
@@ -118,13 +123,13 @@ struct InspectionView: View {
                 Spacer()
                 
                 if currentItemIndex < checklistItems.count - 1 {
-                    Button("Next") {
+                    Button(inv("next")) {
                         withAnimation {
                             currentItemIndex += 1
                         }
                     }
                 } else {
-                    Button("Complete") {
+                    Button(inv("complete")) {
                         showCompletionView = true
                     }
                 }
@@ -143,20 +148,20 @@ struct InspectionView: View {
     // MARK: - Completion View
     private var completionView: some View {
         Form {
-            Section("Inspection Result") {
-                Picker("Result", selection: $result) {
-                    Text("Passed").tag(Inspection.InspectionResult.passed)
-                    Text("Failed").tag(Inspection.InspectionResult.failed)
-                    Text("Conditional").tag(Inspection.InspectionResult.conditional)
+            Section(inv("inspectionResult")) {
+                Picker(inv("result"), selection: $result) {
+                    Text(inv("passed")).tag(Inspection.InspectionResult.passed)
+                    Text(inv("failed")).tag(Inspection.InspectionResult.failed)
+                    Text(inv("conditional")).tag(Inspection.InspectionResult.conditional)
                 }
             }
             
-            Section("Notes") {
+            Section(inv("notes")) {
                 TextEditor(text: $notes)
                     .frame(height: 100)
             }
             
-            Section("Signature") {
+            Section(inv("signature")) {
                 if let signature = signature {
                     Image(uiImage: signature)
                         .resizable()
@@ -165,13 +170,13 @@ struct InspectionView: View {
                         .border(Color.gray, width: 1)
                 }
                 
-                Button("Add Signature") {
+                Button(inv("addSignature")) {
                     showSignaturePad = true
                 }
             }
             
             Section {
-                Button("Save Inspection") {
+                Button(inv("saveInspection")) {
                     saveInspection()
                 }
                 .disabled(signature == nil)
@@ -202,8 +207,8 @@ struct InspectionView: View {
         checklistItems = [
             Inspection.ChecklistItem(
                 id: UUID().uuidString,
-                title: "Visual Inspection",
-                description: "Check for visible damage",
+                title: inv("visualInspection"),
+                description: inv("checkVisibleDamage"),
                 isRequired: true,
                 status: .notChecked,
                 comment: nil,
@@ -212,8 +217,8 @@ struct InspectionView: View {
             ),
             Inspection.ChecklistItem(
                 id: UUID().uuidString,
-                title: "Functionality Test",
-                description: "Test basic functionality",
+                title: inv("functionalityTest"),
+                description: inv("testBasicFunctionality"),
                 isRequired: true,
                 status: .notChecked,
                 comment: nil,
@@ -259,6 +264,11 @@ struct ChecklistItemView: View {
     
     @State private var status: Inspection.ChecklistItem.ChecklistItemStatus = .notChecked
     @State private var comment: String = ""
+    @StateObject private var localizationService = LocalizationService.shared
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     var body: some View {
         ScrollView {
@@ -274,7 +284,7 @@ struct ChecklistItemView: View {
                 }
                 
                 if item.isRequired {
-                    Text("Required")
+                    Text(inv("required"))
                         .font(.caption)
                         .foregroundColor(.red)
                         .padding(.horizontal, 8)
@@ -285,14 +295,14 @@ struct ChecklistItemView: View {
                 
                 Divider()
                 
-                Text("Status")
+                Text(inv("status"))
                     .font(.headline)
                 
-                Picker("Status", selection: $status) {
-                    Text("Not Checked").tag(Inspection.ChecklistItem.ChecklistItemStatus.notChecked)
-                    Text("Passed").tag(Inspection.ChecklistItem.ChecklistItemStatus.passed)
-                    Text("Failed").tag(Inspection.ChecklistItem.ChecklistItemStatus.failed)
-                    Text("N/A").tag(Inspection.ChecklistItem.ChecklistItemStatus.notApplicable)
+                Picker(inv("status"), selection: $status) {
+                    Text(inv("notChecked")).tag(Inspection.ChecklistItem.ChecklistItemStatus.notChecked)
+                    Text(inv("passed")).tag(Inspection.ChecklistItem.ChecklistItemStatus.passed)
+                    Text(inv("failed")).tag(Inspection.ChecklistItem.ChecklistItemStatus.failed)
+                    Text(inv("na")).tag(Inspection.ChecklistItem.ChecklistItemStatus.notApplicable)
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: status) { oldValue, newValue in
@@ -300,7 +310,7 @@ struct ChecklistItemView: View {
                 }
                 
                 if status != .notChecked && status != .notApplicable {
-                    Text("Comment")
+                    Text(inv("comment"))
                         .font(.headline)
                     
                     TextEditor(text: $comment)
@@ -335,6 +345,11 @@ struct SimpleSignaturePadView: View {
     @Binding var signature: UIImage?
     @Environment(\.dismiss) var dismiss
     @State private var path = Path()
+    @StateObject private var localizationService = LocalizationService.shared
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
     
     var body: some View {
         NavigationView {
@@ -352,24 +367,24 @@ struct SimpleSignaturePadView: View {
                 )
                 
                 HStack {
-                    Button("Clear") {
+                    Button(inv("clear")) {
                         path = Path()
                     }
                     
                     Spacer()
                     
-                    Button("Cancel") {
+                    Button(inv("cancel")) {
                         dismiss()
                     }
                     
-                    Button("Done") {
+                    Button(inv("done")) {
                         // TODO: Convert path to image
                         dismiss()
                     }
                 }
                 .padding()
             }
-            .navigationTitle("Signature")
+            .navigationTitle(inv("signature"))
         }
     }
 }

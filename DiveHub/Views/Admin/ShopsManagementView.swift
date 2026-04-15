@@ -37,10 +37,10 @@ struct ShopsManagementView: View {
                         Image(systemName: "storefront")
                             .font(.system(size: 60))
                             .foregroundColor(.gray)
-                        Text("No shops found")
+                        Text("ui_admin_no_shops_found".localized)
                             .font(.headline)
                             .foregroundColor(.gray)
-                        Button("Add First Shop") {
+                        Button("ui_add_first_shop".localized) {
                             showingAddShop = true
                         }
                         .buttonStyle(.borderedProminent)
@@ -60,7 +60,7 @@ struct ShopsManagementView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Shops Management")
+            .navigationTitle("ui_admin_shops_management".localized)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddShop = true }) {
@@ -194,21 +194,21 @@ struct AddEditShopView: View {
     var body: some View {
         NavigationView {
             Form {
-                Section("Basic Information") {
-                    TextField("Name", text: $name)
-                    TextField("Description", text: $description, axis: .vertical)
+                Section("ui_basic_information".localized) {
+                    TextField("ui_admin_name".localized, text: $name)
+                    TextField("ui_admin_description".localized, text: $description, axis: .vertical)
                         .lineLimit(3...6)
                     
-                    Picker("Type", selection: $type) {
+                    Picker("ui_admin_type".localized, selection: $type) {
                         ForEach(ShopType.allCases, id: \.self) { shopType in
                             Text(shopType.displayName).tag(shopType)
                         }
                     }
                     
-                    Toggle("Service Available", isOn: $serviceAvailable)
+                    Toggle("ui_admin_service_available".localized, isOn: $serviceAvailable)
                 }
                 
-                Section("Brands") {
+                Section("ui_brands".localized) {
                     ForEach(brands, id: \.self) { brand in
                         Text(brand)
                     }
@@ -217,8 +217,8 @@ struct AddEditShopView: View {
                     }
                     
                     HStack {
-                        TextField("Add brand", text: $newBrand)
-                        Button("Add") {
+                        TextField("ui_admin_add_brand".localized, text: $newBrand)
+                        Button("ui_add".localized) {
                             if !newBrand.isEmpty {
                                 brands.append(newBrand)
                                 newBrand = ""
@@ -227,26 +227,26 @@ struct AddEditShopView: View {
                     }
                 }
                 
-                Section("Location") {
-                    TextField("Country", text: $country)
-                    TextField("City", text: $city)
-                    TextField("Address", text: $address)
-                    TextField("Latitude", value: $latitude, format: .number)
-                    TextField("Longitude", value: $longitude, format: .number)
+                Section("ui_admin_location".localized) {
+                    TextField("ui_admin_country".localized, text: $country)
+                    TextField("ui_admin_city".localized, text: $city)
+                    TextField("ui_admin_address".localized, text: $address)
+                    TextField("ui_admin_latitude".localized, value: $latitude, format: .number)
+                    TextField("ui_admin_longitude".localized, value: $longitude, format: .number)
                 }
                 
-                Section("Contact") {
-                    TextField("Email", text: $email)
+                Section("ui_contact".localized) {
+                    TextField("ui_admin_email".localized, text: $email)
                         .keyboardType(.emailAddress)
                         .autocapitalization(.none)
-                    TextField("Phone", text: $phone)
+                    TextField("ui_admin_phone".localized, text: $phone)
                         .keyboardType(.phonePad)
-                    TextField("Website", text: $website)
+                    TextField("ui_admin_website".localized, text: $website)
                         .keyboardType(.URL)
                         .autocapitalization(.none)
                 }
                 
-                Section("Photos") {
+                Section("ui_photos".localized) {
                     ForEach(photoUrls, id: \.self) { url in
                         Text(url)
                             .font(.caption)
@@ -256,10 +256,10 @@ struct AddEditShopView: View {
                     }
                     
                     HStack {
-                        TextField("Photo URL", text: $newPhotoUrl)
+                        TextField("ui_admin_photo_url".localized, text: $newPhotoUrl)
                             .keyboardType(.URL)
                             .autocapitalization(.none)
-                        Button("Add") {
+                        Button("ui_add".localized) {
                             if !newPhotoUrl.isEmpty {
                                 photoUrls.append(newPhotoUrl)
                                 newPhotoUrl = ""
@@ -272,12 +272,12 @@ struct AddEditShopView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("ui_cancel".localized) {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
+                    Button("ui_save".localized) {
                         saveShop()
                     }
                     .disabled(name.isEmpty)

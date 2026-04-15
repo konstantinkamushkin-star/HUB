@@ -2,9 +2,12 @@ package com.divehub.app.data.remote
 
 import com.divehub.app.data.remote.dto.CountriesEnvelopeDto
 import com.divehub.app.data.remote.dto.DiveSiteDto
+import com.divehub.app.data.remote.dto.DiveCenterInstructorDto
+import com.divehub.app.data.remote.dto.DiveCenterPublicEnvelopeDto
 import com.divehub.app.data.remote.dto.DiveCenterSearchResultDto
 import com.divehub.app.data.remote.dto.ShopSearchResultDto
 import retrofit2.http.GET
+import retrofit2.http.Path
 import retrofit2.http.Query
 
 interface ExploreApi {
@@ -23,6 +26,12 @@ interface ExploreApi {
     suspend fun diveCenters(
         @Query("limit") limit: Int = 80,
     ): DiveCenterSearchResultDto
+
+    @GET("v1/dive-centers/{id}")
+    suspend fun getDiveCenter(@Path("id") id: String): DiveCenterPublicEnvelopeDto
+
+    @GET("v1/dive-centers/{id}/instructors")
+    suspend fun listDiveCenterInstructors(@Path("id") id: String): List<DiveCenterInstructorDto>
 
     @GET("v1/shops/popular")
     suspend fun shops(

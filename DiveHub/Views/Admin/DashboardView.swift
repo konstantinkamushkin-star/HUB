@@ -33,9 +33,12 @@ struct AdminDashboardView: View {
                                 destination: AnyView(InstructorManagementView())
                             )
                             QuickActionButton(
-                                title: localizationService.localizedString("analytics", table: "admin"),
-                                icon: "chart.bar",
-                                destination: AnyView(AnalyticsView())
+                                title: "Services & Prices",
+                                icon: "tag",
+                                destination: AnyView(
+                                    ServicesManagementView()
+                                        .environmentObject(AuthenticationService.shared)
+                                )
                             )
                         }
                         .padding(.horizontal)
@@ -64,7 +67,7 @@ struct AdminDashboardView: View {
                                     }
                                     if tripsForSelectedDate.count > 3 {
                                         NavigationLink(destination: TripsManagementView().environmentObject(AuthenticationService.shared)) {
-                                            Text("View All Trips")
+                                            Text("ui_admin_view_all_trips".localized)
                                                 .font(.caption)
                                                 .foregroundColor(.divePrimary)
                                                 .padding(.horizontal)
@@ -130,13 +133,13 @@ struct TripRow: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
-                Text("\(trip.startDate.formatted(date: .abbreviated, time: .omitted)) - \(trip.endDate.formatted(date: .abbreviated, time: .omitted))")
+                Text("ui_admin_value_value_3".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
             Spacer()
             VStack(alignment: .trailing) {
-                Text("\(trip.bookedSpots)/\(trip.totalSpots)")
+                Text("ui_admin_value_value".localized)
                     .font(.caption)
                     .foregroundColor(.secondary)
                 Text(localizationService.localizedString("spots", table: "trips"))

@@ -63,7 +63,7 @@ struct CreatePostView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "info.circle")
                                     .foregroundColor(.secondary)
-                                Text("Add dive details?")
+                                Text("ui_feed_add_dive_details".localized)
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
                                 Spacer()
@@ -75,7 +75,7 @@ struct CreatePostView: View {
                             HStack(spacing: 8) {
                                 Image(systemName: "lightbulb")
                                     .foregroundColor(.secondary)
-                                Text("Add dive details?")
+                                Text("ui_feed_add_dive_details".localized)
                                     .font(.footnote)
                                     .foregroundColor(.secondary)
                             }
@@ -103,7 +103,7 @@ struct CreatePostView: View {
                     // Photos block (dynamic)
                     if selectedPhotoImages.isEmpty {
                         PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 10, matching: .images) {
-                            Label("+ Add photos", systemImage: "plus")
+                            Label("ui_feed_add_photos".localized, systemImage: "plus")
                                 .fontWeight(.semibold)
                         }
                         .onChange(of: selectedPhotos) { _, newItems in
@@ -166,18 +166,18 @@ struct CreatePostView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Dive: \(dive.location.name.isEmpty ? "Unknown site" : dive.location.name)")
                                 .font(.headline)
-                            Text("Depth: \(Int(dive.maxDepth))m")
+                            Text("ui_feed_depth_value_m".localized)
                                 .font(.subheadline)
-                            Text("Time: \(dive.bottomTime) min")
+                            Text("ui_feed_time_value_min".localized)
                                 .font(.subheadline)
                             Text("📍 \(dive.location.name.isEmpty ? "Unknown" : dive.location.name)")
                                 .font(.subheadline)
                             
                             HStack(spacing: 16) {
-                                Button("Edit") {
+                                Button("ui_feed_edit".localized) {
                                     showDiveLogPicker = true
                                 }
-                                Button("Remove") {
+                                Button("ui_remove".localized) {
                                     selectedDiveLog = nil
                                     draftDiveId = ""
                                 }
@@ -188,14 +188,14 @@ struct CreatePostView: View {
                         .background(Color.diveBackground)
                         .cornerRadius(12)
                         
-                        if let temperature = dive.waterTemperature {
-                            Text("Water: \(Int(temperature))°C")
+                        if dive.waterTemperature != nil {
+                            Text("ui_feed_water_value_aac".localized)
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                         }
                     } else {
                         Button(action: { showDiveLogPicker = true }) {
-                            Label("+ Add dive", systemImage: "plus")
+                            Label("ui_feed_add_dive".localized, systemImage: "plus")
                                 .fontWeight(.semibold)
                         }
                     }
@@ -205,7 +205,7 @@ struct CreatePostView: View {
                     // Optional preview
                     if canPost {
                         VStack(alignment: .leading, spacing: 6) {
-                            Text("Preview post")
+                            Text("ui_feed_preview_post".localized)
                                 .font(.headline)
                             if !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 Text(content)
@@ -214,10 +214,10 @@ struct CreatePostView: View {
                             }
                             HStack(spacing: 10) {
                                 if !selectedPhotoImages.isEmpty {
-                                    Text("📷 \(selectedPhotoImages.count)")
+                                    Text("ui_feed_aaaa_value".localized)
                                 }
                                 if selectedDiveLog != nil {
-                                    Text("🤿 Dive attached")
+                                    Text("ui_feed_aaaa_dive_attached".localized)
                                 }
                             }
                             .font(.caption)
@@ -230,7 +230,7 @@ struct CreatePostView: View {
                     // Key UX buttons under content
                     HStack(spacing: 12) {
                         PhotosPicker(selection: $selectedPhotos, maxSelectionCount: 10, matching: .images) {
-                            Label("+ Photo", systemImage: "photo.on.rectangle")
+                            Label("ui_feed_photo".localized, systemImage: "photo.on.rectangle")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -241,7 +241,7 @@ struct CreatePostView: View {
                         Button {
                             showDiveLogPicker = true
                         } label: {
-                            Label("+ Dive", systemImage: "figure.open.water.swim")
+                            Label("ui_feed_dive".localized, systemImage: "figure.open.water.swim")
                                 .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
@@ -249,16 +249,16 @@ struct CreatePostView: View {
                 }
             }
             .padding()
-            .navigationTitle("Create Post")
+            .navigationTitle("ui_feed_create_post".localized)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
+                    Button("ui_cancel".localized) {
                         dismiss()
                     }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Post") {
+                    Button("ui_post".localized) {
                         Task {
                             let success = await viewModel.createPost(
                                 content: content.isEmpty ? nil : content,
@@ -389,12 +389,12 @@ struct DiveLogPickerView: View {
                     }
                 }
             }
-            .navigationTitle("Select Dive Log")
+            .navigationTitle("ui_feed_select_dive_log".localized)
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search dive logs")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") {
+                    Button("ui_feed_done".localized) {
                         dismiss()
                     }
                 }

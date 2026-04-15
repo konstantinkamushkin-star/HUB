@@ -47,11 +47,13 @@ class FeedViewModel(
     fun refresh() {
         viewModelScope.launch {
             val imgRoot = graph.tokenStore.getRootBaseUrl()
-            _state.value = FeedUiState(loading = true, imageApiRoot = imgRoot)
+            val prev = _state.value
+            _state.value = prev.copy(loading = true, error = null, imageApiRoot = imgRoot)
             runCatching { repo.list(cursor = null) }
                 .onSuccess { res ->
-                    _state.value = FeedUiState(
+                    _state.value = _state.value.copy(
                         loading = false,
+                        error = null,
                         posts = res.items,
                         hasMore = res.hasMore,
                         cursor = res.nextCursor,
@@ -59,7 +61,7 @@ class FeedViewModel(
                     )
                 }
                 .onFailure { e ->
-                    _state.value = FeedUiState(
+                    _state.value = prev.copy(
                         loading = false,
                         error = e.message ?: "Feed load error",
                         imageApiRoot = imgRoot,

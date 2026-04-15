@@ -203,14 +203,6 @@ struct AdminInstructorDetailView: View {
 
     @MainActor
     private func saveAsync() async {
-        // #region agent log
-        agentDebugLog(
-            "InstructorManagementView.swift:saveAsync",
-            "entry",
-            hypothesisId: "H1",
-            data: ["userId": user.id]
-        )
-        // #endregion
         let trimmed = bioDraft.trimmingCharacters(in: .whitespacesAndNewlines)
         let payload: String? = trimmed.isEmpty ? nil : trimmed
         isSaving = true
@@ -238,35 +230,6 @@ struct AdminInstructorDetailView: View {
         }
         isSaving = false
     }
-
-    // #region agent log
-    private func agentDebugLog(_ location: String, _ message: String, hypothesisId: String, data: [String: String] = [:]) {
-        struct Payload: Encodable {
-            let sessionId: String
-            let location: String
-            let message: String
-            let hypothesisId: String
-            let timestamp: Int64
-            let data: [String: String]?
-        }
-        let payload = Payload(
-            sessionId: "1c36fa",
-            location: location,
-            message: message,
-            hypothesisId: hypothesisId,
-            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            data: data.isEmpty ? nil : data
-        )
-        guard let body = try? JSONEncoder().encode(payload),
-              let url = URL(string: "http://127.0.0.1:1024/ingest/244a844a-f2ae-44e5-b604-08078d1768c9") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("1c36fa", forHTTPHeaderField: "X-Debug-Session-Id")
-        req.httpBody = body
-        URLSession.shared.dataTask(with: req).resume()
-    }
-    // #endregion
 }
 
 #Preview {

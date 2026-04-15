@@ -33,12 +33,12 @@ struct AddDiveLogView: View {
             Form {
                 Section(localizationService.localizedString("basicInfo", table: "logbook")) {
                     DatePicker(localizationService.localizedString("date", table: "logbook"), selection: $viewModel.date, displayedComponents: .date)
-                    Button("Today") {
+                    Button("ui_today".localized) {
                         viewModel.date = Date()
                     }
                     TextField(localizationService.localizedString("time", table: "logbook"), text: $viewModel.time)
                         .keyboardType(.numbersAndPunctuation)
-                    Button("Use current time") {
+                    Button("ui_use_current_time".localized) {
                         let formatter = DateFormatter()
                         formatter.dateFormat = "HH:mm"
                         viewModel.time = formatter.string(from: Date())
@@ -133,7 +133,7 @@ struct AddDiveLogView: View {
                     }
 
                     Picker(localizationService.localizedString("current", table: "logbook"), selection: $viewModel.current) {
-                        Text("—").tag("")
+                        Text("ui_auth_a".localized).tag("")
                         ForEach(currentOptions, id: \.self) { option in
                             Text(option).tag(option)
                         }
@@ -473,7 +473,7 @@ struct DiveCenterPickerView: View {
                                     Text(center.name)
                                         .font(.headline)
                                         .foregroundColor(.primary)
-                                    Text("\(center.location.city), \(center.location.country)")
+                                    Text("ui_logbook_value_value".localized)
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }

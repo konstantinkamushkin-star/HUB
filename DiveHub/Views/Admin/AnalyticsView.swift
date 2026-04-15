@@ -13,27 +13,27 @@ struct AnalyticsView: View {
     
     var body: some View {
         List {
-            Section("Error Statistics") {
+            Section("ui_error_statistics".localized) {
                 HStack {
-                    Text("Total Errors")
+                    Text("ui_admin_total_errors".localized)
                     Spacer()
-                    Text("\(viewModel.errorStats.totals.allErrors)")
+                    Text("ui_admin_value_4".localized)
                         .font(.headline)
                 }
                 HStack {
-                    Text("HTTP Errors")
+                    Text("ui_admin_http_errors".localized)
                     Spacer()
-                    Text("\(viewModel.errorStats.totals.httpErrors)")
+                    Text("ui_admin_value_5".localized)
                 }
                 HStack {
-                    Text("Uncaught Exceptions")
+                    Text("ui_admin_uncaught_exceptions".localized)
                     Spacer()
-                    Text("\(viewModel.errorStats.totals.uncaughtExceptions)")
+                    Text("ui_admin_value_6".localized)
                 }
                 HStack {
-                    Text("Unhandled Rejections")
+                    Text("ui_admin_unhandled_rejections".localized)
                     Spacer()
-                    Text("\(viewModel.errorStats.totals.unhandledRejections)")
+                    Text("ui_admin_value_7".localized)
                 }
             }
         }

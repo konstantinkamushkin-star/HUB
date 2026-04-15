@@ -49,12 +49,16 @@ import com.divehub.app.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PartnerRegistrationRoute(nav: NavHostController, graph: AppGraph) {
+fun PartnerRegistrationRoute(
+    nav: NavHostController,
+    graph: AppGraph,
+    fixedKind: PartnerRegKind? = null,
+) {
     val vm: PartnerRegistrationViewModel = viewModel(factory = PartnerRegistrationViewModel.factory(graph))
     val state by vm.state.collectAsState()
     val snackbar = remember { SnackbarHostState() }
 
-    var kind by remember { mutableStateOf(PartnerRegKind.DIVE_CENTER) }
+    var kind by remember(fixedKind) { mutableStateOf(fixedKind ?: PartnerRegKind.DIVE_CENTER) }
     var shopType by remember { mutableStateOf(PartnerRegShopType.OFFLINE) }
     var name by remember { mutableStateOf("") }
     var description by remember { mutableStateOf("") }
@@ -104,7 +108,15 @@ fun PartnerRegistrationRoute(nav: NavHostController, graph: AppGraph) {
         snackbarHost = { SnackbarHost(snackbar) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.partner_reg_title)) },
+                title = {
+                    Text(
+                        if (fixedKind == PartnerRegKind.DIVE_CENTER) {
+                            stringResource(R.string.dive_center_registration_title)
+                        } else {
+                            stringResource(R.string.partner_reg_title)
+                        },
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = { nav.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
@@ -123,25 +135,31 @@ fun PartnerRegistrationRoute(nav: NavHostController, graph: AppGraph) {
         ) {
             Spacer(Modifier.height(8.dp))
             Text(
-                stringResource(R.string.partner_reg_subtitle),
+                if (fixedKind == PartnerRegKind.DIVE_CENTER) {
+                    stringResource(R.string.dive_center_registration_subtitle)
+                } else {
+                    stringResource(R.string.partner_reg_subtitle)
+                },
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(4.dp))
-            Text(stringResource(R.string.partner_reg_kind_label), style = MaterialTheme.typography.labelLarge)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = kind == PartnerRegKind.DIVE_CENTER,
-                    onClick = { kind = PartnerRegKind.DIVE_CENTER },
-                    label = { Text(stringResource(R.string.partner_reg_kind_dive_center)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                FilterChip(
-                    selected = kind == PartnerRegKind.SHOP,
-                    onClick = { kind = PartnerRegKind.SHOP },
-                    label = { Text(stringResource(R.string.partner_reg_kind_shop)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            if (fixedKind == null) {
+                Text(stringResource(R.string.partner_reg_kind_label), style = MaterialTheme.typography.labelLarge)
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilterChip(
+                        selected = kind == PartnerRegKind.DIVE_CENTER,
+                        onClick = { kind = PartnerRegKind.DIVE_CENTER },
+                        label = { Text(stringResource(R.string.partner_reg_kind_dive_center)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    FilterChip(
+                        selected = kind == PartnerRegKind.SHOP,
+                        onClick = { kind = PartnerRegKind.SHOP },
+                        label = { Text(stringResource(R.string.partner_reg_kind_shop)) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
             }
             if (kind == PartnerRegKind.SHOP) {
                 Text(stringResource(R.string.partner_reg_shop_type_label), style = MaterialTheme.typography.labelLarge)
@@ -276,7 +294,7 @@ fun PartnerRegistrationRoute(nav: NavHostController, graph: AppGraph) {
                 Button(
                     onClick = {
                         vm.submit(
-                            kind = kind,
+                            kind = fixedKind ?: kind,
                             shopType = shopType,
                             name = name,
                             description = description,
@@ -300,4 +318,13 @@ fun PartnerRegistrationRoute(nav: NavHostController, graph: AppGraph) {
             Spacer(Modifier.height(24.dp))
         }
     }
+}
+
+@Composable
+fun DiveCenterRegistrationRoute(nav: NavHostController, graph: AppGraph) {
+    PartnerRegistrationRoute(
+        nav = nav,
+        graph = graph,
+        fixedKind = PartnerRegKind.DIVE_CENTER,
+    )
 }

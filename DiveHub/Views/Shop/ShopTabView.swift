@@ -17,31 +17,31 @@ struct ShopTabView: View {
         TabView(selection: $selectedTab) {
             ShopDashboardView()
                 .tabItem {
-                    Label("Dashboard", systemImage: "house.fill")
+                    Label("ui_shop_dashboard".localized, systemImage: "house.fill")
                 }
                 .tag(0)
             
             ShopsManagementView()
                 .tabItem {
-                    Label("My Shop", systemImage: "storefront")
+                    Label("ui_shop_my_shop".localized, systemImage: "storefront")
                 }
                 .tag(1)
             
             ShopProductsView()
                 .tabItem {
-                    Label("Products", systemImage: "cube.box")
+                    Label("ui_shop_products".localized, systemImage: "cube.box")
                 }
                 .tag(2)
             
             ShopOrdersView()
                 .tabItem {
-                    Label("Orders", systemImage: "cart")
+                    Label("ui_shop_orders".localized, systemImage: "cart")
                 }
                 .tag(3)
             
             ShopAnalyticsView()
                 .tabItem {
-                    Label("Analytics", systemImage: "chart.bar")
+                    Label("ui_shop_analytics".localized, systemImage: "chart.bar")
                 }
                 .tag(4)
             
@@ -93,7 +93,7 @@ struct ShopDashboardView: View {
                     .padding()
                     
                     // Quick Actions
-                    Section(header: Text("Quick Actions")
+                    Section(header: Text("ui_shop_quick_actions".localized)
                         .font(.headline)
                         .padding(.horizontal)) {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
@@ -122,7 +122,7 @@ struct ShopDashboardView: View {
                     }
                 }
             }
-            .navigationTitle("Shop Dashboard")
+            .navigationTitle("ui_shop_shop_dashboard".localized)
             .onAppear {
                 Task {
                     await viewModel.loadStats()
@@ -173,10 +173,10 @@ struct ShopProductsView: View {
                         Image(systemName: "cube.box")
                             .font(.system(size: 60))
                             .foregroundColor(.gray)
-                        Text("No products yet")
+                        Text("ui_shop_no_products_yet".localized)
                             .font(.headline)
                             .foregroundColor(.gray)
-                        Button("Add First Product") {
+                        Button("ui_add_first_product".localized) {
                             // TODO: Add product
                         }
                         .buttonStyle(.borderedProminent)
@@ -189,7 +189,7 @@ struct ShopProductsView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Products")
+            .navigationTitle("ui_shop_products".localized)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { /* Add product */ }) {
@@ -263,7 +263,7 @@ struct ShopOrdersView: View {
                         Image(systemName: "cart")
                             .font(.system(size: 60))
                             .foregroundColor(.gray)
-                        Text("No orders yet")
+                        Text("ui_shop_no_orders_yet".localized)
                             .font(.headline)
                             .foregroundColor(.gray)
                     }
@@ -275,7 +275,7 @@ struct ShopOrdersView: View {
                     .listStyle(.plain)
                 }
             }
-            .navigationTitle("Orders")
+            .navigationTitle("ui_shop_orders".localized)
             .onAppear {
                 Task {
                     await viewModel.loadOrders()
@@ -291,7 +291,7 @@ struct OrderRowView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("Order #\(order.id.prefix(8))")
+                Text("ui_shop_order_value".localized)
                     .font(.headline)
                 Spacer()
                 Text(order.status.rawValue.capitalized)
@@ -316,13 +316,13 @@ struct ShopAnalyticsView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                    Text("Analytics coming soon")
+                    Text("ui_shop_analytics_coming_soon".localized)
                         .font(.headline)
                         .foregroundColor(.secondary)
                         .padding()
                 }
             }
-            .navigationTitle("Analytics")
+            .navigationTitle("ui_shop_analytics".localized)
         }
     }
 }

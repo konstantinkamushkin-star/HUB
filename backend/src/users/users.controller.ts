@@ -1,13 +1,15 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
   Post,
-  Query,
   Request,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -16,10 +18,20 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { UsersService } from './users.service';
 import { PushService } from '../push/push.service';
 import { RegisterPushTokenDto } from './dto/register-push-token.dto';
+import { DeleteMyAccountDto } from './dto/delete-my-account.dto';
+
+function extractForwardedIp(forwardedFor?: string): string | null {
+  if (!forwardedFor) {
+    return null;
+  }
+  const first = forwardedFor.split(',')[0]?.trim();
+  return first && first.length > 0 ? first : null;
+}
 
 @ApiTags('users')
 @Controller('users')
@@ -56,6 +68,46 @@ export class UsersController {
     @Query('query') query?: string,
   ) {
     return this.usersService.search(req.user.sub, query ?? '');
+  }
+
+  @Get('me/export')
+  @Throttle({ default: { limit: 3, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Export my personal data (GDPR/DSAR)' })
+  @ApiResponse({ status: 200, description: 'Personal data export payload' })
+  exportMe(
+    @Request() req: { user: { sub: string } },
+    @Headers('user-agent') userAgent?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-forwarded-for') forwardedFor?: string,
+  ) {
+    return this.usersService.exportMyData(req.user.sub, {
+      userAgent: userAgent ?? null,
+      correlationId: correlationId ?? null,
+      ip: extractForwardedIp(forwardedFor),
+    });
+  }
+
+  @Delete('me')
+  @Throttle({ default: { limit: 2, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Delete (anonymize) my account data with re-auth checks' })
+  @ApiResponse({ status: 200, description: 'Account deletion scheduled/completed' })
+  @ApiResponse({ status: 400, description: 'Missing explicit delete confirmation' })
+  @ApiResponse({ status: 401, description: 'Invalid current password for password account' })
+  deleteMe(
+    @Request() req: { user: { sub: string } },
+    @Body() dto: DeleteMyAccountDto,
+    @Headers('x-account-delete-confirm') deleteConfirmHeader?: string,
+    @Headers('user-agent') userAgent?: string,
+    @Headers('x-correlation-id') correlationId?: string,
+    @Headers('x-forwarded-for') forwardedFor?: string,
+  ) {
+    return this.usersService.deleteMyAccount(req.user.sub, dto, {
+      deleteConfirmHeader: deleteConfirmHeader ?? null,
+      userAgent: userAgent ?? null,
+      correlationId: correlationId ?? null,
+      ip: extractForwardedIp(forwardedFor),
+    });
   }
 
   @Get(':id')

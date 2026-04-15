@@ -137,16 +137,16 @@ struct DiveCenterRegistrationView: View {
                     }
                 }
 
-                Section("Согласие") {
+                Section("ui_343n".localized) {
                     Toggle(isOn: $personalDataConsentAccepted) {
-                        Text("Подтверждаю ознакомление с Политикой конфиденциальности и Пользовательским соглашением DiveHub и принимаю их условия, включая обработку персональных данных.")
+                        Text("ui_auth_consent_full_text".localized)
                     }
                     HStack(spacing: 16) {
                         Link("Политика конфиденциальности", destination: ConsentTexts.privacyPolicyURL)
                         Link("Пользовательское соглашение", destination: ConsentTexts.userAgreementURL)
                     }
                     .font(.caption)
-                    Text("Документы открываются в браузере.")
+                    Text("ui_auth_documents_open_in_browser".localized)
                         .font(.caption2)
                         .foregroundColor(.secondary)
                 }

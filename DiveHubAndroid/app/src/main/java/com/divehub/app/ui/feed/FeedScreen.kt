@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.ScubaDiving
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
@@ -68,24 +69,57 @@ fun FeedRoute(graph: AppGraph) {
     ) { padding ->
         Box(modifier = Modifier.fillMaxSize().padding(padding)) {
             when {
-                state.loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                state.posts.isEmpty() -> EmptyFeed()
-                else -> LazyColumn(
-                    contentPadding = PaddingValues(IosDesign.ScreenPadding),
-                    verticalArrangement = Arrangement.spacedBy(IosDesign.ScreenPadding),
+                state.loading && state.posts.isEmpty() -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                state.error != null && state.posts.isEmpty() && !state.loading -> Column(
+                    Modifier
+                        .align(Alignment.Center)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    itemsIndexed(state.posts, key = { _, it -> it.id }) { idx, post ->
-                        FeedCard(
-                            post = post,
-                            imageApiRoot = state.imageApiRoot,
-                            onLike = { vm.toggleLike(post.id) },
-                            onComments = { commentsFor = post },
-                            onOpenDiveLog = { diveDetail = it },
-                        )
-                        if (idx >= state.posts.size - 2) vm.loadMore()
+                    Text(
+                        state.error ?: stringResource(R.string.common_error),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    TextButton(onClick = { vm.refresh() }) {
+                        Text(stringResource(R.string.common_retry))
                     }
-                    if (state.loadingMore) {
-                        item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                }
+                state.posts.isEmpty() -> EmptyFeed()
+                else -> PullToRefreshBox(
+                    isRefreshing = state.loading && state.posts.isNotEmpty(),
+                    onRefresh = { vm.refresh() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(IosDesign.ScreenPadding),
+                        verticalArrangement = Arrangement.spacedBy(IosDesign.ScreenPadding),
+                    ) {
+                        if (state.error != null) {
+                            item {
+                                Text(
+                                    state.error ?: "",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
+                        }
+                        itemsIndexed(state.posts, key = { _, it -> it.id }) { idx, post ->
+                            FeedCard(
+                                post = post,
+                                imageApiRoot = state.imageApiRoot,
+                                onLike = { vm.toggleLike(post.id) },
+                                onComments = { commentsFor = post },
+                                onOpenDiveLog = { diveDetail = it },
+                            )
+                            if (idx >= state.posts.size - 2) vm.loadMore()
+                        }
+                        if (state.loadingMore) {
+                            item { Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { CircularProgressIndicator() } }
+                        }
                     }
                 }
             }

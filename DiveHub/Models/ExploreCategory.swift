@@ -32,7 +32,7 @@ enum ExploreCategory: String, CaseIterable, Identifiable {
     
     var iconName: String {
         switch self {
-        case .diveSites: return "divehub.logo"
+        case .diveSites: return "map"
         case .diveCenters: return "building.2"
         case .shops: return "bag"
         }

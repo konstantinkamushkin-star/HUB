@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,8 +44,26 @@ fun LogbookRoute(graph: AppGraph) {
         },
     ) { padding ->
         when {
-            state.loading -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            state.loading && state.logs.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
+            }
+            state.error != null && state.logs.isEmpty() && !state.loading -> Box(
+                Modifier.fillMaxSize().padding(padding),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        state.error ?: stringResource(R.string.common_error),
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    TextButton(onClick = { vm.refresh() }) {
+                        Text(stringResource(R.string.common_retry))
+                    }
+                }
             }
             state.logs.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -52,14 +71,32 @@ fun LogbookRoute(graph: AppGraph) {
                     Text(stringResource(R.string.logbook_no_dives_subtitle), style = MaterialTheme.typography.bodyMedium)
                 }
             }
-            else -> LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(padding),
-                contentPadding = PaddingValues(IosDesign.ScreenPadding),
-                verticalArrangement = Arrangement.spacedBy(IosDesign.SectionSpacing),
+            else -> PullToRefreshBox(
+                isRefreshing = state.loading && state.logs.isNotEmpty(),
+                onRefresh = { vm.refresh() },
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding),
             ) {
-                item { StatsCard(state.stats) }
-                items(state.logs, key = { it.id }) { log ->
-                    LogRow(log = log, onTap = { selectedLog = log })
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(IosDesign.ScreenPadding),
+                    verticalArrangement = Arrangement.spacedBy(IosDesign.SectionSpacing),
+                ) {
+                    if (state.error != null) {
+                        item {
+                            Text(
+                                state.error ?: "",
+                                color = MaterialTheme.colorScheme.error,
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
+                    }
+                    item { StatsCard(state.stats) }
+                    items(state.logs, key = { it.id }) { log ->
+                        LogRow(log = log, onTap = { selectedLog = log })
+                    }
                 }
             }
         }
@@ -124,6 +161,8 @@ private fun LogRow(log: DiveLogDto, onTap: () -> Unit) {
 
 @Composable
 private fun DiveLogDetailSheet(log: DiveLogDto, imageApiRoot: String, onClose: () -> Unit) {
+    val currentLabel = stringResource(R.string.logbook_current_label)
+    val diveTypeLabel = stringResource(R.string.logbook_dive_type_label)
     Column(Modifier.fillMaxWidth().padding(16.dp)) {
         Text(stringResource(R.string.logbook_dive_log_title), style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
@@ -133,6 +172,12 @@ private fun DiveLogDetailSheet(log: DiveLogDto, imageApiRoot: String, onClose: (
         Text(stringResource(R.string.logbook_duration_value, log.duration))
         log.waterTemperature?.let { Text(stringResource(R.string.logbook_water_temp_value, it.toInt())) }
         log.visibility?.let { Text(stringResource(R.string.logbook_visibility_value, it.toInt())) }
+        log.current?.takeIf { it.isNotBlank() }?.let { cur ->
+            Text("$currentLabel: $cur", style = MaterialTheme.typography.bodyMedium)
+        }
+        log.diveType?.takeIf { it.isNotBlank() }?.let { dt ->
+            Text("$diveTypeLabel: $dt", style = MaterialTheme.typography.bodyMedium)
+        }
         if (!log.notes.isNullOrBlank()) {
             Spacer(Modifier.height(6.dp))
             Text(log.notes ?: "")

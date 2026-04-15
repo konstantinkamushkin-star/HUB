@@ -11,133 +11,150 @@ struct AdminTabView: View {
     @StateObject private var localizationService = LocalizationService.shared
     @StateObject private var authService = AuthenticationService.shared
     @State private var selectedTab = 0
-    
+    @Environment(\.displayScale) private var displayScale
+
     private var isSuperAdmin: Bool {
         authService.currentUser?.role == .superAdmin
     }
-    
+
+    private var tabContentBottomPad: CGFloat {
+        DiveHubCarouselTabBar.contentBottomInset(displayScale: displayScale)
+    }
+
     var body: some View {
-        TabView(selection: $selectedTab) {
-            AdminDashboardView()
-                .tabItem {
-                    Label(localizationService.localizedString("dashboard", table: "admin"), systemImage: "house.fill")
-                }
-                .tag(0)
-            
-            if !isSuperAdmin {
-                CoursesManagementView()
-                    .environmentObject(authService)
-                    .tabItem {
-                        Label(localizationService.localizedString("courses", table: "courses"), systemImage: "book.closed")
-                    }
-                    .tag(1)
-                
-                TripsManagementView()
-                    .environmentObject(authService)
-                    .tabItem {
-                        Label(localizationService.localizedString("trips", table: "trips"), systemImage: "airplane.departure")
-                    }
-                    .tag(2)
-                
-                PhotoProcessingView()
-                    .tabItem {
-                        Label(localizationService.localizedString("photoProcessing"), systemImage: "wand.and.stars")
-                    }
-                    .tag(3)
-            }
-            
-            AnalyticsView()
-                .tabItem {
-                    Label(localizationService.localizedString("analytics", table: "admin"), systemImage: "chart.bar")
-                }
-                .tag(isSuperAdmin ? 1 : 4)
-            
+        Group {
             if isSuperAdmin {
-                SuperAdminControlCenterView()
-                    .tabItem {
-                        Label("Control", systemImage: "lock.shield")
-                    }
-                    .tag(2)
+                superAdminShell
+            } else {
+                diveCenterAdminShell
             }
-            
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea(edges: .bottom)
+        .tint(.divePrimary)
+        .sensoryFeedback(.selection, trigger: selectedTab)
+    }
+
+    private func superAdminCarouselItems() -> [CarouselTabItem] {
+        [
+            CarouselTabItem(
+                id: 0,
+                title: localizationService.localizedString("webPanel", table: "admin"),
+                systemImage: "globe",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 1,
+                title: localizationService.localizedString("profile", table: "common"),
+                systemImage: "person.circle",
+                accessibilityLabel: nil
+            )
+        ]
+    }
+
+    private func diveCenterCarouselItems() -> [CarouselTabItem] {
+        [
+            CarouselTabItem(
+                id: 0,
+                title: localizationService.localizedString("dashboard", table: "admin"),
+                systemImage: "house.fill",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 1,
+                title: localizationService.localizedString("feed", table: "feed"),
+                systemImage: "newspaper",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 2,
+                title: localizationService.localizedString("courses", table: "courses"),
+                systemImage: "book.closed",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 3,
+                title: localizationService.localizedString("trips", table: "trips"),
+                systemImage: "airplane.departure",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 4,
+                title: localizationService.localizedString("photoProcessing"),
+                systemImage: "wand.and.stars",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 5,
+                title: localizationService.localizedString("profile", table: "common"),
+                systemImage: "person.circle",
+                accessibilityLabel: nil
+            )
+        ]
+    }
+
+    private var superAdminShell: some View {
+        ZStack(alignment: .bottom) {
+            superAdminTabContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, tabContentBottomPad)
+
+            DiveHubCarouselTabBar(
+                items: superAdminCarouselItems(),
+                selectedTab: $selectedTab,
+                visibleColumnBasis: nil,
+                scrollAnchorNonce: 0
+            )
+        }
+    }
+
+    private var diveCenterAdminShell: some View {
+        ZStack(alignment: .bottom) {
+            diveCenterTabContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, tabContentBottomPad)
+
+            DiveHubCarouselTabBar(
+                items: diveCenterCarouselItems(),
+                selectedTab: $selectedTab,
+                visibleColumnBasis: nil,
+                scrollAnchorNonce: 0
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var superAdminTabContent: some View {
+        switch selectedTab {
+        case 0:
+            AdminWebPanelView()
+        case 1:
             ProfileTabView()
-                .tabItem {
-                    Label(localizationService.localizedString("profile"), systemImage: "person.circle")
-                }
-                .tag(isSuperAdmin ? 3 : 5)
-        }
-        .accentColor(.divePrimary)
-    }
-}
-
-struct SuperAdminControlCenterView: View {
-    var body: some View {
-        NavigationStack {
-            List {
-                Section("Super Admin") {
-                    NavigationLink {
-                        SuperAdminSectionDetailView(
-                            routeKey: "moderation_verification",
-                            title: "Moderation & verification",
-                            detail: "Reports, content moderation, and verification workflows. API: /api/admin/reports, /api/admin/verification."
-                        )
-                    } label: {
-                        Label("Global moderation and verification", systemImage: "exclamationmark.shield")
-                    }
-
-                    NavigationLink {
-                        SuperAdminSectionDetailView(
-                            routeKey: "roles_permissions",
-                            title: "Roles & permissions",
-                            detail: "Admin role matrix. API: GET /api/admin/roles."
-                        )
-                    } label: {
-                        Label("Roles & permissions governance", systemImage: "person.3")
-                    }
-
-                    NavigationLink {
-                        SuperAdminSectionDetailView(
-                            routeKey: "settings_flags",
-                            title: "Settings & feature flags",
-                            detail: "System settings and toggles. API: /api/admin/system-settings, /api/admin/feature-flags."
-                        )
-                    } label: {
-                        Label("System settings and feature flags", systemImage: "slider.horizontal.3")
-                    }
-
-                    NavigationLink {
-                        SuperAdminSectionDetailView(
-                            routeKey: "audit_compliance",
-                            title: "Audit & compliance",
-                            detail: "Immutable audit trail and data requests. API: /api/admin/audit-logs, /api/admin/compliance."
-                        )
-                    } label: {
-                        Label("Audit logs and compliance controls", systemImage: "doc.text.magnifyingglass")
-                    }
-                }
-            }
-            .navigationTitle("Control Center")
+        default:
+            AdminWebPanelView()
         }
     }
-}
 
-/// Detail screen after tapping a Control Center row (proves navigation works; full CRUD UI can layer on these routes).
-struct SuperAdminSectionDetailView: View {
-    let routeKey: String
-    let title: String
-    let detail: String
-
-    var body: some View {
-        List {
-            Section {
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+    @ViewBuilder
+    private var diveCenterTabContent: some View {
+        switch selectedTab {
+        case 0:
+            AdminDashboardView()
+        case 1:
+            FeedView()
+        case 2:
+            CoursesManagementView()
+                .environmentObject(authService)
+        case 3:
+            TripsManagementView()
+                .environmentObject(authService)
+        case 4:
+            PhotoProcessingView()
+        case 5:
+            ProfileTabView()
+        default:
+            AdminDashboardView()
         }
-        .id(routeKey)
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

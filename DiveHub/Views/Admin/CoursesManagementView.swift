@@ -8,6 +8,11 @@
 import SwiftUI
 import Combine
 
+/// Маркер для `sheet(item:)` при редактировании модуля курса (без `NavigationLink` в списке — чтобы работал drag-reorder).
+private struct CourseModuleEditToken: Identifiable, Hashable {
+    let id: String
+}
+
 struct CoursesManagementView: View {
     @StateObject private var viewModel = CourseViewModel()
     @StateObject private var localizationService = LocalizationService.shared
@@ -282,7 +287,7 @@ struct CourseDetailView: View {
                             Text(localizationService.localizedString("prerequisites", table: "courses"))
                                 .font(.headline)
                             ForEach(prerequisites, id: \.self) { prereq in
-                                Text("• \(prereq)")
+                                Text("ui_admin_a_value".localized)
                                     .font(.subheadline)
                             }
                         }
@@ -295,7 +300,7 @@ struct CourseDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     if canBookCourse {
-                        Button("Book") {
+                        Button(localizationService.localizedString("book", table: "common")) {
                             showBooking = true
                         }
                     }
@@ -350,6 +355,21 @@ struct CreateCourseView: View {
     @State private var prerequisites: [String] = []
     @State private var modules: [Course.CourseModule] = []
     @State private var selectedTrainingSystem: String = ""
+    @State private var showAddPrerequisiteSheet = false
+    @State private var newPrerequisiteDraft = ""
+    @State private var showAddModuleSheet = false
+    @State private var moduleAddDraft = Course.CourseModule(
+        id: UUID().uuidString,
+        title: "",
+        description: "",
+        duration: 1,
+        moduleType: .theory,
+        order: 0
+    )
+    @State private var editingModuleToken: CourseModuleEditToken?
+    @State private var centerInstructors: [Instructor] = []
+    @State private var selectedInstructorUserIds: Set<String> = []
+    @State private var loadingInstructors = false
     
     let availableTrainingSystems = ["PADI", "SSI", "NAUI", "CMAS", "BSAC", "SDI", "TDI"]
     
@@ -360,8 +380,8 @@ struct CreateCourseView: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section("Basic Information") {
+            List {
+                Section {
                     TextField(localizationService.localizedString("courseName", table: "courses"), text: $name)
                     Picker(localizationService.localizedString("level", table: "courses"), selection: $level) {
                         ForEach([Course.CourseLevel.basic, .advanced, .professional, .technical, .specialization], id: \.self) { level in
@@ -371,6 +391,8 @@ struct CreateCourseView: View {
                     TextEditor(text: $description)
                         .frame(height: 100)
                     Stepper("\(localizationService.localizedString("duration", table: "courses")): \(duration) \(localizationService.localizedString("days", table: "courses"))", value: $duration, in: 1...30)
+                } header: {
+                    Text(localizationService.localizedString("courseSectionBasic", table: "courses"))
                 }
                 
                 Section(localizationService.localizedString("trainingSystems", table: "courses")) {
@@ -401,6 +423,40 @@ struct CreateCourseView: View {
                     }
                 }
                 
+                Section {
+                    if loadingInstructors {
+                        HStack {
+                            ProgressView()
+                            Text(localizationService.localizedString("loading", table: "common"))
+                                .foregroundStyle(.secondary)
+                        }
+                    } else if centerInstructors.isEmpty {
+                        Text(localizationService.localizedString("noInstructorsForCourseForm", table: "courses"))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(centerInstructors) { inst in
+                            Toggle(isOn: Binding(
+                                get: { selectedInstructorUserIds.contains(inst.id) },
+                                set: { on in
+                                    if on {
+                                        selectedInstructorUserIds.insert(inst.id)
+                                    } else {
+                                        selectedInstructorUserIds.remove(inst.id)
+                                    }
+                                }
+                            )) {
+                                Text(inst.name)
+                            }
+                        }
+                    }
+                } header: {
+                    Text(localizationService.localizedString("courseInstructorsSection", table: "courses"))
+                } footer: {
+                    Text(localizationService.localizedString("courseInstructorsFooter", table: "courses"))
+                        .font(.caption)
+                }
+                
                 Section(localizationService.localizedString("prerequisites", table: "courses")) {
                     ForEach(prerequisites, id: \.self) { prereq in
                         HStack {
@@ -416,32 +472,38 @@ struct CreateCourseView: View {
                     }
                     
                     Button(localizationService.localizedString("addPrerequisite", table: "courses")) {
-                        // TODO: Show text field to add prerequisite
+                        newPrerequisiteDraft = ""
+                        showAddPrerequisiteSheet = true
                     }
                 }
                 
-                Section(localizationService.localizedString("courseModules", table: "courses")) {
-                    ForEach(modules.sorted(by: { $0.order < $1.order })) { module in
-                        NavigationLink(destination: CourseModuleEditView(module: Binding(
-                            get: { module },
-                            set: { newModule in
-                                if let index = modules.firstIndex(where: { $0.id == module.id }) {
-                                    modules[index] = newModule
+                Section {
+                    ForEach(modules) { module in
+                        Button {
+                            editingModuleToken = CourseModuleEditToken(id: module.id)
+                        } label: {
+                            HStack(spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(module.title)
+                                        .font(.headline)
+                                        .foregroundStyle(.primary)
+                                    Text(module.moduleType.localizedTitle)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
                                 }
+                                Spacer(minLength: 8)
+                                Image(systemName: "chevron.right")
+                                    .font(.caption.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
                             }
-                        ))) {
-                            VStack(alignment: .leading) {
-                                Text(module.title)
-                                    .font(.headline)
-                                Text(module.moduleType.rawValue.capitalized)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
-                    
+                    .onMove(perform: moveModules)
+
                     Button(localizationService.localizedString("addModule", table: "courses")) {
-                        let newModule = Course.CourseModule(
+                        moduleAddDraft = Course.CourseModule(
                             id: UUID().uuidString,
                             title: localizationService.localizedString("newModule", table: "courses"),
                             description: "",
@@ -449,10 +511,20 @@ struct CreateCourseView: View {
                             moduleType: .theory,
                             order: modules.count
                         )
-                        modules.append(newModule)
+                        showAddModuleSheet = true
+                    }
+                } header: {
+                    Text(localizationService.localizedString("courseModules", table: "courses"))
+                } footer: {
+                    if !modules.isEmpty {
+                        Text(localizationService.localizedString("reorderModulesHint", table: "courses"))
+                            .font(.caption)
                     }
                 }
             }
+            .listStyle(.insetGrouped)
+            /// Без постоянного режима правки ручки перестановки часто не появляются; строки не `NavigationLink`, жест не конфликтует.
+            .environment(\.editMode, .constant(.active))
             .navigationTitle(course == nil ? localizationService.localizedString("createCourse", table: "courses") : localizationService.localizedString("editCourse", table: "courses"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
@@ -474,11 +546,136 @@ struct CreateCourseView: View {
                     loadCourseData(course)
                 }
             }
+            .sheet(isPresented: $showAddPrerequisiteSheet) {
+                addPrerequisiteSheet
+            }
+            .sheet(isPresented: $showAddModuleSheet) {
+                addModuleSheet
+            }
+            .sheet(item: $editingModuleToken) { token in
+                editExistingModuleSheet(token: token)
+            }
+            .task(id: authService.currentUser?.diveCenterId) {
+                await loadCenterInstructors()
+            }
+        }
+    }
+    
+    private func loadCenterInstructors() async {
+        guard let dc = authService.currentUser?.diveCenterId else {
+            centerInstructors = []
+            return
+        }
+        loadingInstructors = true
+        defer { loadingInstructors = false }
+        do {
+            centerInstructors = try await NetworkService.shared.getDiveCenterInstructors(diveCenterId: dc)
+        } catch {
+            centerInstructors = []
+        }
+    }
+
+    @ViewBuilder
+    private func editExistingModuleSheet(token: CourseModuleEditToken) -> some View {
+        NavigationStack {
+            Group {
+                if let idx = modules.firstIndex(where: { $0.id == token.id }) {
+                    CourseModuleEditView(
+                        module: Binding(
+                            get: { modules[idx] },
+                            set: { modules[idx] = $0 }
+                        )
+                    )
+                }
+            }
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(localizationService.localizedString("done", table: "common")) {
+                        editingModuleToken = nil
+                    }
+                }
+            }
+        }
+    }
+
+    private var addPrerequisiteSheet: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField(
+                        localizationService.localizedString("prerequisitePlaceholder", table: "courses"),
+                        text: $newPrerequisiteDraft,
+                        axis: .vertical
+                    )
+                    .lineLimit(2...6)
+                }
+            }
+            .navigationTitle(localizationService.localizedString("addPrerequisite", table: "courses"))
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(localizationService.localizedString("cancel", table: "common")) {
+                        showAddPrerequisiteSheet = false
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(localizationService.localizedString("add", table: "common")) {
+                        let t = newPrerequisiteDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !t.isEmpty else { return }
+                        if !prerequisites.contains(t) {
+                            prerequisites.append(t)
+                        }
+                        showAddPrerequisiteSheet = false
+                    }
+                    .disabled(newPrerequisiteDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private var addModuleSheet: some View {
+        NavigationStack {
+            CourseModuleEditView(module: $moduleAddDraft)
+                .navigationTitle(localizationService.localizedString("addModule", table: "courses"))
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button(localizationService.localizedString("cancel", table: "common")) {
+                            showAddModuleSheet = false
+                        }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button(localizationService.localizedString("add", table: "common")) {
+                            let title = moduleAddDraft.title.trimmingCharacters(in: .whitespacesAndNewlines)
+                            guard !title.isEmpty else { return }
+                            var toAdd = moduleAddDraft
+                            toAdd.title = title
+                            toAdd.description = moduleAddDraft.description.trimmingCharacters(in: .whitespacesAndNewlines)
+                            toAdd.order = modules.count
+                            modules.append(toAdd)
+                            syncModuleOrdersFromIndices()
+                            showAddModuleSheet = false
+                        }
+                        .disabled(moduleAddDraft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
+                }
         }
     }
     
     private var isFormValid: Bool {
         !name.isEmpty && !description.isEmpty && duration > 0
+    }
+
+    private func moveModules(from source: IndexSet, to destination: Int) {
+        modules.move(fromOffsets: source, toOffset: destination)
+        syncModuleOrdersFromIndices()
+    }
+
+    /// Порядок в API — по полю `order`; в UI порядок задаётся перетаскиванием строк.
+    private func syncModuleOrdersFromIndices() {
+        for i in modules.indices {
+            modules[i].order = i
+        }
     }
     
     private func loadCourseData(_ course: Course) {
@@ -488,7 +685,9 @@ struct CreateCourseView: View {
         trainingSystems = course.trainingSystems
         duration = course.duration
         prerequisites = course.prerequisites ?? []
-        modules = course.program
+        modules = course.program.sorted(by: { $0.order < $1.order })
+        syncModuleOrdersFromIndices()
+        selectedInstructorUserIds = Set(course.assignedInstructorUserIds)
     }
     
     private func saveCourse() async {
@@ -534,9 +733,15 @@ struct CreateCourseView: View {
         }
         
         // Create Course object for saving
-        // NetworkService will handle DTO conversion for new courses (removing id, createdAt, updatedAt, module ids)
-        let cleanedModules = modules.filter { !$0.description.isEmpty }
-        
+        // Модули без названия не сохраняем; пустое описание допустимо.
+        var cleanedModules = modules.filter {
+            !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        for i in cleanedModules.indices {
+            cleanedModules[i].order = i
+        }
+
+        let instructorList = Array(selectedInstructorUserIds).sorted()
         let courseToSave = Course(
             id: course?.id ?? UUID().uuidString,
             name: name,
@@ -547,7 +752,8 @@ struct CreateCourseView: View {
             duration: duration,
             prerequisites: prerequisites.isEmpty ? nil : prerequisites,
             diveCenterId: finalDiveCenterId,
-            instructorId: course?.instructorId,
+            instructorId: instructorList.first,
+            instructorIds: instructorList,
             photos: course?.photos ?? [],
             createdAt: course?.createdAt ?? Date(),
             updatedAt: Date()
@@ -581,17 +787,18 @@ struct CourseModuleEditView: View {
     
     var body: some View {
         Form {
-            Section("Module Information") {
+            Section {
                 TextField(localizationService.localizedString("moduleTitle", table: "courses"), text: $module.title)
                 TextEditor(text: $module.description)
                     .frame(height: 100)
                 Stepper("\(localizationService.localizedString("moduleDuration", table: "courses")): \(module.duration) \(localizationService.localizedString("hours", table: "courses"))", value: $module.duration, in: 1...24)
                 Picker(localizationService.localizedString("moduleType", table: "courses"), selection: $module.moduleType) {
                     ForEach([Course.CourseModule.ModuleType.theory, .confinedWater, .openWater, .exam], id: \.self) { type in
-                        Text(type.rawValue.capitalized).tag(type)
+                        Text(type.localizedTitle).tag(type)
                     }
                 }
-                Stepper("\(localizationService.localizedString("order", table: "courses")): \(module.order)", value: $module.order, in: 0...100)
+            } header: {
+                Text(localizationService.localizedString("courseSectionModule", table: "courses"))
             }
         }
         .navigationTitle(localizationService.localizedString("editModule", table: "courses"))

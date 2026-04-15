@@ -16,7 +16,7 @@ enum FriendRequestError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .alreadyExists:
-            return "Friend request already sent or you are already friends with this user."
+            return LocalizationService.shared.localizedString("friendRequestExists", table: "errors")
         }
     }
 }
@@ -34,24 +34,97 @@ enum NetworkError: LocalizedError {
     case unknown(Error)
     
     var errorDescription: String? {
+        let L = LocalizationService.shared
         switch self {
         case .invalidURL:
-            return "Invalid URL"
+            return L.localizedString("networkInvalidURL", table: "errors")
         case .noData:
-            return "No data received"
+            return L.localizedString("networkNoData", table: "errors")
         case .decodingError:
-            return "Failed to decode response"
-        case .serverError(let code):
-            return "Server error: \(code)"
-        case .serverErrorWithDetail(let code, let message):
-            return "\(message) (HTTP \(code))"
-        case .visionModuleHTTPError(let code, let message):
-            return "Server error: \(code) — \(message)"
+            return L.localizedString("networkDecoding", table: "errors")
+        case .serverError:
+            return L.localizedString("serverError", table: "errors")
+        case .serverErrorWithDetail(_, let message):
+            return Self.userFacingAPIMessage(message)
+        case .visionModuleHTTPError(_, let message):
+            let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? L.localizedString("serverError", table: "errors") : trimmed
         case .networkUnavailable:
-            return "Network unavailable"
+            return L.localizedString("noInternetConnection", table: "errors")
         case .unknown(let error):
+            if Self.isTransportLikelyNoInternet(error) {
+                return L.localizedString("noInternetConnection", table: "errors")
+            }
             return error.localizedDescription
         }
+    }
+
+    /// Типичные сбои транспорта, когда HTTP-ответа нет (офлайн, DNS, таймаут).
+    static func isTransportLikelyNoInternet(_ error: Error) -> Bool {
+        if let urlError = error as? URLError {
+            switch urlError.code {
+            case .notConnectedToInternet, .networkConnectionLost, .cannotConnectToHost,
+                 .cannotFindHost, .dnsLookupFailed, .internationalRoamingOff, .dataNotAllowed,
+                 .timedOut:
+                return true
+            default:
+                break
+            }
+        }
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain {
+            switch ns.code {
+            case NSURLErrorNotConnectedToInternet, NSURLErrorNetworkConnectionLost,
+                 NSURLErrorCannotConnectToHost, NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed,
+                 NSURLErrorInternationalRoamingOff, NSURLErrorDataNotAllowed, NSURLErrorTimedOut:
+                return true
+            default:
+                break
+            }
+        }
+        return false
+    }
+
+    /// Текст из Nest/FastAPI без технических кодов HTTP — для экранов пользователя.
+    private static func userFacingAPIMessage(_ raw: String) -> String {
+        let L = LocalizationService.shared
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return L.localizedString("serverError", table: "errors")
+        }
+        let lower = trimmed.lowercased()
+        if lower.contains("invalid email") || lower.contains("invalid password")
+            || lower.contains("invalid credentials") || lower.contains("unauthorized") {
+            return L.localizedString("invalidCredentials", table: "errors")
+        }
+        if lower.contains("too many requests") || lower.contains("throttl") {
+            return L.localizedString("tooManyRequests", table: "errors")
+        }
+        if lower.contains("email") && (lower.contains("already") || lower.contains("exist")
+            || lower.contains("taken") || lower.contains("registered") || lower.contains("duplicate")) {
+            return L.localizedString("emailAlreadyExists", table: "errors")
+        }
+        if lower.contains("forbidden") || lower.contains("not allowed") || lower.contains("permission denied") {
+            return L.localizedString("editProfileNoPermission", table: "errors")
+        }
+        if lower.contains("token expired") || lower.contains("invalid token") {
+            return L.localizedString("pleaseSignIn", table: "errors")
+        }
+        if lower.contains("cannot patch") || lower.contains("cannot get")
+            || lower.contains("cannot post") || lower.contains("cannot put") || lower.contains("cannot delete") {
+            return L.localizedString("editProfileSaveFailed", table: "errors")
+        }
+        return trimmed.replacingOccurrences(
+            of: #"\s*\(HTTP\s*\d+\)\s*$"#,
+            with: "",
+            options: .regularExpression
+        )
+        .replacingOccurrences(
+            of: #"^HTTP\s*\d+\s*[—\-:]\s*"#,
+            with: "",
+            options: .regularExpression
+        )
+        .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }
 
@@ -89,6 +162,9 @@ class NetworkService {
     /// Пусто → встроенный default. Без завершающего `/`. Профиль → «Сервер (разработка)» в DEBUG.
     static let apiBaseURLUserDefaultsKey = "networkServiceAPIBaseURL"
     
+    /// Базовый URL веб-админки (Next `admin-web`), без завершающего `/`. Пусто в UserDefaults → выводится из `baseURL` (`api.*` → `admin.*`).
+    static let adminWebBaseURLUserDefaultsKey = "networkServiceAdminWebBaseURL"
+    
     /// По умолчанию (DEBUG и Release) — прод `productionAPIBaseURL`. Свой URL: настройки / `UserDefaults` (`apiBaseURLUserDefaultsKey`), например `http://127.0.0.1:3000` для Nest только на симуляторе.
     var baseURL: String {
         let raw = UserDefaults.standard.string(forKey: Self.apiBaseURLUserDefaultsKey)?
@@ -112,6 +188,42 @@ class NetworkService {
         }
         return Self.productionAPIBaseURL
     }
+    
+    /// База для `WKWebView` с админ-панелью (совпадает с деплоем `admin-web`).
+    var adminWebBaseURL: String {
+        let raw = UserDefaults.standard.string(forKey: Self.adminWebBaseURLUserDefaultsKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !raw.isEmpty {
+            return raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+        }
+        return Self.derivedAdminWebBaseURL(fromAPIBase: baseURL)
+    }
+    
+    /// Точка входа панели: `/dashboard` (как после логина в `admin-web`).
+    func adminPanelDashboardURL() -> URL? {
+        URL(string: adminWebBaseURL + "/dashboard")
+    }
+    
+    /// Прод: панель на корневом домене `https://dive-hub.ru` (путь `/dashboard`), не на поддомене `admin.*`.
+    static func derivedAdminWebBaseURL(fromAPIBase api: String) -> String {
+        let trimmed = api.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "https://dive-hub.ru"
+        }
+        let noSlash = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        if let range = noSlash.range(of: "://api.", options: .caseInsensitive) {
+            return noSlash.replacingCharacters(in: range, with: "://")
+        }
+        let lower = noSlash.lowercased()
+        if lower.contains("127.0.0.1") || lower.contains("localhost") {
+            if noSlash.hasSuffix(":3000") {
+                return String(noSlash.dropLast(5)) + ":3001"
+            }
+            return "http://127.0.0.1:3001"
+        }
+        return "https://dive-hub.ru"
+    }
+    
     private let session: URLSession
     
     private init() {
@@ -123,35 +235,6 @@ class NetworkService {
         self.session = URLSession(configuration: configuration)
     }
 
-    // #region agent log
-    private static func agentDebugLog(_ location: String, _ message: String, hypothesisId: String, data: [String: String] = [:]) {
-        struct Payload: Encodable {
-            let sessionId: String
-            let location: String
-            let message: String
-            let hypothesisId: String
-            let timestamp: Int64
-            let data: [String: String]?
-        }
-        let payload = Payload(
-            sessionId: "1c36fa",
-            location: location,
-            message: message,
-            hypothesisId: hypothesisId,
-            timestamp: Int64(Date().timeIntervalSince1970 * 1000),
-            data: data.isEmpty ? nil : data
-        )
-        guard let body = try? JSONEncoder().encode(payload),
-              let url = URL(string: "http://127.0.0.1:1024/ingest/244a844a-f2ae-44e5-b604-08078d1768c9") else { return }
-        var req = URLRequest(url: url)
-        req.httpMethod = "POST"
-        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        req.setValue("1c36fa", forHTTPHeaderField: "X-Debug-Session-Id")
-        req.httpBody = body
-        URLSession.shared.dataTask(with: req).resume()
-    }
-    // #endregion
-    
     // MARK: - URL Helper
     
     /// Converts a relative image URL path to a full URL
@@ -337,6 +420,9 @@ class NetworkService {
                         retryRequest.httpMethod = method.rawValue
                         retryRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
                         retryRequest.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                        headers?.forEach { key, value in
+                            retryRequest.setValue(value, forHTTPHeaderField: key)
+                        }
                         
                         if let body = body {
                             let encoder = JSONEncoder()
@@ -377,6 +463,9 @@ class NetworkService {
             #if DEBUG
             print("❌ [NetworkService] Unknown Error: \(error)")
             #endif
+            if NetworkError.isTransportLikelyNoInternet(error) {
+                throw NetworkError.networkUnavailable
+            }
             throw NetworkError.unknown(error)
         }
     }
@@ -1452,11 +1541,25 @@ extension NetworkService {
         return try await request(endpoint: endpoint)
     }
     
-    func updateBookingStatus(bookingId: String, status: Booking.BookingStatus) async throws -> Booking {
+    func updateBookingStatus(
+        bookingId: String,
+        status: Booking.BookingStatus,
+        finalPriceAmount: Double? = nil,
+        finalPriceCurrency: String? = nil,
+        manualVerificationNote: String? = nil
+    ) async throws -> Booking {
         struct UpdateRequest: Codable {
             let status: String
+            let finalPriceAmount: Double?
+            let finalPriceCurrency: String?
+            let manualVerificationNote: String?
         }
-        let request = UpdateRequest(status: status.rawValue)
+        let request = UpdateRequest(
+            status: status.rawValue,
+            finalPriceAmount: finalPriceAmount,
+            finalPriceCurrency: finalPriceCurrency,
+            manualVerificationNote: manualVerificationNote
+        )
         return try await self.request(
             endpoint: "/api/admin/bookings/\(bookingId)/status",
             method: .patch,
@@ -3252,6 +3355,255 @@ extension NetworkService {
     }
     
     // MARK: - Courses API
+
+    // MARK: - Dive Center Services API
+
+    func getCenterServices(diveCenterId: String, includeInactive: Bool = false) async throws -> [DiveCenterService] {
+        var endpoint = "/api/center-services?diveCenterId=\(diveCenterId)"
+        if includeInactive {
+            endpoint += "&includeInactive=true"
+        }
+
+        struct ServiceDTO: Codable {
+            let id: String
+            let diveCenterId: String
+            let name: String
+            let description: String
+            let type: String
+            let pricingUnit: String
+            let duration: Int
+            let maxParticipants: Int
+            let requirements: [String]
+            let includedItems: [String]
+            let pricingRules: [String: String]?
+            let ownGearDiscountPercent: Double?
+            let groupDiscountThreshold: Int?
+            let groupDiscountPercent: Double?
+            let nightDiveSurchargeAmount: Double?
+            let privateInstructorSurchargeAmount: Double?
+            let isActive: Bool
+            let price: DiveCenterService.Price
+            let createdAt: Date
+            let updatedAt: Date
+        }
+
+        let response: [ServiceDTO] = try await request(endpoint: endpoint)
+        return response.map { row in
+            DiveCenterService(
+                id: row.id,
+                diveCenterId: row.diveCenterId,
+                name: row.name,
+                description: row.description,
+                type: DiveCenterService.ServiceType(rawValue: row.type) ?? .other,
+                price: row.price,
+                pricingUnit: row.pricingUnit,
+                duration: row.duration,
+                maxParticipants: row.maxParticipants,
+                requirements: row.requirements,
+                includedItems: row.includedItems,
+                pricingRules: row.pricingRules,
+                ownGearDiscountPercent: row.ownGearDiscountPercent,
+                groupDiscountThreshold: row.groupDiscountThreshold,
+                groupDiscountPercent: row.groupDiscountPercent,
+                nightDiveSurchargeAmount: row.nightDiveSurchargeAmount,
+                privateInstructorSurchargeAmount: row.privateInstructorSurchargeAmount,
+                isActive: row.isActive,
+                createdAt: row.createdAt,
+                updatedAt: row.updatedAt
+            )
+        }
+    }
+
+    func createCenterService(_ service: DiveCenterService) async throws -> DiveCenterService {
+        struct CreateServiceBody: Codable {
+            let diveCenterId: String
+            let name: String
+            let description: String
+            let serviceType: String
+            let basePriceAmount: Double
+            let currency: String
+            let pricingUnit: String
+            let durationMinutes: Int
+            let maxParticipants: Int
+            let requirements: [String]
+            let includedItems: [String]
+            let pricingRules: [String: String]?
+            let ownGearDiscountPercent: Double?
+            let groupDiscountThreshold: Int?
+            let groupDiscountPercent: Double?
+            let nightDiveSurchargeAmount: Double?
+            let privateInstructorSurchargeAmount: Double?
+            let isActive: Bool
+        }
+
+        let body = CreateServiceBody(
+            diveCenterId: service.diveCenterId,
+            name: service.name,
+            description: service.description,
+            serviceType: service.type.rawValue,
+            basePriceAmount: service.price.amount,
+            currency: service.price.currency,
+            pricingUnit: service.pricingUnit,
+            durationMinutes: service.duration,
+            maxParticipants: service.maxParticipants,
+            requirements: service.requirements,
+            includedItems: service.includedItems,
+            pricingRules: service.pricingRules,
+            ownGearDiscountPercent: service.ownGearDiscountPercent,
+            groupDiscountThreshold: service.groupDiscountThreshold,
+            groupDiscountPercent: service.groupDiscountPercent,
+            nightDiveSurchargeAmount: service.nightDiveSurchargeAmount,
+            privateInstructorSurchargeAmount: service.privateInstructorSurchargeAmount,
+            isActive: service.isActive
+        )
+
+        struct ServiceDTO: Codable {
+            let id: String
+            let diveCenterId: String
+            let name: String
+            let description: String
+            let type: String
+            let pricingUnit: String
+            let duration: Int
+            let maxParticipants: Int
+            let requirements: [String]
+            let includedItems: [String]
+            let pricingRules: [String: String]?
+            let ownGearDiscountPercent: Double?
+            let groupDiscountThreshold: Int?
+            let groupDiscountPercent: Double?
+            let nightDiveSurchargeAmount: Double?
+            let privateInstructorSurchargeAmount: Double?
+            let isActive: Bool
+            let price: DiveCenterService.Price
+            let createdAt: Date
+            let updatedAt: Date
+        }
+
+        let row: ServiceDTO = try await request(endpoint: "/api/center-services", method: .post, body: body)
+        return DiveCenterService(
+            id: row.id,
+            diveCenterId: row.diveCenterId,
+            name: row.name,
+            description: row.description,
+            type: DiveCenterService.ServiceType(rawValue: row.type) ?? .other,
+            price: row.price,
+            pricingUnit: row.pricingUnit,
+            duration: row.duration,
+            maxParticipants: row.maxParticipants,
+            requirements: row.requirements,
+            includedItems: row.includedItems,
+            pricingRules: row.pricingRules,
+            ownGearDiscountPercent: row.ownGearDiscountPercent,
+            groupDiscountThreshold: row.groupDiscountThreshold,
+            groupDiscountPercent: row.groupDiscountPercent,
+            nightDiveSurchargeAmount: row.nightDiveSurchargeAmount,
+            privateInstructorSurchargeAmount: row.privateInstructorSurchargeAmount,
+            isActive: row.isActive,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt
+        )
+    }
+
+    func updateCenterService(_ service: DiveCenterService) async throws -> DiveCenterService {
+        struct UpdateServiceBody: Codable {
+            let name: String
+            let description: String
+            let serviceType: String
+            let basePriceAmount: Double
+            let currency: String
+            let pricingUnit: String
+            let durationMinutes: Int
+            let maxParticipants: Int
+            let requirements: [String]
+            let includedItems: [String]
+            let pricingRules: [String: String]?
+            let ownGearDiscountPercent: Double?
+            let groupDiscountThreshold: Int?
+            let groupDiscountPercent: Double?
+            let nightDiveSurchargeAmount: Double?
+            let privateInstructorSurchargeAmount: Double?
+            let isActive: Bool
+        }
+
+        let body = UpdateServiceBody(
+            name: service.name,
+            description: service.description,
+            serviceType: service.type.rawValue,
+            basePriceAmount: service.price.amount,
+            currency: service.price.currency,
+            pricingUnit: service.pricingUnit,
+            durationMinutes: service.duration,
+            maxParticipants: service.maxParticipants,
+            requirements: service.requirements,
+            includedItems: service.includedItems,
+            pricingRules: service.pricingRules,
+            ownGearDiscountPercent: service.ownGearDiscountPercent,
+            groupDiscountThreshold: service.groupDiscountThreshold,
+            groupDiscountPercent: service.groupDiscountPercent,
+            nightDiveSurchargeAmount: service.nightDiveSurchargeAmount,
+            privateInstructorSurchargeAmount: service.privateInstructorSurchargeAmount,
+            isActive: service.isActive
+        )
+
+        struct ServiceDTO: Codable {
+            let id: String
+            let diveCenterId: String
+            let name: String
+            let description: String
+            let type: String
+            let pricingUnit: String
+            let duration: Int
+            let maxParticipants: Int
+            let requirements: [String]
+            let includedItems: [String]
+            let pricingRules: [String: String]?
+            let ownGearDiscountPercent: Double?
+            let groupDiscountThreshold: Int?
+            let groupDiscountPercent: Double?
+            let nightDiveSurchargeAmount: Double?
+            let privateInstructorSurchargeAmount: Double?
+            let isActive: Bool
+            let price: DiveCenterService.Price
+            let createdAt: Date
+            let updatedAt: Date
+        }
+
+        let row: ServiceDTO = try await request(
+            endpoint: "/api/center-services/\(service.id)",
+            method: .patch,
+            body: body
+        )
+        return DiveCenterService(
+            id: row.id,
+            diveCenterId: row.diveCenterId,
+            name: row.name,
+            description: row.description,
+            type: DiveCenterService.ServiceType(rawValue: row.type) ?? .other,
+            price: row.price,
+            pricingUnit: row.pricingUnit,
+            duration: row.duration,
+            maxParticipants: row.maxParticipants,
+            requirements: row.requirements,
+            includedItems: row.includedItems,
+            pricingRules: row.pricingRules,
+            ownGearDiscountPercent: row.ownGearDiscountPercent,
+            groupDiscountThreshold: row.groupDiscountThreshold,
+            groupDiscountPercent: row.groupDiscountPercent,
+            nightDiveSurchargeAmount: row.nightDiveSurchargeAmount,
+            privateInstructorSurchargeAmount: row.privateInstructorSurchargeAmount,
+            isActive: row.isActive,
+            createdAt: row.createdAt,
+            updatedAt: row.updatedAt
+        )
+    }
+
+    func deleteCenterService(serviceId: String) async throws {
+        let _: EmptyResponse = try await request(
+            endpoint: "/api/center-services/\(serviceId)",
+            method: .delete
+        )
+    }
     
     func getCourses(diveCenterId: String? = nil) async throws -> [Course] {
         var endpoint = "/api/courses"
@@ -3273,11 +3625,12 @@ extension NetworkService {
             let level: String
             let description: String
             let trainingSystems: [String]
-            let program: [CreateModuleDTO]
+            let modules: [CreateModuleDTO]
             let duration: Int
             let prerequisites: [String]?
             let diveCenterId: String?
             let instructorId: String?
+            let instructorIds: [String]
             
             struct CreateModuleDTO: Codable {
                 let title: String
@@ -3301,16 +3654,18 @@ extension NetworkService {
                 )
             }
         
+        let instructorIds = course.instructorIds
         let dto = CreateCourseDTO(
             name: course.name,
             level: course.level.rawValue,
             description: course.description,
             trainingSystems: course.trainingSystems,
-            program: modules,
+            modules: modules,
             duration: course.duration,
             prerequisites: course.prerequisites,
             diveCenterId: course.diveCenterId,
-            instructorId: course.instructorId
+            instructorId: instructorIds.first ?? course.instructorId,
+            instructorIds: instructorIds
         )
         
         return try await request(endpoint: "/api/courses", method: .post, body: dto)
@@ -3323,11 +3678,12 @@ extension NetworkService {
             let level: String
             let description: String
             let trainingSystems: [String]
-            let program: [UpdateModuleDTO]
+            let modules: [UpdateModuleDTO]
             let duration: Int
             let prerequisites: [String]?
             let diveCenterId: String?
             let instructorId: String?
+            let instructorIds: [String]
             
             struct UpdateModuleDTO: Codable {
                 let title: String
@@ -3351,16 +3707,18 @@ extension NetworkService {
                 )
             }
         
+        let instructorIds = course.instructorIds
         let dto = UpdateCourseDTO(
             name: course.name,
             level: course.level.rawValue,
             description: course.description,
             trainingSystems: course.trainingSystems,
-            program: cleanedModules,
+            modules: cleanedModules,
             duration: course.duration,
             prerequisites: course.prerequisites,
             diveCenterId: course.diveCenterId,
-            instructorId: course.instructorId
+            instructorId: instructorIds.first ?? course.instructorId,
+            instructorIds: instructorIds
         )
         
             let endpoint = "/api/courses/\(course.id)"
@@ -3440,55 +3798,23 @@ extension NetworkService {
         struct PatchOk: Codable {
             let ok: Bool
         }
-        // #region agent log
-        Self.agentDebugLog(
-            "NetworkService.swift:patchInstructorProfile",
-            "before_patch",
-            hypothesisId: "H2",
-            data: ["diveCenterId": diveCenterId, "userId": userId]
-        )
-        // #endregion
         do {
             let _: PatchOk = try await request(
                 endpoint: "/api/v1/dive-centers/\(diveCenterId)/instructors/\(userId)",
                 method: .patch,
                 body: PatchInstructorBody(bio: bio)
             )
-            // #region agent log
-            Self.agentDebugLog(
-                "NetworkService.swift:patchInstructorProfile",
-                "patch_decode_ok",
-                hypothesisId: "H3",
-                data: [:]
-            )
-            // #endregion
             let user = try await getUser(userId: userId)
-            // #region agent log
-            Self.agentDebugLog(
-                "NetworkService.swift:patchInstructorProfile",
-                "getUser_ok",
-                hypothesisId: "H4",
-                data: ["userId": user.id]
-            )
-            // #endregion
             return user
         } catch {
-            // #region agent log
-            Self.agentDebugLog(
-                "NetworkService.swift:patchInstructorProfile",
-                "error",
-                hypothesisId: "H2",
-                data: ["err": String(describing: error)]
-            )
-            // #endregion
             throw error
         }
     }
     
+    #if DEBUG
     // MARK: - Test Data Initialization API
     
-    /// Initializes test data on the backend (trips, instructors, courses, etc.)
-    /// This should be called once to seed the database with test data
+    /// Initializes test data on the backend for local development only.
     func initializeTestData() async throws {
         struct InitializeTestDataResponse: Codable {
             let message: String
@@ -3501,6 +3827,7 @@ extension NetworkService {
             method: .post
         )
     }
+    #endif
 
     // MARK: - Image Processing Service (async jobs, v1)
 

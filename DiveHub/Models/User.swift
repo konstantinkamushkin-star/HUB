@@ -68,6 +68,10 @@ struct User: Identifiable, Codable, Hashable {
     /// id магазина, если пользователь владелец (с бэкенда по owner_id).
     var shopId: String?
     var language: String?
+    /// ISO 3166-1 alpha-2 from server (`countryCode`).
+    var countryCode: String?
+    /// Extended diver profile from `diver_profile` JSON.
+    var diverProfile: DiverProfilePayload?
     var totalDives: Int? // Total number of dives
     /// С бэкенда: обязательная смена пароля после временного пароля партнёра.
     var mustChangePassword: Bool?
@@ -108,6 +112,8 @@ struct User: Identifiable, Codable, Hashable {
         case diveCenterId
         case shopId
         case language
+        case countryCode
+        case diverProfile
         case totalDives
         case mustChangePassword
         case createdAt
@@ -130,6 +136,8 @@ struct User: Identifiable, Codable, Hashable {
         diveCenterId: String? = nil,
         shopId: String? = nil,
         language: String? = nil,
+        countryCode: String? = nil,
+        diverProfile: DiverProfilePayload? = nil,
         totalDives: Int? = nil,
         mustChangePassword: Bool? = nil,
         createdAt: Date,
@@ -149,6 +157,8 @@ struct User: Identifiable, Codable, Hashable {
         self.diveCenterId = diveCenterId
         self.shopId = shopId
         self.language = language
+        self.countryCode = countryCode
+        self.diverProfile = diverProfile
         self.totalDives = totalDives
         self.mustChangePassword = mustChangePassword
         self.createdAt = createdAt
