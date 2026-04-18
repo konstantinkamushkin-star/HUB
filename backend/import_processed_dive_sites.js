@@ -31,15 +31,23 @@ function loadEnvFile() {
 
 loadEnvFile();
 
-// На хосте VPS используйте DB_HOST=127.0.0.1, не имя сервиса docker «postgres».
-// Database connection configuration
+// На хосте VPS: DB_HOST=127.0.0.1 (не имя сервиса docker «postgres»).
+// Учётные данные как в deploy-dive-hub-ru.sh: контейнерный Postgres задаётся POSTGRES_*;
+// DB_* в .env часто относятся к API и могут не совпадать с паролем Postgres на хосте.
 const dbConfig = {
   host: process.env.DB_HOST || 'localhost',
-  port: parseInt(process.env.DB_PORT || '5432', 10),
-  database: process.env.DB_DATABASE || 'divehub',
-  user: process.env.DB_USERNAME || process.env.DB_USER || 'postgres',
-  // Как в docker-compose.yml и .env.example; в production задайте в .env.
-  password: process.env.DB_PASSWORD || 'postgres',
+  port: parseInt(
+    process.env.POSTGRES_PUBLISH_PORT || process.env.DB_PORT || '5432',
+    10,
+  ),
+  database: process.env.POSTGRES_DB || process.env.DB_DATABASE || 'divehub',
+  user:
+    process.env.POSTGRES_USER ||
+    process.env.DB_USERNAME ||
+    process.env.DB_USER ||
+    'postgres',
+  password:
+    process.env.POSTGRES_PASSWORD || process.env.DB_PASSWORD || 'postgres',
 };
 
 const pool = new Pool(dbConfig);
@@ -205,7 +213,10 @@ async function importDiveSites(inputFile, options = {}) {
   } catch (error) {
     console.error('❌ Ошибка подключения к базе данных:', error.message);
     console.error('\n💡 Проверьте настройки подключения:');
-    console.error('   DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD');
+    console.error(
+      '   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB, POSTGRES_PUBLISH_PORT (как в deploy-dive-hub-ru.sh)',
+    );
+    console.error('   или DB_HOST, DB_PORT, DB_DATABASE, DB_USERNAME, DB_PASSWORD');
     process.exit(1);
   }
   
