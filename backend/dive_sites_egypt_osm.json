@@ -1,0 +1,1430 @@
+[
+  {
+    "name": "Abu Bassala",
+    "description": "",
+    "latitude": 23.387818,
+    "longitude": 35.810935,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/16662755"
+  },
+  {
+    "name": "Abu Dabbab Ithnain",
+    "description": "",
+    "latitude": 25.348193,
+    "longitude": 34.776654,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/307508334"
+  },
+  {
+    "name": "Abu Dabbab Thalata",
+    "description": "",
+    "latitude": 25.346402,
+    "longitude": 34.777561,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/307508338"
+  },
+  {
+    "name": "Abu Dabbab Wahid",
+    "description": "",
+    "latitude": 25.347597,
+    "longitude": 34.772328,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1221542877"
+  },
+  {
+    "name": "Abu Galawa",
+    "description": "",
+    "latitude": 27.32499,
+    "longitude": 33.791499,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/601830173"
+  },
+  {
+    "name": "Abu Hashish Reef",
+    "description": "",
+    "latitude": 27.022801,
+    "longitude": 33.918148,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/91910695"
+  },
+  {
+    "name": "Abu Kafan",
+    "description": "",
+    "latitude": 26.655651,
+    "longitude": 34.107649,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 6,
+    "depthMax": 100,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/197754187"
+  },
+  {
+    "name": "Abu Nuhas",
+    "description": "",
+    "latitude": 27.576609,
+    "longitude": 33.928297,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 4,
+    "depthMax": 32,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/16662777"
+  },
+  {
+    "name": "Abu Salama",
+    "description": "",
+    "latitude": 27.341682,
+    "longitude": 33.782927,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/2894107064"
+  },
+  {
+    "name": "Banana Reef",
+    "description": "name:reference Banana Reef \"Red Sea Partners\"",
+    "latitude": 27.222118,
+    "longitude": 33.951283,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 28,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/372060484"
+  },
+  {
+    "name": "Big Gota Sataya",
+    "description": "",
+    "latitude": 24.18695,
+    "longitude": 35.652571,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/981549798"
+  },
+  {
+    "name": "El Fanadir",
+    "description": "",
+    "latitude": 27.286338,
+    "longitude": 33.826412,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/372047077"
+  },
+  {
+    "name": "El Fanadir",
+    "description": "",
+    "latitude": 27.282225,
+    "longitude": 33.831097,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/372048748"
+  },
+  {
+    "name": "Elphinstone Reef",
+    "description": "",
+    "latitude": 25.309304,
+    "longitude": 34.860711,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 1,
+    "depthMax": 120,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/644356549"
+  },
+  {
+    "name": "Erg Sabina",
+    "description": "",
+    "latitude": 27.216773,
+    "longitude": 33.954046,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 50,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/372097494"
+  },
+  {
+    "name": "Fandera Hemera",
+    "description": "",
+    "latitude": 23.386447,
+    "longitude": 35.756008,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1062701168"
+  },
+  {
+    "name": "Gamul Kebir",
+    "description": "",
+    "latitude": 26.786413,
+    "longitude": 33.987162,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 16,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266162"
+  },
+  {
+    "name": "Gamul Soraya",
+    "description": "",
+    "latitude": 26.795825,
+    "longitude": 33.992026,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 20,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266049"
+  },
+  {
+    "name": "Gota Abu Makadi",
+    "description": "",
+    "latitude": 26.993191,
+    "longitude": 33.910479,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/574802201"
+  },
+  {
+    "name": "Gota Abu Ramada",
+    "description": "",
+    "latitude": 27.140101,
+    "longitude": 33.953398,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 30,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/92130492"
+  },
+  {
+    "name": "Gotta Hemera",
+    "description": "",
+    "latitude": 23.41205,
+    "longitude": 35.702948,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1216458194"
+  },
+  {
+    "name": "Habili Ali",
+    "description": "",
+    "latitude": 23.417514,
+    "longitude": 35.98722,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1213850350"
+  },
+  {
+    "name": "Habili Marsa Alam",
+    "description": "",
+    "latitude": 25.06861,
+    "longitude": 34.943604,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/649614591"
+  },
+  {
+    "name": "Hausriff Zabargad Beach Resort",
+    "description": "",
+    "latitude": 24.2571,
+    "longitude": 35.406533,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/663869770"
+  },
+  {
+    "name": "Horseshoe Reef",
+    "description": "",
+    "latitude": 23.802898,
+    "longitude": 35.797845,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1216458172"
+  },
+  {
+    "name": "Laguna Reef",
+    "description": "",
+    "latitude": 28.006443,
+    "longitude": 34.484506,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 28,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/2628832137"
+  },
+  {
+    "name": "LightHouse",
+    "description": "",
+    "latitude": 28.534125,
+    "longitude": 34.52382,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/12115461"
+  },
+  {
+    "name": "Marsa Umm Gerifat",
+    "description": "",
+    "latitude": 25.62845,
+    "longitude": 34.593694,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/477487726"
+  },
+  {
+    "name": "Marsa Umm Gerifat",
+    "description": "",
+    "latitude": 25.568637,
+    "longitude": 34.624495,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/650038980"
+  },
+  {
+    "name": "Novotel House Reef",
+    "description": "",
+    "latitude": 25.954011,
+    "longitude": 34.381711,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 25,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/11082801709"
+  },
+  {
+    "name": "Panorama Reef",
+    "description": "",
+    "latitude": 26.752984,
+    "longitude": 34.080089,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 120,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/197754194"
+  },
+  {
+    "name": "Paradise Reef",
+    "description": "",
+    "latitude": 23.628492,
+    "longitude": 35.822059,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19269652"
+  },
+  {
+    "name": "Ras Abu Soma Garden",
+    "description": "",
+    "latitude": 26.840722,
+    "longitude": 34.000684,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/663869787"
+  },
+  {
+    "name": "Ras Bob Reef",
+    "description": "",
+    "latitude": 27.963333,
+    "longitude": 34.413333,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/663869842"
+  },
+  {
+    "name": "Ras Ghamila Reef",
+    "description": "",
+    "latitude": 27.98,
+    "longitude": 34.436667,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/663869845"
+  },
+  {
+    "name": "Recif Abu Dabbab 4",
+    "description": "",
+    "latitude": 25.342965,
+    "longitude": 34.793754,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/307508335"
+  },
+  {
+    "name": "Recif Abu Dabbab 5",
+    "description": "",
+    "latitude": 25.334386,
+    "longitude": 34.797415,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/307508336"
+  },
+  {
+    "name": "Recif Abu Dabbab 6",
+    "description": "",
+    "latitude": 25.327523,
+    "longitude": 34.798547,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 25,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/307508337"
+  },
+  {
+    "name": "Safaga Soraya",
+    "description": "",
+    "latitude": 26.774009,
+    "longitude": 33.99241,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1396277160"
+  },
+  {
+    "name": "Sandy Island",
+    "description": "",
+    "latitude": 26.815066,
+    "longitude": 33.978531,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 1,
+    "depthMax": 15,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/663869790"
+  },
+  {
+    "name": "Sataya",
+    "description": "",
+    "latitude": 24.165684,
+    "longitude": 35.694205,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/981549823"
+  },
+  {
+    "name": "Sha'ab El Erg",
+    "description": "",
+    "latitude": 27.412891,
+    "longitude": 33.856044,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/11238324660"
+  },
+  {
+    "name": "Shaab Claude",
+    "description": "",
+    "latitude": 26.651502,
+    "longitude": 34.063548,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266690"
+  },
+  {
+    "name": "Shaab Hamdallah",
+    "description": "",
+    "latitude": 26.630022,
+    "longitude": 34.061231,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1396426968"
+  },
+  {
+    "name": "Shaab Maksour",
+    "description": "",
+    "latitude": 24.243668,
+    "longitude": 35.650152,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1216501695"
+  },
+  {
+    "name": "Shaab Malahi",
+    "description": "",
+    "latitude": 24.197899,
+    "longitude": 35.66017,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/981549795"
+  },
+  {
+    "name": "Shaab Marsa Alam",
+    "description": "",
+    "latitude": 25.07427,
+    "longitude": 34.935791,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19269583"
+  },
+  {
+    "name": "Shaab Nakari",
+    "description": "",
+    "latitude": 24.943921,
+    "longitude": 34.984374,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 50,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/91978566"
+  },
+  {
+    "name": "Shaab Rur Umm Gamar",
+    "description": "",
+    "latitude": 27.335179,
+    "longitude": 33.916013,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/372021446"
+  },
+  {
+    "name": "Shaab Samdai (Dolphin House)",
+    "description": "",
+    "latitude": 24.988584,
+    "longitude": 34.999671,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/454976411"
+  },
+  {
+    "name": "Shaab Sharm",
+    "description": "",
+    "latitude": 24.788527,
+    "longitude": 35.178779,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/91978564"
+  },
+  {
+    "name": "Shaab Sheer",
+    "description": "",
+    "latitude": 26.65738,
+    "longitude": 34.048758,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266689"
+  },
+  {
+    "name": "Shaab Sheer Soraya",
+    "description": "",
+    "latitude": 26.643482,
+    "longitude": 34.049624,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1396426964"
+  },
+  {
+    "name": "Shabrour",
+    "description": "",
+    "latitude": 24.223748,
+    "longitude": 35.444547,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1378386184"
+  },
+  {
+    "name": "Shag Rock",
+    "description": "",
+    "latitude": 27.776453,
+    "longitude": 33.881504,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/882845837"
+  },
+  {
+    "name": "Shiliniat",
+    "description": "",
+    "latitude": 24.671213,
+    "longitude": 35.133154,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/91978565"
+  },
+  {
+    "name": "Small Gota Sataya",
+    "description": "",
+    "latitude": 24.199223,
+    "longitude": 35.651694,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/981549797"
+  },
+  {
+    "name": "Soma Gatden",
+    "description": "",
+    "latitude": 26.838267,
+    "longitude": 33.996412,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/1556438805"
+  },
+  {
+    "name": "St John's Gota Kebir",
+    "description": "",
+    "latitude": 23.414698,
+    "longitude": 35.930614,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1213850351"
+  },
+  {
+    "name": "St John's Habili Gaffar",
+    "description": "",
+    "latitude": 23.426923,
+    "longitude": 35.876394,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/315493984"
+  },
+  {
+    "name": "St John's Small Gota",
+    "description": "",
+    "latitude": 23.429574,
+    "longitude": 35.90332,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1213850349"
+  },
+  {
+    "name": "St John's Um Arouk",
+    "description": "",
+    "latitude": 23.431041,
+    "longitude": 35.864584,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/16660674"
+  },
+  {
+    "name": "Tobia Araba",
+    "description": "",
+    "latitude": 26.836678,
+    "longitude": 33.99131,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 38,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266688"
+  },
+  {
+    "name": "Tobia Hamra",
+    "description": "",
+    "latitude": 26.831227,
+    "longitude": 33.985907,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/663869789"
+  },
+  {
+    "name": "Tobia Kebir",
+    "description": "",
+    "latitude": 26.810319,
+    "longitude": 33.995093,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 2,
+    "depthMax": 15,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266140"
+  },
+  {
+    "name": "Tobia Soraya",
+    "description": "",
+    "latitude": 26.805051,
+    "longitude": 33.994308,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266139"
+  },
+  {
+    "name": "Torfa",
+    "description": "",
+    "latitude": 24.221034,
+    "longitude": 35.425504,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1378386185"
+  },
+  {
+    "name": "Wadi Lahmy Azur Housereef",
+    "description": "",
+    "latitude": 24.237632,
+    "longitude": 35.416207,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/6920738901"
+  },
+  {
+    "name": "המערות",
+    "description": "",
+    "latitude": 29.497408,
+    "longitude": 34.912314,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/1198269361"
+  },
+  {
+    "name": "שונית אלמוגים",
+    "description": "",
+    "latitude": 29.510456,
+    "longitude": 34.923673,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 35,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/463635421"
+  },
+  {
+    "name": "أبو لبدة",
+    "description": "",
+    "latitude": 26.573538,
+    "longitude": 36.066324,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/11871306614"
+  },
+  {
+    "name": "الإسم العربي ؟",
+    "description": "",
+    "latitude": 26.707004,
+    "longitude": 34.100144,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/197754185"
+  },
+  {
+    "name": "الإسم العربي ؟",
+    "description": "",
+    "latitude": 26.666422,
+    "longitude": 33.96252,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/242598041"
+  },
+  {
+    "name": "الإسم العربي ؟",
+    "description": "",
+    "latitude": 26.656831,
+    "longitude": 33.991234,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "relation/19266691"
+  },
+  {
+    "name": "جيرة ديدلاس",
+    "description": "",
+    "latitude": 24.934828,
+    "longitude": 35.868146,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/374758292"
+  },
+  {
+    "name": "شعب أبو تنون",
+    "description": "",
+    "latitude": 27.926341,
+    "longitude": 34.63947,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/310525047"
+  },
+  {
+    "name": "شعب أبو درج",
+    "description": "",
+    "latitude": 29.372045,
+    "longitude": 32.576715,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/768562795"
+  },
+  {
+    "name": "شعب البلم",
+    "description": "",
+    "latitude": 27.820197,
+    "longitude": 35.103305,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/11871307234"
+  },
+  {
+    "name": "شعب بدكين",
+    "description": "",
+    "latitude": 23.469137,
+    "longitude": 35.532245,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": null,
+    "depthMax": null,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/767977660"
+  },
+  {
+    "name": "شعب توماس",
+    "description": "",
+    "latitude": 27.992734,
+    "longitude": 34.460096,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/23185890"
+  },
+  {
+    "name": "شعب جاكسون",
+    "description": "",
+    "latitude": 28.008815,
+    "longitude": 34.473159,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/23185893"
+  },
+  {
+    "name": "شعب جوردون Gordon Reef",
+    "description": "",
+    "latitude": 27.987558,
+    "longitude": 34.45347,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 5,
+    "depthMax": 45,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/23185889"
+  },
+  {
+    "name": "شعب مساوك",
+    "description": "",
+    "latitude": 26.945152,
+    "longitude": 35.814951,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "node/11870951271"
+  },
+  {
+    "name": "شعب وودهاوس",
+    "description": "",
+    "latitude": 28.001223,
+    "longitude": 34.464992,
+    "country": "Egypt",
+    "region": "Red Sea",
+    "siteTypes": [
+      "reef"
+    ],
+    "difficulty": 2,
+    "depthMin": 3,
+    "depthMax": 40,
+    "marineLife": [],
+    "source": "OpenStreetMap",
+    "osmId": "way/23185891"
+  }
+]
