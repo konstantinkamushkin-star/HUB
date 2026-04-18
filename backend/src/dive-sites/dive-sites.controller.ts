@@ -37,6 +37,40 @@ export class DiveSitesController {
     return { success: true, data: countries };
   }
 
+  /** Paginated explore (same body as `GET /api/dive-sites/explore`). Prefer this path on clients. */
+  @Get('explore')
+  @HttpCode(HttpStatus.OK)
+  async explore(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('language') language?: string,
+    @Query('country') country?: string,
+    @Query('difficultyLevel') difficultyLevel?: number,
+    @Query('diveTypes') diveTypes?: string | string[],
+    @Query('minDepth') minDepth?: number,
+    @Query('maxDepth') maxDepth?: number,
+    @Query('minRating') minRating?: number,
+    @Query('sort') sort?: string,
+    @Query('userLat') userLat?: number,
+    @Query('userLng') userLng?: number,
+    @Query('q') q?: string,
+  ) {
+    return this.diveSitesService.listExploreIosPayload({
+      page,
+      limit,
+      country,
+      difficultyLevel,
+      diveTypes,
+      minDepth,
+      maxDepth,
+      minRating,
+      sort,
+      userLat,
+      userLng,
+      q,
+    });
+  }
+
   // Legacy endpoint for backward compatibility
   @Get()
   @HttpCode(HttpStatus.OK)

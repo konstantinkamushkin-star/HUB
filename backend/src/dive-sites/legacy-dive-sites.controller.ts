@@ -31,6 +31,48 @@ export class LegacyDiveSitesController {
     return { ok: true };
   }
 
+  /**
+   * Paginated explore list (filters + sort + total). iOS Explore (GenericExploreView).
+   */
+  @Get('explore')
+  @HttpCode(HttpStatus.OK)
+  async explore(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('language') language?: string,
+    @Query('country') country?: string,
+    @Query('difficultyLevel') difficultyLevel?: number,
+    @Query('diveTypes') diveTypes?: string | string[],
+    @Query('minDepth') minDepth?: number,
+    @Query('maxDepth') maxDepth?: number,
+    @Query('minRating') minRating?: number,
+    @Query('sort') sort?: string,
+    @Query('userLat') userLat?: number,
+    @Query('userLng') userLng?: number,
+    @Query('q') q?: string,
+  ): Promise<{
+    success: boolean;
+    data: any[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    return this.diveSitesService.listExploreIosPayload({
+      page,
+      limit,
+      country,
+      difficultyLevel,
+      diveTypes,
+      minDepth,
+      maxDepth,
+      minRating,
+      sort,
+      userLat,
+      userLng,
+      q,
+    });
+  }
+
   // Legacy endpoint for backward compatibility with iOS app
   @Get()
   @HttpCode(HttpStatus.OK)

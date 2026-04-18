@@ -377,6 +377,314 @@ export class DiveSitesService {
   }
 
   /**
+   * Paginated explore list with filters + total count (for mobile Explore list).
+   */
+  async listExplore(raw: {
+    page?: number | string;
+    limit?: number | string;
+    country?: string;
+    difficultyLevel?: number | string;
+    diveTypes?: string | string[];
+    minDepth?: number | string;
+    maxDepth?: number | string;
+    minRating?: number | string;
+    sort?: string;
+    userLat?: number | string;
+    userLng?: number | string;
+    q?: string;
+  }): Promise<{
+    data: DiveSiteListItemDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const parseNum = (v: unknown, fallback: number): number => {
+      if (v === undefined || v === null || v === '') return fallback;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    const page = Math.max(1, Math.floor(parseNum(raw.page, 1)));
+    let limit = Math.floor(parseNum(raw.limit, 20));
+    limit = Math.min(100, Math.max(1, limit));
+    const offset = (page - 1) * limit;
+
+    const sortRaw = (raw.sort || 'popularity').toLowerCase();
+    const sort =
+      sortRaw === 'distance' ||
+      sortRaw === 'rating' ||
+      sortRaw === 'name' ||
+      sortRaw === 'reviews' ||
+      sortRaw === 'popularity'
+        ? sortRaw
+        : 'popularity';
+
+    let diveTypesArr: string[] = [];
+    if (raw.diveTypes) {
+      if (Array.isArray(raw.diveTypes)) {
+        diveTypesArr = raw.diveTypes.map((s) => String(s).trim()).filter(Boolean);
+      } else if (typeof raw.diveTypes === 'string') {
+        diveTypesArr = raw.diveTypes
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+    }
+
+    let difficultyLevelNum: number | undefined;
+    if (
+      raw.difficultyLevel !== undefined &&
+      raw.difficultyLevel !== null &&
+      raw.difficultyLevel !== ''
+    ) {
+      const dn = parseNum(raw.difficultyLevel, NaN);
+      if (!Number.isNaN(dn)) {
+        difficultyLevelNum = Math.min(4, Math.max(1, Math.floor(dn)));
+      }
+    }
+
+    const minDepth =
+      raw.minDepth !== undefined && raw.minDepth !== null && raw.minDepth !== ''
+        ? parseNum(raw.minDepth, NaN)
+        : undefined;
+    const maxDepth =
+      raw.maxDepth !== undefined && raw.maxDepth !== null && raw.maxDepth !== ''
+        ? parseNum(raw.maxDepth, NaN)
+        : undefined;
+    const minRating =
+      raw.minRating !== undefined && raw.minRating !== null && raw.minRating !== ''
+        ? parseNum(raw.minRating, NaN)
+        : undefined;
+
+    const userLat =
+      raw.userLat !== undefined && raw.userLat !== null && raw.userLat !== ''
+        ? parseNum(raw.userLat, NaN)
+        : undefined;
+    const userLng =
+      raw.userLng !== undefined && raw.userLng !== null && raw.userLng !== ''
+        ? parseNum(raw.userLng, NaN)
+        : undefined;
+
+    let q = (raw.q || '').trim();
+    if (q.length > 200) q = q.slice(0, 200);
+
+    let where = `
+      WHERE is_active = true
+        AND location IS NOT NULL
+    `;
+    const params: any[] = [];
+    let p = 1;
+
+    if (raw.country && String(raw.country).trim()) {
+      // ILIKE без % — по сути регистронезависимое равенство; TRIM — на случай пробелов в БД/клиенте.
+      where += ` AND TRIM(COALESCE(country, '')) ILIKE TRIM($${p}::text)`;
+      params.push(String(raw.country).trim());
+      p++;
+    }
+
+    if (difficultyLevelNum !== undefined && !Number.isNaN(difficultyLevelNum)) {
+      where += ` AND difficulty_level = $${p}`;
+      params.push(difficultyLevelNum);
+      p++;
+    }
+
+    if (diveTypesArr.length > 0) {
+      where += ` AND site_types && $${p}::varchar[]`;
+      params.push(diveTypesArr);
+      p++;
+    }
+
+    // 0 = «без ограничения» в приложении; иначе COALESCE(depth_max,0) <= 0 отсекает почти всё.
+    if (
+      minDepth !== undefined &&
+      !Number.isNaN(minDepth) &&
+      minDepth > 0
+    ) {
+      where += ` AND COALESCE(depth_max, 0) >= $${p}`;
+      params.push(minDepth);
+      p++;
+    }
+
+    if (
+      maxDepth !== undefined &&
+      !Number.isNaN(maxDepth) &&
+      maxDepth > 0
+    ) {
+      where += ` AND COALESCE(depth_max, 0) <= $${p}`;
+      params.push(maxDepth);
+      p++;
+    }
+
+    if (
+      minRating !== undefined &&
+      !Number.isNaN(minRating) &&
+      minRating > 0
+    ) {
+      where += ` AND average_rating >= $${p}`;
+      params.push(minRating);
+      p++;
+    }
+
+    if (q.length > 0) {
+      where += ` AND (name ILIKE $${p} OR country ILIKE $${p})`;
+      params.push(`%${q.replace(/([%_])/g, '\\$1')}%`);
+      p++;
+    }
+
+    const countSql = `SELECT COUNT(*)::int AS c FROM dive_sites ${where}`;
+    const countRows = await this.dataSource.query(countSql, params);
+    const total = countRows?.[0]?.c ?? 0;
+
+    let orderBy = `
+      ORDER BY
+        (average_rating * LN(COALESCE(review_count, 0) + 1)) DESC,
+        review_count DESC,
+        id
+    `;
+
+    const orderExtra: any[] = [];
+
+    if (sort === 'rating') {
+      orderBy = `
+        ORDER BY average_rating DESC NULLS LAST, review_count DESC NULLS LAST, id
+      `;
+    } else if (sort === 'name') {
+      orderBy = ` ORDER BY LOWER(name) ASC NULLS LAST, id `;
+    } else if (sort === 'reviews') {
+      orderBy = ` ORDER BY review_count DESC NULLS LAST, average_rating DESC NULLS LAST, id `;
+    } else if (
+      sort === 'distance' &&
+      userLat !== undefined &&
+      !Number.isNaN(userLat) &&
+      userLng !== undefined &&
+      !Number.isNaN(userLng)
+    ) {
+      const latIdx = params.length + 1;
+      const lngIdx = params.length + 2;
+      orderExtra.push(userLat, userLng);
+      orderBy = `
+        ORDER BY
+          (POWER(ST_Y(location::geometry) - $${latIdx}::double precision, 2)
+          + POWER(ST_X(location::geometry) - $${lngIdx}::double precision, 2)) ASC NULLS LAST,
+          id
+      `;
+    }
+
+    const limitIdx = params.length + orderExtra.length + 1;
+    const offsetIdx = params.length + orderExtra.length + 2;
+    const dataParams = [...params, ...orderExtra, limit, offset];
+
+    const dataSql = `
+      SELECT 
+        id,
+        name,
+        ST_Y(location::geometry) AS latitude,
+        ST_X(location::geometry) AS longitude,
+        site_types,
+        difficulty_level,
+        depth_min,
+        depth_max,
+        average_rating,
+        review_count,
+        country,
+        region
+      FROM dive_sites
+      ${where}
+      ${orderBy}
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+    `;
+
+    const results = await this.dataSource.query(dataSql, dataParams);
+
+    const data: DiveSiteListItemDto[] = results.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      latitude: row.latitude ? parseFloat(parseFloat(row.latitude).toFixed(6)) : 0,
+      longitude: row.longitude ? parseFloat(parseFloat(row.longitude).toFixed(6)) : 0,
+      site_types: Array.isArray(row.site_types) ? row.site_types : [],
+      difficulty_level: row.difficulty_level || 1,
+      depth_min: row.depth_min ? parseFloat(row.depth_min) : undefined,
+      depth_max: row.depth_max ? parseFloat(row.depth_max) : undefined,
+      average_rating: parseFloat(row.average_rating) || 0,
+      review_count: row.review_count || 0,
+      country: row.country || undefined,
+      region: row.region || undefined,
+      thumbnail_url: undefined,
+    }));
+
+    return { data, total, page, limit };
+  }
+
+  /**
+   * `listExplore` + iOS-compatible row shape (same as LegacyDiveSitesController.explore).
+   */
+  async listExploreIosPayload(raw: {
+    page?: number | string;
+    limit?: number | string;
+    country?: string;
+    difficultyLevel?: number | string;
+    diveTypes?: string | string[];
+    minDepth?: number | string;
+    maxDepth?: number | string;
+    minRating?: number | string;
+    sort?: string;
+    userLat?: number | string;
+    userLng?: number | string;
+    q?: string;
+  }): Promise<{
+    success: boolean;
+    data: any[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const result = await this.listExplore(raw);
+
+    const toNum = (v: unknown, fallback = 0): number => {
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const toStrArr = (v: unknown): string[] => {
+      if (Array.isArray(v)) {
+        return v.map((x) => String(x));
+      }
+      if (typeof v === 'string' && v.length > 0) {
+        return [v];
+      }
+      return [];
+    };
+
+    const transformed = result.data.map((site) => ({
+      id: String((site as { id?: unknown }).id ?? ''),
+      name: String((site as { name?: unknown }).name ?? ''),
+      description: '',
+      latitude: toNum(site.latitude, 0),
+      longitude: toNum(site.longitude, 0),
+      country: String(site.country ?? ''),
+      region: String(site.region ?? ''),
+      diveTypes: toStrArr(site.site_types),
+      difficultyLevel: Math.min(
+        4,
+        Math.max(1, Math.floor(toNum(site.difficulty_level, 1))),
+      ),
+      depthMin: toNum(site.depth_min, 0),
+      depthMax: toNum(site.depth_max, 0),
+      averageRating: toNum(site.average_rating, 0),
+      reviewCount: Math.max(0, Math.floor(toNum(site.review_count, 0))),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+
+    return {
+      success: true,
+      data: transformed,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    };
+  }
+
+  /**
    * Get popular dive sites (fallback when no location)
    */
   async getPopular(searchDto: PopularDiveSitesDto): Promise<DiveSiteListItemDto[]> {

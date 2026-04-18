@@ -7,6 +7,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { LegalPagesController } from './legal-pages/legal-pages.controller';
+import { LocalizationController } from './localization/localization.controller';
 import { DiveSitesModule } from './dive-sites/dive-sites.module';
 import { DiveCentersModule } from './dive-centers/dive-centers.module';
 import { AuthModule } from './auth/auth.module';
@@ -33,7 +34,7 @@ import { BookingsModule } from './bookings/bookings.module';
 import { CenterServicesModule } from './center-services/center-services.module';
 
 @Module({
-  controllers: [AppController, LegalPagesController],
+  controllers: [AppController, LegalPagesController, LocalizationController],
   imports: [
     // Configuration
     ConfigModule.forRoot({
