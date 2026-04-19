@@ -219,7 +219,7 @@ struct ScheduleAndGroupStep: View {
             }
 
             Section("ui_nn".localized) {
-                Stepper("Участников: \(viewModel.participantsCount)", value: $viewModel.participantsCount, in: 1...20)
+                Stepper("\("ui_label_participants".localized): \(viewModel.participantsCount)", value: $viewModel.participantsCount, in: 1...20)
             }
         }
     }
@@ -287,23 +287,26 @@ struct ParticipantsStep: View {
 
 struct ReviewAndPaymentStep: View {
     @ObservedObject var viewModel: BookingWizardViewModel
+    @StateObject private var localizationService = LocalizationService.shared
 
     var body: some View {
         Form {
             Section("ui_n343".localized) {
-                Text("ui_booking_value".localized)
-                Text("ui_booking_participants_count".localized)
-                if viewModel.selectedService != nil {
-                    Text("ui_booking_service_selected".localized)
+                Text("\("ui_label_type".localized): \(viewModel.bookingType.displayName)")
+                Text("\("ui_label_participants".localized): \(viewModel.participantsCount)")
+                if let selected = viewModel.selectedService {
+                    Text("\("ui_label_service".localized): \(selected.name)")
                 }
                 if viewModel.bookingType == .openWater {
-                    Text("ui_booking_dates_range".localized)
+                    Text("\("ui_label_dates".localized): \(viewModel.startDate.formatted(date: .abbreviated, time: .omitted)) - \(viewModel.endDate.formatted(date: .abbreviated, time: .omitted))")
                 } else {
-                    Text("ui_booking_pool_slot_summary".localized)
-                    Text(viewModel.needsEquipmentRental ? "Аренда: нужна" : "Аренда: не нужна")
+                    Text("\("ui_label_slot".localized): \(viewModel.poolDate.formatted(date: .abbreviated, time: .omitted)), \(viewModel.poolTime)")
+                    Text(viewModel.needsEquipmentRental
+                         ? "\("ui_label_rental".localized): \("ui_rental_required".localized)"
+                         : "\("ui_label_rental".localized): \("ui_rental_not_required".localized)")
                 }
                 if let estimate = viewModel.estimatedTotalAmount {
-                    Text("Предварительная цена: \(String(format: "%.0f %@", estimate, viewModel.estimateCurrency))")
+                    Text("\("ui_label_estimated_price".localized): \(String(format: "%.0f %@", estimate, viewModel.estimateCurrency))")
                         .fontWeight(.semibold)
                     Text("ui_booking_final_amount_confirmed_manually".localized)
                         .font(.caption)
@@ -347,8 +350,8 @@ final class BookingWizardViewModel: ObservableObject {
 
         var displayName: String {
             switch self {
-            case .openWater: return "Дайвинг / поездка"
-            case .pool: return "Бассейн"
+            case .openWater: return "ui_booking_type_open_water".localized
+            case .pool: return "ui_booking_type_pool".localized
             }
         }
     }
@@ -484,7 +487,7 @@ final class BookingWizardViewModel: ObservableObject {
     func confirmBooking() async -> ConfirmationResult? {
         guard let userId = AuthenticationService.shared.currentUser?.id,
               let centerId = selectedCenterId else {
-            errorMessage = "Не удалось определить пользователя или дайвцентр."
+            errorMessage = "ui_booking_error_user_or_center_missing".localized
             return nil
         }
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -30,6 +31,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -60,6 +62,14 @@ fun StatisticsRoute(graph: AppGraph, innerNav: NavController) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
+                actions = {
+                    IconButton(
+                        onClick = { vm.refresh() },
+                        enabled = !state.loading,
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.common_refresh_list))
+                    }
+                },
             )
         },
     ) { padding ->
@@ -83,14 +93,49 @@ fun StatisticsRoute(graph: AppGraph, innerNav: NavController) {
             }
             state.stats != null -> {
                 val s = state.stats!!
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                PullToRefreshBox(
+                    isRefreshing = state.loading,
+                    onRefresh = { vm.refresh() },
+                    modifier = Modifier.fillMaxSize().padding(padding),
                 ) {
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                    if (state.refreshError != null) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.35f),
+                            ),
+                        ) {
+                            Row(
+                                Modifier.padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                            ) {
+                                Text(
+                                    state.refreshError ?: "",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                TextButton(onClick = { vm.dismissRefreshError() }) {
+                                    Text(stringResource(R.string.common_close))
+                                }
+                            }
+                        }
+                    }
+                    if (s.totalDives == 0) {
+                        Text(
+                            stringResource(R.string.stats_empty_hint),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         StatCard(
                             modifier = Modifier.weight(1f),
@@ -154,6 +199,7 @@ fun StatisticsRoute(graph: AppGraph, innerNav: NavController) {
                                 }
                             }
                         }
+                    }
                     }
                 }
             }

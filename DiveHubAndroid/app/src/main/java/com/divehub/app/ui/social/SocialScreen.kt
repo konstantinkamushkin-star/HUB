@@ -41,9 +41,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import com.divehub.app.util.absoluteMediaUrl
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
@@ -119,6 +123,7 @@ fun SocialRoute(
             items(state.searchResults, key = { it.id }) { user ->
                 SearchUserCard(
                     user = user,
+                    imageApiRoot = state.imageApiRoot,
                     onAdd = { vm.sendRequest(user.id) },
                     onOpenProfile = { innerNav.navigate(InnerRoutes.userProfile(user.id)) },
                 )
@@ -148,11 +153,16 @@ fun SocialRoute(
             }
             if (requestsTab == 0) {
                 items(state.received, key = { it.id }) { req ->
-                    RequestCard(req = req, onAccept = { vm.accept(req.user.id) }, onDecline = { vm.decline(req.id) })
+                    RequestCard(
+                        req = req,
+                        imageApiRoot = state.imageApiRoot,
+                        onAccept = { vm.accept(req.user.id) },
+                        onDecline = { vm.decline(req.id) },
+                    )
                 }
             } else {
                 items(state.sent, key = { it.id }) { req ->
-                    SentRequestCard(req = req)
+                    SentRequestCard(req = req, imageApiRoot = state.imageApiRoot)
                 }
             }
             item {
@@ -168,6 +178,7 @@ fun SocialRoute(
             items(state.friends, key = { it.id }) { friend ->
                 FriendCard(
                     friend = friend,
+                    imageApiRoot = state.imageApiRoot,
                     onOpenProfile = { innerNav.navigate(InnerRoutes.userProfile(friend.id)) },
                     onOpenChat = { onOpenChat(friend.id) },
                 )
@@ -177,7 +188,12 @@ fun SocialRoute(
 }
 
 @Composable
-private fun SearchUserCard(user: UserDto, onAdd: () -> Unit, onOpenProfile: () -> Unit) {
+private fun SearchUserCard(
+    user: UserDto,
+    imageApiRoot: String,
+    onAdd: () -> Unit,
+    onOpenProfile: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = IosDesign.CardCorner,
@@ -195,7 +211,12 @@ private fun SearchUserCard(user: UserDto, onAdd: () -> Unit, onOpenProfile: () -
                     .clickable(onClick = onOpenProfile),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AvatarStub(name = user.displayName(), size = IosDesign.AvatarSizeSmall)
+                UserAvatar(
+                    displayName = user.displayName(),
+                    avatarUrl = user.avatarUrl,
+                    apiRoot = imageApiRoot,
+                    size = IosDesign.AvatarSizeSmall,
+                )
                 Spacer(Modifier.size(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(user.displayName(), fontWeight = FontWeight.SemiBold)
@@ -212,7 +233,7 @@ private fun SearchUserCard(user: UserDto, onAdd: () -> Unit, onOpenProfile: () -
 }
 
 @Composable
-private fun SentRequestCard(req: FriendRequestDto) {
+private fun SentRequestCard(req: FriendRequestDto, imageApiRoot: String) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = IosDesign.CardCorner,
@@ -224,7 +245,12 @@ private fun SentRequestCard(req: FriendRequestDto) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            AvatarStub(name = req.user.displayName(), size = IosDesign.AvatarSizeSmall)
+            UserAvatar(
+                displayName = req.user.displayName(),
+                avatarUrl = req.user.avatarUrl,
+                apiRoot = imageApiRoot,
+                size = IosDesign.AvatarSizeSmall,
+            )
             Spacer(Modifier.size(8.dp))
             Column(Modifier.weight(1f)) {
                 Text(req.user.displayName(), fontWeight = FontWeight.SemiBold)
@@ -244,7 +270,12 @@ private fun SentRequestCard(req: FriendRequestDto) {
 }
 
 @Composable
-private fun FriendCard(friend: UserDto, onOpenProfile: () -> Unit, onOpenChat: () -> Unit) {
+private fun FriendCard(
+    friend: UserDto,
+    imageApiRoot: String,
+    onOpenProfile: () -> Unit,
+    onOpenChat: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = IosDesign.CardCorner,
@@ -262,7 +293,12 @@ private fun FriendCard(friend: UserDto, onOpenProfile: () -> Unit, onOpenChat: (
                     .clickable(onClick = onOpenProfile),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                AvatarStub(name = friend.displayName(), size = IosDesign.AvatarSizeLarge)
+                UserAvatar(
+                    displayName = friend.displayName(),
+                    avatarUrl = friend.avatarUrl,
+                    apiRoot = imageApiRoot,
+                    size = IosDesign.AvatarSizeLarge,
+                )
                 Spacer(Modifier.size(8.dp))
                 Column(Modifier.weight(1f)) {
                     Text(friend.displayName(), fontWeight = FontWeight.SemiBold)
@@ -279,7 +315,12 @@ private fun FriendCard(friend: UserDto, onOpenProfile: () -> Unit, onOpenChat: (
 }
 
 @Composable
-private fun RequestCard(req: FriendRequestDto, onAccept: () -> Unit, onDecline: () -> Unit) {
+private fun RequestCard(
+    req: FriendRequestDto,
+    imageApiRoot: String,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = IosDesign.CardCorner,
@@ -291,7 +332,12 @@ private fun RequestCard(req: FriendRequestDto, onAccept: () -> Unit, onDecline: 
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            AvatarStub(name = req.user.displayName(), size = IosDesign.AvatarSizeLarge)
+            UserAvatar(
+                displayName = req.user.displayName(),
+                avatarUrl = req.user.avatarUrl,
+                apiRoot = imageApiRoot,
+                size = IosDesign.AvatarSizeLarge,
+            )
             Spacer(Modifier.size(8.dp))
             Column(Modifier.weight(1f)) {
                 Text(req.user.displayName(), fontWeight = FontWeight.SemiBold)
@@ -310,7 +356,16 @@ private fun RequestCard(req: FriendRequestDto, onAccept: () -> Unit, onDecline: 
 }
 
 @Composable
-private fun AvatarStub(name: String, size: androidx.compose.ui.unit.Dp) {
+private fun UserAvatar(
+    displayName: String,
+    avatarUrl: String?,
+    apiRoot: String,
+    size: Dp,
+) {
+    val trimmed = avatarUrl?.trim().orEmpty()
+    val resolved = if (trimmed.isEmpty()) "" else absoluteMediaUrl(apiRoot, trimmed)
+    val showImage = resolved.isNotBlank() &&
+        resolved.startsWith("http", ignoreCase = true)
     Box(
         modifier = Modifier
             .size(size)
@@ -318,6 +373,16 @@ private fun AvatarStub(name: String, size: androidx.compose.ui.unit.Dp) {
             .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(name.take(1).uppercase(), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        if (showImage) {
+            AsyncImage(
+                model = resolved,
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            val initial = displayName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+            Text(initial, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        }
     }
 }

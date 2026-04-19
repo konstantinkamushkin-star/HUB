@@ -7,6 +7,8 @@ import com.divehub.app.data.remote.dto.CreateTripRequestDto
 import com.divehub.app.data.remote.dto.ImportTripUrlRequestDto
 import com.divehub.app.data.remote.dto.ImportTripUrlResponseDto
 import com.divehub.app.data.remote.dto.CourseListItemDto
+import com.divehub.app.data.remote.dto.CourseRemoteDto
+import com.divehub.app.data.remote.dto.CourseWriteRequestDto
 import com.divehub.app.data.remote.dto.DiveCenterBriefDto
 import com.divehub.app.data.remote.dto.TripCreatedResponseDto
 import com.divehub.app.data.remote.dto.TripJoinResponseDto
@@ -31,6 +33,16 @@ class TripsRepository(private val graph: AppGraph) {
 
     suspend fun listCoursesForCenter(diveCenterId: String): List<CourseListItemDto> =
         graph.coursesApi().listCourses(diveCenterId = diveCenterId)
+
+    suspend fun createCourse(body: CourseWriteRequestDto): CourseRemoteDto =
+        graph.coursesApi().createCourse(body)
+
+    suspend fun updateCourse(id: String, body: CourseWriteRequestDto): CourseRemoteDto =
+        graph.coursesApi().patchCourse(id, body)
+
+    suspend fun deleteCourse(id: String) {
+        graph.coursesApi().deleteCourse(id)
+    }
 
     suspend fun listInstructorsForCenter(centerId: String): List<UserDto> =
         graph.partnerAdminApi().listCenterInstructors(centerId)

@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
@@ -24,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -50,11 +53,13 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.AdminBookingsRepository
 import com.divehub.app.data.remote.dto.AdminBookingLocal
+import com.divehub.app.ui.navigation.InnerRoutes
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 private const val BOOKING_FILTER_ALL = "all"
 
@@ -78,26 +83,26 @@ class AdminBookingsViewModel(
         viewModelScope.launch {
             val prev = _state.value
             _state.value = prev.copy(loading = true, error = null)
-            runCatching { repo.loadAll() }
-                .onSuccess { list ->
-                    _state.value = _state.value.copy(
-                        loading = false,
-                        error = null,
-                        bookings = list.sortedByDescending { it.createdAt },
-                    )
-                }
-                .onFailure { e ->
-                    _state.value = prev.copy(loading = false, error = e.message ?: "Error")
-                }
+            val (list, err) = repo.syncFromRemoteWithFallback(null)
+            _state.value = _state.value.copy(
+                loading = false,
+                error = err,
+                bookings = list.sortedByDescending { it.createdAt },
+            )
         }
     }
 
     fun setStatus(id: String, status: String) {
         viewModelScope.launch {
-            _state.update { st ->
-                st.copy(bookings = st.bookings.map { if (it.id == id) it.copy(status = status) else it })
-            }
-            repo.saveAll(_state.value.bookings)
+            val prev = _state.value
+            _state.value = prev.copy(loading = true, error = null)
+            runCatching { repo.updateBookingStatusRemote(id, status) }
+                .onFailure { e ->
+                    _state.value = prev.copy(loading = false, error = e.message ?: "Error")
+                }
+                .onSuccess {
+                    refresh()
+                }
         }
     }
 
@@ -118,9 +123,24 @@ fun AdminBookingManagementRoute(graph: AppGraph, innerNav: NavController) {
     val state by vm.state.collectAsState()
     var selected by remember { mutableStateOf<AdminBookingLocal?>(null) }
     var statusFilter by remember { mutableStateOf(BOOKING_FILTER_ALL) }
-    val visible = remember(state.bookings, statusFilter) {
-        if (statusFilter == BOOKING_FILTER_ALL) state.bookings else state.bookings.filter { it.status == statusFilter }
+    var query by remember { mutableStateOf("") }
+    val visible = remember(state.bookings, statusFilter, query) {
+        val q = query.trim().lowercase()
+        state.bookings.filter { b ->
+            val passStatus = statusFilter == BOOKING_FILTER_ALL || b.status.equals(statusFilter, ignoreCase = true)
+            val passQuery = q.isBlank() || listOf(
+                b.id,
+                b.diveCenterId,
+                b.serviceId,
+                b.date,
+            ).joinToString(" ").lowercase().contains(q)
+            passStatus && passQuery
+        }
     }
+    val total = visible.size
+    val pending = visible.count { it.status.equals("pending", ignoreCase = true) }
+    val confirmed = visible.count { it.status.equals("confirmed", ignoreCase = true) }
+    val revenue = visible.filter { it.status.equals("completed", ignoreCase = true) }.sumOf { it.amount }
 
     Scaffold(
         topBar = {
@@ -164,7 +184,21 @@ fun AdminBookingManagementRoute(graph: AppGraph, innerNav: NavController) {
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = query,
+                            onValueChange = { query = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.admin_bookings_search_label)) },
+                            singleLine = true,
+                        )
+                    }
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             listOf(
                                 BOOKING_FILTER_ALL,
                                 "pending",
@@ -189,6 +223,19 @@ fun AdminBookingManagementRoute(graph: AppGraph, innerNav: NavController) {
                                 )
                             }
                         }
+                    }
+                    item {
+                        Text(
+                            stringResource(
+                                R.string.admin_bookings_kpi_line,
+                                total,
+                                pending,
+                                confirmed,
+                                "$" + String.format(Locale.US, "%.2f", revenue),
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
                     }
                     if (state.error != null) {
                         item {
@@ -226,8 +273,9 @@ fun AdminBookingManagementRoute(graph: AppGraph, innerNav: NavController) {
                                         )
                                     }
                                     Text(
-                                        booking.status,
-                                        color = Color.White,
+                                        booking.status.uppercase(Locale.US),
+                                        color = bookingStatusColor(booking.status),
+                                        style = MaterialTheme.typography.labelMedium,
                                         modifier = Modifier
                                             .padding(start = 8.dp)
                                             .align(Alignment.CenterVertically),
@@ -253,11 +301,24 @@ fun AdminBookingManagementRoute(graph: AppGraph, innerNav: NavController) {
                 Text("Amount: $${"%.2f".format(booking.amount)}", style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = { vm.setStatus(booking.id, "pending") }) {
+                        Text(stringResource(R.string.admin_bookings_action_pending))
+                    }
                     TextButton(onClick = { vm.setStatus(booking.id, "confirmed") }) {
                         Text(stringResource(R.string.admin_bookings_action_confirm))
                     }
+                    TextButton(onClick = { vm.setStatus(booking.id, "completed") }) {
+                        Text(stringResource(R.string.admin_bookings_action_complete))
+                    }
                     TextButton(onClick = { vm.setStatus(booking.id, "cancelled") }) {
                         Text(stringResource(R.string.admin_bookings_action_cancel))
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(
+                        onClick = { innerNav.navigate(InnerRoutes.centerTrips(booking.diveCenterId)) },
+                    ) {
+                        Text(stringResource(R.string.admin_bookings_open_center_trips))
                     }
                     TextButton(onClick = { selected = null }) {
                         Text(stringResource(R.string.common_close))
@@ -266,5 +327,14 @@ fun AdminBookingManagementRoute(graph: AppGraph, innerNav: NavController) {
             }
         }
     }
+}
+
+@Composable
+private fun bookingStatusColor(status: String): Color = when {
+    status.equals("pending", ignoreCase = true) -> MaterialTheme.colorScheme.tertiary
+    status.equals("confirmed", ignoreCase = true) -> MaterialTheme.colorScheme.primary
+    status.equals("completed", ignoreCase = true) -> Color(0xFF2E7D32)
+    status.equals("cancelled", ignoreCase = true) -> MaterialTheme.colorScheme.error
+    else -> MaterialTheme.colorScheme.onSurfaceVariant
 }
 

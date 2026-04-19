@@ -24,25 +24,28 @@ struct BookingManagementView: View {
     }
     
     var body: some View {
-        List {
-            Section {
-                Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
-                    Text(localizationService.localizedString("all", table: "common")).tag("all")
-                    ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
-                        Text(status.rawValue.capitalized).tag(status.rawValue)
+        VStack(spacing: 0) {
+            List {
+                Section {
+                    Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
+                        Text(localizationService.localizedString("all", table: "common")).tag("all")
+                        ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
+                            Text(status.rawValue.capitalized).tag(status.rawValue)
+                        }
                     }
                 }
-            }
-            
-            Section {
-                ForEach(filteredBookings) { booking in
-                    BookingRowView(booking: booking, onTap: {
-                        selectedBooking = booking
-                    })
+
+                Section {
+                    ForEach(filteredBookings) { booking in
+                        BookingRowView(booking: booking, onTap: {
+                            selectedBooking = booking
+                        })
+                    }
                 }
             }
         }
         .navigationTitle(localizationService.localizedString("bookings", table: "admin"))
+        .diveHubNavigationChrome()
         .sheet(item: $selectedBooking) { booking in
             BookingDetailView(booking: booking, viewModel: viewModel)
         }
@@ -67,7 +70,7 @@ struct BookingRowView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     if !booking.serviceId.isEmpty {
-                        Text("ui_admin_service_value".localized)
+                        Text("\("ui_label_service".localized): \(booking.serviceId)")
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
@@ -77,7 +80,7 @@ struct BookingRowView: View {
                     Text(formatPrice(booking.payment.amount))
                         .font(.headline)
                         .foregroundColor(.primary)
-                    Text(booking.status.rawValue.capitalized)
+                    Text(localizedStatus(booking.status))
                         .font(.caption)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
@@ -98,11 +101,7 @@ struct BookingRowView: View {
     }
     
     private func formatParticipantsCount(_ count: Int) -> String {
-        if count == 1 {
-            return "1 participant"
-        } else {
-            return "\(count) participants"
-        }
+        return "\("ui_label_participants".localized): \(count)"
     }
     
     private func formatPrice(_ amount: Double) -> String {
@@ -123,6 +122,24 @@ struct BookingRowView: View {
             return Color.red
         case .refunded:
             return Color.gray
+        }
+    }
+
+    private func localizedStatus(_ status: Booking.BookingStatus) -> String {
+        let l = LocalizationService.shared
+        switch status {
+        case .pending:
+            return l.localizedString("bookingStatusPending", table: "admin")
+        case .quoted:
+            return l.localizedString("bookingStatusQuoted", table: "admin")
+        case .confirmed:
+            return l.localizedString("bookingStatusConfirmed", table: "admin")
+        case .completed:
+            return l.localizedString("bookingStatusCompleted", table: "admin")
+        case .cancelled:
+            return l.localizedString("bookingStatusCancelled", table: "admin")
+        case .refunded:
+            return l.localizedString("bookingStatusRefunded", table: "admin")
         }
     }
 }

@@ -23,6 +23,7 @@ export class AdminSupportTicketsController {
     @Query('status') status?: string,
     @Query('priority') priority?: string,
     @Query('assignedAdminId') assignedAdminId?: string,
+    @Query('category') category?: string,
   ) {
     return this.service.list({
       limit: limit ? Number(limit) : undefined,
@@ -30,6 +31,7 @@ export class AdminSupportTicketsController {
       status,
       priority,
       assignedAdminId,
+      category,
     });
   }
 

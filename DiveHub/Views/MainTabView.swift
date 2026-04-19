@@ -151,6 +151,15 @@ struct DiverTabView: View {
                 else if selectedTab == 5 { selectedTab = 0 }
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .diveHubNavigateToExploreDiveSitesMap)) { _ in
+            selectedTab = 0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NotificationCenter.default.post(name: .diveHubExploreApplyDiveSitesMap, object: nil)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .diveHubNavigateToSocial)) { _ in
+            selectedTab = 3
+        }
     }
 
     @ViewBuilder
@@ -166,7 +175,7 @@ struct DiverTabView: View {
             SocialTabView()
         case 4:
             NavigationStack {
-                ChatListView()
+                ChatHubView()
             }
         case 5:
             if diveEditorEnabled {

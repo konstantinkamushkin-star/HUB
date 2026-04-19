@@ -34,10 +34,16 @@ struct SplashView: View {
                     .ignoresSafeArea()
                 
                 VStack(spacing: 20) {
-                    DiveHubLogoMark(color: .white)
-                        .frame(width: 130, height: 100)
+                    // Opaque raster flattened on divePrimary — avoids white fringe from alpha × scaling on the splash.
+                    Image("BrandLogoSplash")
+                        .resizable()
+                        .interpolation(.high)
+                        .scaledToFit()
+                        .aspectRatio(1, contentMode: .fit)
+                        .frame(width: 120, height: 120)
                         .scaleEffect(size)
                         .opacity(opacity)
+                        .accessibilityLabel("DiveHub")
                     
                     Text("ui_splash_divehub".localized)
                         .font(.system(size: 40, weight: .bold))

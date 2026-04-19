@@ -15,18 +15,26 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AdminSupportTicketsService } from '../admin/admin-support-tickets.service';
+import { PublicCreateSupportTicketDto } from '../support/dto/public-create-support-ticket.dto';
+import { executePublicSupportTicketCreate } from '../support/support-ticket-app.handler';
 import { ChatService } from './chat.service';
 import { OpenChatDto } from './dto/open-chat.dto';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
 import { OpenContributionSupportChatDto } from './dto/open-contribution-support-chat.dto';
+import { OpenAppSupportTopicDto } from './dto/open-app-support-topic.dto';
 
 @ApiTags('chat')
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly supportTickets: AdminSupportTicketsService,
+  ) {}
 
   @Get('conversations')
   @ApiOperation({ summary: 'List conversations for current user' })
@@ -58,6 +66,35 @@ export class ChatController {
       req.user.sub,
       dto.contributionId,
     );
+  }
+
+  @Post('support/topics')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Open or create an app support thread (one topic per topicId; omit topicId for a new topic)',
+  })
+  async openAppSupportTopic(
+    @Request() req: { user: { sub: string } },
+    @Body() dto: OpenAppSupportTopicDto,
+  ) {
+    return this.chatService.openAppSupportTopicChat(
+      req.user.sub,
+      dto.topicId,
+      dto.title,
+    );
+  }
+
+  /** Same as `POST /api/support/tickets` — under `/api/chat` so older API deploys still route feedback. */
+  @Post('support/tickets')
+  @HttpCode(HttpStatus.CREATED)
+  @Throttle({ default: { ttl: 60000, limit: 10 } })
+  @ApiOperation({ summary: 'Submit feedback / bug report (authenticated app user)' })
+  async createSupportTicketFromApp(
+    @Request() req: { user: { sub: string; email?: string } },
+    @Body() dto: PublicCreateSupportTicketDto,
+  ) {
+    return executePublicSupportTicketCreate(this.supportTickets, req, dto);
   }
 
   @Post('messages')

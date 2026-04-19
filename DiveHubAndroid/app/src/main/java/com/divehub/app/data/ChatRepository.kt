@@ -4,6 +4,7 @@ import com.divehub.app.AppGraph
 import com.divehub.app.data.remote.dto.ChatConversationDto
 import com.divehub.app.data.remote.dto.ChatMessageDto
 import com.divehub.app.data.remote.dto.ChatMessagesPageDto
+import com.divehub.app.data.remote.dto.OpenAppSupportTopicRequest
 import com.divehub.app.data.remote.dto.OpenConversationRequest
 import com.divehub.app.data.remote.dto.UserDto
 
@@ -15,6 +16,14 @@ class ChatRepository(private val graph: AppGraph) {
 
     suspend fun openUserConversation(userId: String): ChatConversationDto =
         openConversation(peerId = userId, peerType = "user")
+
+    suspend fun openAppSupportTopic(title: String?) =
+        graph.chatApi().openAppSupportTopic(
+            OpenAppSupportTopicRequest(
+                title = title?.takeIf { it.isNotBlank() },
+                topicId = null,
+            ),
+        )
 
     suspend fun messagesPage(
         conversationId: String,

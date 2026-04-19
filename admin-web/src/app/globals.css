@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
+/* Панель админки — тёмная тема по умолчанию. Не задавать светлый --background,
+   иначе правило `body { background: var(--background) }` перебивает Tailwind и даёт «белый экран». */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #fafafa;
 }
 
 @theme inline {
@@ -12,17 +14,9 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  /* Фон и текст задаёт layout (`bg-zinc-950 text-zinc-100`); здесь не дублировать светлую тему. */
 }
 
 /* Leaflet: скрыть иконки в атрибуции (напр. флаг в префиксе ссылки) */

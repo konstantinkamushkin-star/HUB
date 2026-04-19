@@ -4,24 +4,18 @@ import com.divehub.app.AppGraph
 import com.divehub.app.data.remote.dto.InventoryItemLocal
 import com.divehub.app.data.remote.dto.MaintenanceTicketLocal
 import com.google.gson.reflect.TypeToken
-import java.time.Instant
-import java.util.UUID
 
 class InventoryRepository(private val graph: AppGraph) {
     private val gson get() = graph.gson
 
     suspend fun loadItems(): List<InventoryItemLocal> {
         val raw = graph.tokenStore.getInventoryItemsJson()
-        if (raw.isNullOrBlank()) {
-            val seeded = defaultItems()
-            saveItems(seeded)
-            return seeded
-        }
+        if (raw.isNullOrBlank()) return emptyList()
         return try {
             val type = object : TypeToken<List<InventoryItemLocal>>() {}.type
-            gson.fromJson<List<InventoryItemLocal>>(raw, type) ?: defaultItems()
+            gson.fromJson<List<InventoryItemLocal>>(raw, type).orEmpty()
         } catch (_: Exception) {
-            defaultItems()
+            emptyList()
         }
     }
 
@@ -31,16 +25,12 @@ class InventoryRepository(private val graph: AppGraph) {
 
     suspend fun loadTickets(): List<MaintenanceTicketLocal> {
         val raw = graph.tokenStore.getInventoryTicketsJson()
-        if (raw.isNullOrBlank()) {
-            val seeded = defaultTickets()
-            saveTickets(seeded)
-            return seeded
-        }
+        if (raw.isNullOrBlank()) return emptyList()
         return try {
             val type = object : TypeToken<List<MaintenanceTicketLocal>>() {}.type
-            gson.fromJson<List<MaintenanceTicketLocal>>(raw, type) ?: defaultTickets()
+            gson.fromJson<List<MaintenanceTicketLocal>>(raw, type).orEmpty()
         } catch (_: Exception) {
-            defaultTickets()
+            emptyList()
         }
     }
 
@@ -48,50 +38,79 @@ class InventoryRepository(private val graph: AppGraph) {
         graph.tokenStore.setInventoryTicketsJson(gson.toJson(tickets))
     }
 
-    private fun nowIso() = Instant.now().toString()
+    suspend fun syncFromRemote(centerId: String): Pair<List<InventoryItemLocal>, List<MaintenanceTicketLocal>> {
+        val api = graph.partnerAdminApi()
+        val items = api.listInventoryItems(centerId)
+        val tickets = api.listInventoryTickets(centerId)
+        saveItems(items)
+        saveTickets(tickets)
+        return items to tickets
+    }
 
-    private fun defaultItems(): List<InventoryItemLocal> = listOf(
-        InventoryItemLocal(
-            id = UUID.randomUUID().toString(),
-            name = "Aqualung Wetsuit 5mm L",
-            category = "wetsuit",
+    suspend fun syncFromRemoteOrCache(centerId: String): Pair<List<InventoryItemLocal>, List<MaintenanceTicketLocal>> =
+        runCatching { syncFromRemote(centerId) }.getOrElse { loadItems() to loadTickets() }
+
+    suspend fun upsertItemRemote(centerId: String, item: InventoryItemLocal): InventoryItemLocal {
+        val api = graph.partnerAdminApi()
+        val body = item.copy(id = insertIdForApi(item.id))
+        return api.upsertInventoryItem(centerId, body)
+    }
+
+    suspend fun upsertTicketRemote(centerId: String, ticket: MaintenanceTicketLocal): MaintenanceTicketLocal {
+        val api = graph.partnerAdminApi()
+        val body = ticket.copy(id = insertIdForApi(ticket.id))
+        return api.upsertInventoryTicket(centerId, body)
+    }
+
+    suspend fun deleteItemRemote(centerId: String, itemId: String) {
+        val api = graph.partnerAdminApi()
+        api.deleteInventoryItem(itemId)
+        syncFromRemote(centerId)
+    }
+
+    suspend fun checkInItemRemote(centerId: String, itemId: String) {
+        val items = loadItems()
+        val cur = items.firstOrNull { it.id == itemId } ?: return
+        val cleared = cur.copy(
             status = "available",
-            condition = "good",
-            location = "Main warehouse",
-            size = "L",
-            createdAt = nowIso(),
-        ),
-        InventoryItemLocal(
-            id = UUID.randomUUID().toString(),
-            name = "Scubapro Regulator MK25",
-            category = "regulator",
-            status = "issued",
-            condition = "good",
-            location = "Rental desk",
-            createdAt = nowIso(),
-        ),
-        InventoryItemLocal(
-            id = UUID.randomUUID().toString(),
-            name = "Mares BCD Rover M",
-            category = "bcd",
-            status = "maintenance",
-            condition = "needs_service",
-            location = "Service room",
-            size = "M",
-            createdAt = nowIso(),
-        ),
-    )
+            issuedToName = null,
+            dueAt = null,
+            checkoutNotes = null,
+            checkoutHandedOffBy = null,
+            checkoutHandedOffAt = null,
+        )
+        upsertItemRemote(centerId, cleared)
+    }
 
-    private fun defaultTickets(): List<MaintenanceTicketLocal> = listOf(
-        MaintenanceTicketLocal(
-            id = UUID.randomUUID().toString(),
-            itemId = "seed_reg_1",
-            itemName = "Scubapro Regulator MK25",
-            title = "Annual regulator service",
-            status = "open",
-            priority = "high",
-            createdAt = nowIso(),
-        ),
-    )
+    suspend fun checkInItem(itemId: String) {
+        val items = loadItems().map { it ->
+            if (it.id != itemId) {
+                it
+            } else {
+                it.copy(
+                    status = "available",
+                    issuedToName = null,
+                    dueAt = null,
+                    checkoutNotes = null,
+                    checkoutHandedOffBy = null,
+                    checkoutHandedOffAt = null,
+                )
+            }
+        }
+        saveItems(items)
+    }
+
+    suspend fun deleteItemAndRelatedTickets(itemId: String) {
+        saveItems(loadItems().filter { it.id != itemId })
+        saveTickets(loadTickets().filter { it.itemId != itemId })
+    }
+
+    /** Use server id when present; empty string triggers INSERT on Nest. */
+    private fun insertIdForApi(localId: String): String =
+        if (localId.isNotBlank() && SERVER_UUID.matches(localId)) localId else ""
+
+    companion object {
+        private val SERVER_UUID =
+            Regex("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-5][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$")
+    }
 }
-

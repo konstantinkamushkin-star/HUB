@@ -1,17 +1,24 @@
 package com.divehub.app.ui.admin
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
@@ -40,9 +47,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -57,10 +67,15 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
+import kotlin.math.min
 
 private enum class BookingCalendarMode { CALENDAR, LIST }
 
@@ -84,17 +99,12 @@ class AdminBookingCalendarViewModel(
         viewModelScope.launch {
             val prev = _state.value
             _state.value = prev.copy(loading = true, error = null)
-            runCatching { repo.loadAll() }
-                .onSuccess { list ->
-                    _state.value = _state.value.copy(
-                        loading = false,
-                        error = null,
-                        bookings = list.sortedByDescending { it.date + it.startTime },
-                    )
-                }
-                .onFailure { e ->
-                    _state.value = prev.copy(loading = false, error = e.message ?: "Error")
-                }
+            val (list, err) = repo.syncFromRemoteWithFallback(null)
+            _state.value = _state.value.copy(
+                loading = false,
+                error = err,
+                bookings = list.sortedByDescending { it.date + it.startTime },
+            )
         }
     }
 
@@ -115,8 +125,17 @@ fun AdminBookingCalendarRoute(graph: AppGraph, innerNav: NavController) {
     val state by vm.state.collectAsState()
     var mode by remember { mutableStateOf(BookingCalendarMode.CALENDAR) }
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var displayMonth by remember { mutableStateOf(YearMonth.from(LocalDate.now())) }
     var showDatePicker by remember { mutableStateOf(false) }
     val datePickerState = rememberDatePickerState()
+    val locale = LocalConfiguration.current.locales[0] ?: Locale.getDefault()
+
+    val bookingsByDate = remember(state.bookings) {
+        state.bookings.mapNotNull { b ->
+            val d = runCatching { LocalDate.parse(b.date) }.getOrNull() ?: return@mapNotNull null
+            d to b
+        }.groupBy({ it.first }, { it.second })
+    }
 
     val listForDate = remember(state.bookings, selectedDate) {
         state.bookings.filter { runCatching { LocalDate.parse(it.date) }.getOrNull() == selectedDate }
@@ -181,6 +200,46 @@ fun AdminBookingCalendarRoute(graph: AppGraph, innerNav: NavController) {
                     }
                     if (mode == BookingCalendarMode.CALENDAR) {
                         item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                TextButton(onClick = { displayMonth = displayMonth.minusMonths(1) }) {
+                                    Text(stringResource(R.string.admin_booking_calendar_prev_month))
+                                }
+                                Text(
+                                    displayMonth.format(
+                                        DateTimeFormatter.ofPattern("LLLL uuuu", locale),
+                                    ),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                TextButton(onClick = { displayMonth = displayMonth.plusMonths(1) }) {
+                                    Text(stringResource(R.string.admin_booking_calendar_next_month))
+                                }
+                            }
+                        }
+                        item {
+                            BookingMonthHeatmap(
+                                yearMonth = displayMonth,
+                                bookingsByDate = bookingsByDate,
+                                selectedDate = selectedDate,
+                                locale = locale,
+                                onSelectDay = { day ->
+                                    selectedDate = day
+                                    displayMonth = YearMonth.from(day)
+                                },
+                            )
+                        }
+                        item {
+                            Text(
+                                stringResource(R.string.admin_booking_calendar_heatmap_hint),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        item {
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                                 elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -226,7 +285,9 @@ fun AdminBookingCalendarRoute(graph: AppGraph, innerNav: NavController) {
                 TextButton(onClick = {
                     val millis = datePickerState.selectedDateMillis
                     if (millis != null) {
-                        selectedDate = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        val picked = Instant.ofEpochMilli(millis).atZone(ZoneId.systemDefault()).toLocalDate()
+                        selectedDate = picked
+                        displayMonth = YearMonth.from(picked)
                     }
                     showDatePicker = false
                 }) { Text(stringResource(R.string.common_ok)) }
@@ -238,6 +299,144 @@ fun AdminBookingCalendarRoute(graph: AppGraph, innerNav: NavController) {
             DatePicker(state = datePickerState)
         }
     }
+}
+
+private val HeatmapDowOrder: List<DayOfWeek> = listOf(
+    DayOfWeek.MONDAY,
+    DayOfWeek.TUESDAY,
+    DayOfWeek.WEDNESDAY,
+    DayOfWeek.THURSDAY,
+    DayOfWeek.FRIDAY,
+    DayOfWeek.SATURDAY,
+    DayOfWeek.SUNDAY,
+)
+
+@Composable
+private fun BookingMonthHeatmap(
+    yearMonth: YearMonth,
+    bookingsByDate: Map<LocalDate, List<AdminBookingLocal>>,
+    selectedDate: LocalDate,
+    locale: Locale,
+    onSelectDay: (LocalDate) -> Unit,
+) {
+    val first = yearMonth.atDay(1)
+    val daysInMonth = yearMonth.lengthOfMonth()
+    val offset = (first.dayOfWeek.value + 6) % 7
+    val numWeeks = (offset + daysInMonth + 6) / 7
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(Modifier.fillMaxWidth().padding(10.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                HeatmapDowOrder.forEach { d ->
+                    Text(
+                        d.getDisplayName(TextStyle.NARROW, locale),
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+            }
+            Spacer(Modifier.height(6.dp))
+            for (week in 0 until numWeeks) {
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    for (dow in 0 until 7) {
+                        val dayIndex = week * 7 + dow - offset + 1
+                        if (dayIndex in 1..daysInMonth) {
+                            val date = yearMonth.atDay(dayIndex)
+                            val dayBookings = bookingsByDate[date].orEmpty()
+                            MonthDayCell(
+                                dayNum = dayIndex,
+                                count = dayBookings.size,
+                                dominantStatus = dominantBookingStatus(dayBookings),
+                                selected = date == selectedDate,
+                                onClick = { onSelectDay(date) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        } else {
+                            Spacer(Modifier.weight(1f).aspectRatio(1f))
+                        }
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+            }
+        }
+    }
+}
+
+private fun dominantBookingStatus(list: List<AdminBookingLocal>): String? {
+    if (list.isEmpty()) return null
+    val order = listOf("pending", "confirmed", "completed", "cancelled")
+    for (s in order) {
+        if (list.any { it.status.equals(s, ignoreCase = true) }) return s
+    }
+    return list.first().status
+}
+
+@Composable
+private fun MonthDayCell(
+    dayNum: Int,
+    count: Int,
+    dominantStatus: String?,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val intensity = when {
+        count <= 0 -> 0.08f
+        count == 1 -> 0.22f
+        count == 2 -> 0.35f
+        else -> min(0.25f + count * 0.1f, 0.88f)
+    }
+    val fill = MaterialTheme.colorScheme.primary.copy(alpha = intensity)
+    val borderWidth = if (selected) 2.dp else 0.dp
+    Box(
+        modifier
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(8.dp))
+            .border(borderWidth, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+            .background(fill, RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(2.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                dayNum.toString(),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+            )
+            if (count > 0) {
+                Text(
+                    count.toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            dominantStatus?.let {
+                Box(
+                    Modifier
+                        .padding(top = 2.dp)
+                        .size(6.dp)
+                        .clip(CircleShape)
+                        .background(bookingStatusHeatColor(it)),
+                )
+            }
+        }
+    }
+}
+
+private fun bookingStatusHeatColor(status: String): Color = when (status.lowercase()) {
+    "pending" -> Color(0xFFF57C00)
+    "confirmed" -> Color(0xFF1565C0)
+    "completed" -> Color(0xFF2E7D32)
+    "cancelled" -> Color(0xFFC62828)
+    else -> Color(0xFF757575)
 }
 
 @Composable

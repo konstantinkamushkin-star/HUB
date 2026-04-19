@@ -8,6 +8,41 @@
 import SwiftUI
 import Combine
 
+/// Messages + in-app / push notification inbox (same tab).
+struct ChatHubView: View {
+    private enum Segment: Int, CaseIterable {
+        case messages = 0
+        case notifications = 1
+    }
+
+    @StateObject private var localizationService = LocalizationService.shared
+    @State private var segment: Segment = .messages
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Picker("", selection: $segment) {
+                Text(localizationService.localizedString("messages"))
+                    .tag(Segment.messages)
+                Text("ui_notifications_notifications".localized)
+                    .tag(Segment.notifications)
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            .padding(.vertical, 8)
+
+            Group {
+                switch segment {
+                case .messages:
+                    ChatListView()
+                case .notifications:
+                    NotificationsView()
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+}
+
 struct ChatListView: View {
     @StateObject private var viewModel = ChatListViewModel()
     @StateObject private var localizationService = LocalizationService.shared
@@ -80,7 +115,7 @@ struct ChatRow: View {
                 }
                 
                 if conversation.unreadCount > 0 {
-                    Text("ui_chat_value".localized)
+                    Text("\(conversation.unreadCount)")
                         .font(.caption)
                         .foregroundColor(.white)
                         .padding(6)

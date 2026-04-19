@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Full-color brand mark from `BrandLogoMask` (JPEG/PNG **without** a shape-only alpha channel).
 /// Do not use `.template` here: a fully opaque raster becomes a solid rectangle when tinted.
+
 struct DiveHubLogoMark: View {
     /// Kept for call-site compatibility; raster asset ignores tint.
     var color: Color = .divePrimary
@@ -11,7 +12,6 @@ struct DiveHubLogoMark: View {
             .renderingMode(.original)
             .resizable()
             .interpolation(.high)
-            .antialiased(true)
             .scaledToFit()
             .accessibilityLabel("DiveHub")
     }
@@ -28,7 +28,6 @@ struct DiveHubBrandIcon: View {
             .renderingMode(.original)
             .resizable()
             .interpolation(.high)
-            .antialiased(true)
             .scaledToFit()
             .frame(width: size, height: size)
             .accessibilityLabel("DiveHub")

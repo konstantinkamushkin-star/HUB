@@ -37,12 +37,16 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -61,6 +65,7 @@ import com.divehub.app.R
 import com.divehub.app.data.remote.dto.ChatConversationDto
 import com.divehub.app.data.remote.dto.ChatMessageDto
 import com.divehub.app.data.remote.dto.UserDto
+import com.divehub.app.ui.notifications.NotificationsTabEmbed
 import com.divehub.app.ui.social.SocialUiState
 import com.divehub.app.ui.social.SocialViewModel
 import com.divehub.app.ui.theme.IosDesign
@@ -74,6 +79,7 @@ fun ChatRoute(graph: AppGraph, openFriendId: String? = null, onOpenFriendConsume
     val state by vm.state.collectAsState()
     val snack = remember { SnackbarHostState() }
     var showNewChat by remember { mutableStateOf(false) }
+    var chatSubTab by remember { mutableIntStateOf(0) }
     val socialVm: SocialViewModel = viewModel(factory = SocialViewModel.factory(graph))
     val socialState by socialVm.state.collectAsState()
 
@@ -117,34 +123,60 @@ fun ChatRoute(graph: AppGraph, openFriendId: String? = null, onOpenFriendConsume
         val selected = state.selectedConversation
         if (selected == null) {
             Column(Modifier.fillMaxSize()) {
-                Row(
-                    Modifier
+                SingleChoiceSegmentedButtonRow(
+                    modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 6.dp),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
                 ) {
-                    TextButton(onClick = { showNewChat = true }) {
-                        Text(stringResource(R.string.chat_new_message))
-                    }
+                    SegmentedButton(
+                        selected = chatSubTab == 0,
+                        onClick = { chatSubTab = 0 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) { Text(stringResource(R.string.chat_subtab_messages)) }
+                    SegmentedButton(
+                        selected = chatSubTab == 1,
+                        onClick = { chatSubTab = 1 },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) { Text(stringResource(R.string.chat_subtab_notifications)) }
                 }
-                when {
-                    state.loading -> Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f),
-                        contentAlignment = Alignment.Center,
-                    ) { CircularProgressIndicator() }
-                    state.error != null -> Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .weight(1f)
-                            .padding(16.dp),
-                        contentAlignment = Alignment.Center,
-                    ) { Text(state.error ?: "Error") }
-                    else -> ChatList(
-                        conversations = state.conversations,
-                        onOpen = vm::selectConversation,
+                when (chatSubTab) {
+                    0 -> {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.End,
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            TextButton(onClick = { showNewChat = true }) {
+                                Text(stringResource(R.string.chat_new_message))
+                            }
+                        }
+                        when {
+                            state.loading -> Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                                contentAlignment = Alignment.Center,
+                            ) { CircularProgressIndicator() }
+                            state.error != null -> Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f)
+                                    .padding(16.dp),
+                                contentAlignment = Alignment.Center,
+                            ) { Text(state.error ?: "Error") }
+                            else -> ChatList(
+                                conversations = state.conversations,
+                                onOpen = vm::selectConversation,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .weight(1f),
+                            )
+                        }
+                    }
+                    1 -> NotificationsTabEmbed(
+                        graph = graph,
                         modifier = Modifier
                             .fillMaxWidth()
                             .weight(1f),

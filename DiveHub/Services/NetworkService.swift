@@ -86,6 +86,32 @@ enum NetworkError: LocalizedError {
         return false
     }
 
+    /// Текст для алертов: `NetworkError` уже локализован; сырые `URLError` из `URLSession` иначе часто дают **английский** системный текст даже при `ru` locale.
+    static func userFacingMessage(_ error: Error) -> String {
+        let L = LocalizationService.shared
+        if let ne = error as? NetworkError {
+            return ne.errorDescription ?? L.localizedString("networkError", table: "errors")
+        }
+        let ns = error as NSError
+        if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorCancelled {
+            return error.localizedDescription
+        }
+        if error is URLError || ns.domain == NSURLErrorDomain {
+            // Таймаут ≠ «нет интернета» — иначе пользователь видит ложное сообщение при долгом UVM/Nest.
+            if let u = error as? URLError, u.code == .timedOut {
+                return L.localizedString("networkRequestTimedOut", table: "errors")
+            }
+            if ns.domain == NSURLErrorDomain, ns.code == NSURLErrorTimedOut {
+                return L.localizedString("networkRequestTimedOut", table: "errors")
+            }
+            if isTransportLikelyNoInternet(error) {
+                return L.localizedString("noInternetConnection", table: "errors")
+            }
+            return L.localizedString("networkError", table: "errors")
+        }
+        return error.localizedDescription
+    }
+
     /// Текст из Nest/FastAPI без технических кодов HTTP — для экранов пользователя.
     private static func userFacingAPIMessage(_ raw: String) -> String {
         let L = LocalizationService.shared
@@ -111,12 +137,14 @@ enum NetworkError: LocalizedError {
         if lower.contains("token expired") || lower.contains("invalid token") {
             return L.localizedString("pleaseSignIn", table: "errors")
         }
-        // NestJS 404: "Cannot GET /path" — это сбой загрузки, не сохранения профиля.
+        // NestJS 404: "Cannot GET /path" — сбой загрузки.
         if lower.contains("cannot get") {
             return L.localizedString("errorLoadingData", table: "errors")
         }
-        if lower.contains("cannot patch") || lower.contains("cannot post")
-            || lower.contains("cannot put") || lower.contains("cannot delete") {
+        // Ошибки маршрута к профилю — дружелюбный текст; «Cannot POST /api/chat/...» и т.п. сюда не попадают.
+        if (lower.contains("cannot patch") || lower.contains("cannot post")
+            || lower.contains("cannot put") || lower.contains("cannot delete"))
+            && (lower.contains("/users/") || lower.contains("/user/") || lower.contains("profile")) {
             return L.localizedString("editProfileSaveFailed", table: "errors")
         }
         return trimmed.replacingOccurrences(
@@ -1464,6 +1492,56 @@ extension NetworkService {
         return try await request(endpoint: "/api/chat/messages", method: .post, body: body)
     }
     
+    /// Opens a new app support topic thread (`APP_SUPPORT_TOPIC`).
+    func openAppSupportTopic(title: String? = nil, topicId: String? = nil) async throws -> ChatConversation {
+        struct OpenAppSupportTopicBody: Codable {
+            let title: String?
+            let topicId: String?
+        }
+        return try await request(
+            endpoint: "/api/chat/support/topics",
+            method: .post,
+            body: OpenAppSupportTopicBody(title: title, topicId: topicId)
+        )
+    }
+    
+    struct SupportTicketClientMetadata: Codable {
+        var appVersion: String?
+        var build: String?
+        var os: String?
+        var locale: String?
+    }
+    
+    /// Feedback / bug report ticket (`POST /api/chat/support/tickets` — тот же модуль, что и чат; работает при старых деплоях без отдельного `SupportModule`).
+    func submitSupportTicket(
+        subject: String,
+        body: String,
+        category: String,
+        conversationId: String? = nil,
+        metadata: SupportTicketClientMetadata? = nil
+    ) async throws {
+        struct Body: Codable {
+            let subject: String
+            let body: String
+            let category: String
+            let conversationId: String?
+            let metadata: SupportTicketClientMetadata?
+        }
+        let b = Body(
+            subject: subject,
+            body: body,
+            category: category,
+            conversationId: conversationId,
+            metadata: metadata
+        )
+        struct SupportTicketCreateResponse: Codable { let success: Bool? }
+        let _: SupportTicketCreateResponse = try await request(
+            endpoint: "/api/chat/support/tickets",
+            method: .post,
+            body: b
+        )
+    }
+    
     /// Returns absolute URL for use in posts / chat attachments.
     func uploadMediaImage(_ imageData: Data, fileName: String = "photo.jpg") async throws -> String {
         guard let url = URL(string: baseURL + "/api/media/upload") else {
@@ -2172,28 +2250,50 @@ extension NetworkService {
     
     // MARK: - Underwater Vision Module (Python FastAPI, standalone)
     
-    /// UserDefaults key; if empty, uses default host in DEBUG.
+    /// UserDefaults key; пусто → хост как у REST API. На **устройстве** значения `127.0.0.1` / `localhost` принудительно сбрасываются (не работают с UVM на Mac).
     static let underwaterVisionModuleBaseURLKey = "underwaterVisionModuleBaseURL"
     
     /// Base URL без завершающего `/`.
-    /// Пусто в DEBUG → прямой UVM `http://127.0.0.1:8010`.
-    /// Пусто в Release → тот же хост, что и REST API (Nest проксирует на UVM через `UVM_URL`).
+    /// По умолчанию — тот же хост, что и REST API (Nest: `/api/v1/process/photo/...` → UVM).
+    /// Прямой uvicorn: в настройках `http://<LAN_IP_Мак>:8010` (на устройстве не используйте `127.0.0.1`). На симуляторе `http://127.0.0.1:8010` допустим.
     static func underwaterVisionModuleBaseURLString() -> String {
-        let raw = UserDefaults.standard.string(forKey: underwaterVisionModuleBaseURLKey) ?? ""
-        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        if let override = Self.normalizedUnderwaterVisionOverrideFromUserDefaults() {
+            return override
         }
-        #if DEBUG
-        return "http://127.0.0.1:8010"
-        #else
         let api = UserDefaults.standard.string(forKey: apiBaseURLUserDefaultsKey)?
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         if !api.isEmpty {
             return api.hasSuffix("/") ? String(api.dropLast()) : api
         }
         return Self.productionAPIBaseURL
+    }
+
+    /// Возвращает override из UserDefaults или `nil` (тогда — API host). На физическом устройстве loopback-URL удаляются из UserDefaults и игнорируются.
+    private static func normalizedUnderwaterVisionOverrideFromUserDefaults() -> String? {
+        let raw = UserDefaults.standard.string(forKey: underwaterVisionModuleBaseURLKey) ?? ""
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        let normalized = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
+        #if targetEnvironment(simulator)
+        return normalized
+        #else
+        guard let host = URL(string: normalized)?.host?.lowercased() else {
+            return normalized
+        }
+        if Self.isLoopbackHost(host) {
+            UserDefaults.standard.removeObject(forKey: underwaterVisionModuleBaseURLKey)
+            return nil
+        }
+        return normalized
         #endif
+    }
+
+    private static func isLoopbackHost(_ host: String) -> Bool {
+        let h = host.lowercased()
+        if h == "127.0.0.1" || h == "localhost" { return true }
+        if h == "::1" { return true }
+        if h.hasPrefix("[::1]") { return true }
+        return false
     }
     
     /// `true` если клиент ходит напрямую на uvicorn (порт 8010), иначе — фасад Nest `/api/v1/process/photo/...`.
@@ -2328,8 +2428,9 @@ extension NetworkService {
         let config = URLSessionConfiguration.default
         config.requestCachePolicy = .reloadIgnoringLocalCacheData
         config.urlCache = nil
-        config.timeoutIntervalForRequest = 120
-        config.timeoutIntervalForResource = 180
+        // Загрузка JPEG + обработка на UVM через Nest могут занимать >2 мин на слабом канале.
+        config.timeoutIntervalForRequest = 300
+        config.timeoutIntervalForResource = 600
         let longSession = URLSession(configuration: config)
         let (data, response) = try await longSession.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }

@@ -33,13 +33,13 @@ struct DiveCenterService: Identifiable, Codable, Hashable {
 
         var displayName: String {
             switch self {
-            case .funDive: return "Fun Dive"
-            case .package: return "Package"
-            case .nightDive: return "Night Dive"
-            case .poolSession: return "Pool Session"
-            case .equipmentRental: return "Equipment Rental"
-            case .course: return "Course"
-            case .other: return "Other"
+            case .funDive: return "ui_service_type_fun_dive".localized
+            case .package: return "ui_service_type_package".localized
+            case .nightDive: return "ui_service_type_night_dive".localized
+            case .poolSession: return "ui_service_type_pool_session".localized
+            case .equipmentRental: return "ui_service_type_equipment_rental".localized
+            case .course: return "ui_service_type_course".localized
+            case .other: return "ui_service_type_other".localized
             }
         }
     }

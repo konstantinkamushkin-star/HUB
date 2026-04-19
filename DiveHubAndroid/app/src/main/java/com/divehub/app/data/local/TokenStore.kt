@@ -12,6 +12,7 @@ import com.divehub.app.util.mediaOriginBaseUrl
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.util.Locale
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "divehub_session")
 
@@ -28,6 +29,8 @@ class TokenStore(private val context: Context) {
         val DIVE_EDITOR_ENABLED = booleanPreferencesKey("dive_editor_enabled")
         /** BCP-47 tag: "en", "ru", or unset = follow system */
         val APP_LANGUAGE = stringPreferencesKey("app_language")
+        /** "light", "dark", or unset = follow system (iOS Appearance). */
+        val APP_THEME = stringPreferencesKey("app_theme")
         /** Last FCM token successfully sent to `POST users/me/push-token` for current session */
         val LAST_REGISTERED_FCM_TOKEN = stringPreferencesKey("last_registered_fcm_token")
         /** INSTRUCTOR: use diver shell (map, logs, social) instead of partner portal */
@@ -41,6 +44,11 @@ class TokenStore(private val context: Context) {
         val ADMIN_AFFILIATED_SITES_JSON = stringPreferencesKey("admin_affiliated_sites_json")
         val INVENTORY_ITEMS_JSON = stringPreferencesKey("inventory_items_json")
         val INVENTORY_TICKETS_JSON = stringPreferencesKey("inventory_tickets_json")
+        val PARTNER_COURSES_JSON = stringPreferencesKey("partner_courses_json")
+        val SHOP_PRODUCTS_JSON = stringPreferencesKey("shop_products_json")
+        val SHOP_ORDERS_JSON = stringPreferencesKey("shop_orders_json")
+        val ADMIN_SHOP_DRAFTS_JSON = stringPreferencesKey("admin_shop_drafts_json")
+        val ADMIN_CENTER_INSTRUCTORS_JSON = stringPreferencesKey("admin_center_instructors_json")
     }
 
     val accessToken: Flow<String?> = store.data.map { it[Keys.ACCESS] }
@@ -134,6 +142,23 @@ class TokenStore(private val context: Context) {
                 prefs.remove(Keys.APP_LANGUAGE)
             } else {
                 prefs[Keys.APP_LANGUAGE] = tag.trim().lowercase()
+            }
+        }
+    }
+
+    /** Emits "", "light", or "dark" (empty = match system). */
+    val appThemeFlow: Flow<String> = store.data.map { prefs ->
+        (prefs[Keys.APP_THEME]?.trim()?.lowercase(Locale.ROOT)).orEmpty()
+    }
+
+    suspend fun setAppTheme(mode: String?) {
+        store.edit { prefs ->
+            when {
+                mode.isNullOrBlank() -> prefs.remove(Keys.APP_THEME)
+                mode.equals("system", ignoreCase = true) -> prefs.remove(Keys.APP_THEME)
+                mode.equals("light", ignoreCase = true) -> prefs[Keys.APP_THEME] = "light"
+                mode.equals("dark", ignoreCase = true) -> prefs[Keys.APP_THEME] = "dark"
+                else -> prefs.remove(Keys.APP_THEME)
             }
         }
     }
@@ -245,6 +270,56 @@ class TokenStore(private val context: Context) {
         store.edit { prefs ->
             if (json.isNullOrBlank()) prefs.remove(Keys.INVENTORY_TICKETS_JSON)
             else prefs[Keys.INVENTORY_TICKETS_JSON] = json
+        }
+    }
+
+    suspend fun getPartnerCoursesJson(): String? =
+        store.data.map { it[Keys.PARTNER_COURSES_JSON] }.first()
+
+    suspend fun setPartnerCoursesJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.PARTNER_COURSES_JSON)
+            else prefs[Keys.PARTNER_COURSES_JSON] = json
+        }
+    }
+
+    suspend fun getShopProductsJson(): String? =
+        store.data.map { it[Keys.SHOP_PRODUCTS_JSON] }.first()
+
+    suspend fun setShopProductsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.SHOP_PRODUCTS_JSON)
+            else prefs[Keys.SHOP_PRODUCTS_JSON] = json
+        }
+    }
+
+    suspend fun getShopOrdersJson(): String? =
+        store.data.map { it[Keys.SHOP_ORDERS_JSON] }.first()
+
+    suspend fun setShopOrdersJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.SHOP_ORDERS_JSON)
+            else prefs[Keys.SHOP_ORDERS_JSON] = json
+        }
+    }
+
+    suspend fun getAdminShopDraftsJson(): String? =
+        store.data.map { it[Keys.ADMIN_SHOP_DRAFTS_JSON] }.first()
+
+    suspend fun setAdminShopDraftsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.ADMIN_SHOP_DRAFTS_JSON)
+            else prefs[Keys.ADMIN_SHOP_DRAFTS_JSON] = json
+        }
+    }
+
+    suspend fun getAdminCenterInstructorsJson(): String? =
+        store.data.map { it[Keys.ADMIN_CENTER_INSTRUCTORS_JSON] }.first()
+
+    suspend fun setAdminCenterInstructorsJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.ADMIN_CENTER_INSTRUCTORS_JSON)
+            else prefs[Keys.ADMIN_CENTER_INSTRUCTORS_JSON] = json
         }
     }
 }

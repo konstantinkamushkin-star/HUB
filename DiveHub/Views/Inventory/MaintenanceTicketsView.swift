@@ -63,6 +63,7 @@ struct MaintenanceTicketsView: View {
 struct MaintenanceTicketDetailView: View {
     let ticket: MaintenanceTicket
     @ObservedObject var viewModel: InventoryViewModel
+    @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
         ScrollView {
@@ -93,41 +94,41 @@ struct MaintenanceTicketDetailView: View {
                 }
                 
                 // Description
-                SectionView(title: "Description") {
+                SectionView(title: localizationService.localizedString("ui_inventory_section_description", table: "ui")) {
                     Text(ticket.description)
                 }
                 
                 // Details
-                SectionView(title: "Details") {
-                    ItemInfoRow(label: "Opened", value: formatDate(ticket.openedAt))
+                SectionView(title: localizationService.localizedString("ui_inventory_section_details", table: "ui")) {
+                    ItemInfoRow(label: localizationService.localizedString("ui_inventory_opened", table: "ui"), value: formatDate(ticket.openedAt))
                     if let startedAt = ticket.startedAt {
-                        ItemInfoRow(label: "Started", value: formatDate(startedAt))
+                        ItemInfoRow(label: localizationService.localizedString("ui_inventory_started", table: "ui"), value: formatDate(startedAt))
                     }
                     if let completedAt = ticket.completedAt {
-                        ItemInfoRow(label: "Completed", value: formatDate(completedAt))
+                        ItemInfoRow(label: localizationService.localizedString("ui_inventory_completed", table: "ui"), value: formatDate(completedAt))
                     }
-                    ItemInfoRow(label: "Days Open", value: "\(ticket.daysOpen)")
+                    ItemInfoRow(label: localizationService.localizedString("ui_inventory_days_open", table: "ui"), value: "\(ticket.daysOpen)")
                     
                     if let assignedTo = ticket.assignedToName {
-                        ItemInfoRow(label: "Assigned To", value: assignedTo)
+                        ItemInfoRow(label: localizationService.localizedString("ui_inventory_assigned_to", table: "ui"), value: assignedTo)
                     }
                 }
                 
                 // Costs
                 if ticket.estimatedCost != nil || ticket.actualCost != nil {
-                    SectionView(title: "Costs") {
+                    SectionView(title: localizationService.localizedString("ui_inventory_costs", table: "ui")) {
                         if let estimated = ticket.estimatedCost {
-                            ItemInfoRow(label: "Estimated", value: String(format: "%.2f %@", estimated, ticket.currency))
+                            ItemInfoRow(label: localizationService.localizedString("ui_inventory_estimated", table: "ui"), value: String(format: "%.2f %@", estimated, ticket.currency))
                         }
                         if let actual = ticket.actualCost {
-                            ItemInfoRow(label: "Actual", value: String(format: "%.2f %@", actual, ticket.currency))
+                            ItemInfoRow(label: localizationService.localizedString("ui_inventory_actual", table: "ui"), value: String(format: "%.2f %@", actual, ticket.currency))
                         }
                     }
                 }
                 
                 // Parts Used
                 if !ticket.partsUsed.isEmpty {
-                    SectionView(title: "Parts Used") {
+                    SectionView(title: localizationService.localizedString("ui_inventory_parts_used", table: "ui")) {
                         ForEach(ticket.partsUsed) { part in
                             HStack {
                                 Text(part.name)

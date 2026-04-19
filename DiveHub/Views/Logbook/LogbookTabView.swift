@@ -193,6 +193,7 @@ struct DiveLogRow: View {
     let log: DiveLog
     let fallbackIndex: Int
     @StateObject private var settingsService = SettingsService.shared
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var diveSiteName: String?
     @State private var diveCenterName: String?
     
@@ -229,7 +230,7 @@ struct DiveLogRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(formatDepth(log.maxDepth))
                     .font(.headline)
-                Text("ui_logbook_value_min".localized)
+                Text("\(log.bottomTime) \(localizationService.localizedString("min", table: "logbook"))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

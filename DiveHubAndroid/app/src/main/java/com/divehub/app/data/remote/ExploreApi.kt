@@ -6,7 +6,11 @@ import com.divehub.app.data.remote.dto.DiveCenterInstructorDto
 import com.divehub.app.data.remote.dto.DiveCenterPublicEnvelopeDto
 import com.divehub.app.data.remote.dto.DiveCenterSearchResultDto
 import com.divehub.app.data.remote.dto.ShopSearchResultDto
+import com.google.gson.JsonObject
+import com.divehub.app.data.remote.dto.DiveSiteContributionsMineEnvelopeDto
+import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -37,4 +41,13 @@ interface ExploreApi {
     suspend fun shops(
         @Query("limit") limit: Int = 80,
     ): ShopSearchResultDto
+
+    /** User-submitted dive site correction or new site (moderated by admins). */
+    @POST("v1/dive-sites/contributions")
+    suspend fun submitDiveSiteContribution(@Body body: JsonObject): JsonObject
+
+    @GET("v1/dive-sites/contributions/mine")
+    suspend fun listMyDiveSiteContributions(
+        @Query("limit") limit: Int = 30,
+    ): DiveSiteContributionsMineEnvelopeDto
 }

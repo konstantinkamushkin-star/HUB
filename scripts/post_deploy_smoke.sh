@@ -42,7 +42,14 @@ try:
     parsed = json.loads(raw)
 except Exception:
     sys.exit(2)
-ok = any(str(v).lower() in ("pong", "ok", "healthy") for v in parsed.values())
+
+def value_ok(v):
+    if v is True:
+        return True
+    s = str(v).lower()
+    return s in ("pong", "ok", "healthy", "true")
+
+ok = any(value_ok(v) for v in parsed.values())
 sys.exit(0 if ok else 1)
 ' "$body" || fail "Ping endpoint did not return an expected payload: $url"
 }

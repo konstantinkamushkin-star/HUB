@@ -171,7 +171,7 @@ struct UnderwaterPhotoEditorView: View {
             HStack {
                 Text(label).font(.caption).foregroundColor(.diveTextSecondary)
                 Spacer()
-                Text("ui_imageediting_value_3".localized).font(.caption2).foregroundColor(.diveText)
+                Text("\(Int(value.wrappedValue))").font(.caption2).foregroundColor(.diveText)
             }
             Slider(value: value, in: range, step: step).tint(.divePrimary).onChange(of: value.wrappedValue) { _, _ in onChange() }
         }
@@ -211,7 +211,7 @@ struct SavePhotoSheet: View {
                 if format == .jpg || format == .heic {
                     Section("ui_quality".localized) {
                         Slider(value: $quality, in: 0.8...1.0, step: 0.05)
-                        Text("ui_imageediting_value".localized).font(.caption).foregroundColor(.secondary)
+                        Text("\(Int(quality * 100))%").font(.caption).foregroundColor(.secondary)
                     }
                 }
                 Section {

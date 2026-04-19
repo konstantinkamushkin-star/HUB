@@ -44,6 +44,8 @@ struct DiveCenterPublicView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     // Title and Rating
                     headerSection
+
+                    DiveCenterPromoCard()
                     
                     Divider()
                     
@@ -86,10 +88,6 @@ struct DiveCenterPublicView: View {
                     Button(action: onShowOnMap) {
                         Image(systemName: "map")
                     }
-                }
-                Button(action: { showBooking = true }) {
-                    Text(localizationService.localizedString("book"))
-                        .fontWeight(.semibold)
                 }
             }
         }
@@ -536,7 +534,7 @@ struct TripCard: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    Text("ui_admin_value_value_3".localized)
+                    Text("\(trip.startDate.formatted(date: .abbreviated, time: .omitted)) - \(trip.endDate.formatted(date: .abbreviated, time: .omitted))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                     

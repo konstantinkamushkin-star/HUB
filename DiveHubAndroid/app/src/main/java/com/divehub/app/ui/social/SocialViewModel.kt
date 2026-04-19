@@ -17,6 +17,8 @@ import kotlinx.coroutines.launch
 data class SocialUiState(
     val loading: Boolean = true,
     val error: String? = null,
+    /** API root for resolving `UserDto.avatarUrl` (same as Feed). */
+    val imageApiRoot: String = "",
     val friends: List<UserDto> = emptyList(),
     val received: List<FriendRequestDto> = emptyList(),
     val sent: List<FriendRequestDto> = emptyList(),
@@ -26,7 +28,10 @@ data class SocialUiState(
     val searchResults: List<UserDto> = emptyList(),
 )
 
-class SocialViewModel(private val repo: SocialRepository) : ViewModel() {
+class SocialViewModel(
+    private val graph: AppGraph,
+    private val repo: SocialRepository,
+) : ViewModel() {
     private val _state = MutableStateFlow(SocialUiState())
     val state: StateFlow<SocialUiState> = _state.asStateFlow()
     private var searchJob: Job? = null
@@ -37,7 +42,8 @@ class SocialViewModel(private val repo: SocialRepository) : ViewModel() {
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(loading = true, error = null)
+            val imgRoot = graph.tokenStore.getRootBaseUrl()
+            _state.value = _state.value.copy(loading = true, error = null, imageApiRoot = imgRoot)
             runCatching {
                 val friends = repo.friends()
                 val received = repo.receivedRequests()
@@ -140,7 +146,7 @@ class SocialViewModel(private val repo: SocialRepository) : ViewModel() {
         fun factory(graph: AppGraph) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return SocialViewModel(SocialRepository(graph)) as T
+                return SocialViewModel(graph, SocialRepository(graph)) as T
             }
         }
     }

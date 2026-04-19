@@ -16,97 +16,7 @@ struct DiveCenterAdminView: View {
     
     var body: some View {
         List {
-            if isLoading {
-                ProgressView()
-            } else if errorMessage != nil {
-                Text("ui_profile_error_value".localized)
-                    .foregroundColor(.red)
-            } else if let center = diveCenter {
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text(center.name)
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        Text("ui_logbook_value_value".localized)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section("ui_contact_information".localized) {
-                    InfoRow(icon: "phone", text: "Phone: \(center.contactInfo.phone)")
-                    InfoRow(icon: "envelope", text: "Email: \(center.contactInfo.email)")
-                    if let website = center.contactInfo.website {
-                        InfoRow(icon: "globe", text: "Website: \(website)")
-                    }
-                }
-                
-                Section("ui_statistics_statistics".localized) {
-                    HStack {
-                        Text("ui_profile_average_rating".localized)
-                        Spacer()
-                        HStack {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.yellow)
-                            Text(String(format: "%.1f", center.averageRating))
-                        }
-                    }
-                    HStack {
-                        Text("ui_profile_total_reviews".localized)
-                        Spacer()
-                        Text("ui_profile_value_6".localized)
-                    }
-                    HStack {
-                        Text("ui_profile_instructors".localized)
-                        Spacer()
-                        Text("ui_profile_value_5".localized)
-                    }
-                    HStack {
-                        Text("ui_profile_affiliated_sites".localized)
-                        Spacer()
-                        Text("ui_profile_value".localized)
-                    }
-                }
-                
-                Section("ui_profile_instructors".localized) {
-                    NavigationLink(destination: ManageInstructorsView(center: center)) {
-                        Label("ui_profile_manage_instructors".localized, systemImage: "person.2")
-                    }
-                    if center.instructors.isEmpty {
-                        Text("ui_profile_no_instructors_added_yet".localized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("ui_profile_value_instructor_s_configured".localized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section("ui_affiliated_dive_sites".localized) {
-                    NavigationLink(destination: ManageAffiliatedSitesView(center: center)) {
-                        Label("ui_profile_manage_dive_sites".localized, systemImage: "map")
-                    }
-                    if center.affiliatedSites.isEmpty {
-                        Text("ui_profile_no_dive_sites_added_yet".localized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        Text("ui_profile_value_dive_site_s_configured".localized)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section("ui_management".localized) {
-                    NavigationLink(destination: AdminTabView()) {
-                        Label("ui_profile_admin_dashboard".localized, systemImage: "chart.bar")
-                    }
-                }
-            } else {
-                Text("ui_profile_no_dive_center_associated_with_your_account".localized)
-                    .foregroundColor(.secondary)
-            }
+            DiveCenterAdminListBody(isLoading: isLoading, errorMessage: errorMessage, diveCenter: diveCenter)
         }
         .navigationTitle("ui_profile_dive_center_profile".localized)
         .navigationBarTitleDisplayMode(.inline)
@@ -139,6 +49,114 @@ struct DiveCenterAdminView: View {
     }
 }
 
+/// Shared list body for `DiveCenterAdminView` and `DiveCenterProfileHubView` (center + account on one screen).
+struct DiveCenterAdminListBody: View {
+    var isLoading: Bool
+    var errorMessage: String?
+    var diveCenter: DiveCenter?
+
+    var body: some View {
+        Group {
+            if isLoading {
+                Section {
+                    ProgressView()
+                }
+            } else if let errorMessage = errorMessage {
+                Section {
+                    Text("\("ui_label_error".localized): \(errorMessage)")
+                        .foregroundColor(.red)
+                }
+            } else if let center = diveCenter {
+                Section {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text(center.name)
+                            .font(.title2)
+                            .fontWeight(.bold)
+                        Text("\(center.location.city), \(center.location.country)")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Section("ui_contact_information".localized) {
+                    InfoRow(icon: "phone", text: "\("ui_label_phone".localized): \(center.contactInfo.phone)")
+                    InfoRow(icon: "envelope", text: "\("ui_label_email".localized): \(center.contactInfo.email)")
+                    if let website = center.contactInfo.website {
+                        InfoRow(icon: "globe", text: "\("ui_label_website".localized): \(website)")
+                    }
+                }
+
+                Section("ui_statistics_statistics".localized) {
+                    HStack {
+                        Text("ui_profile_average_rating".localized)
+                        Spacer()
+                        HStack {
+                            Image(systemName: "star.fill")
+                                .foregroundColor(.yellow)
+                            Text(String(format: "%.1f", center.averageRating))
+                        }
+                    }
+                    HStack {
+                        Text("ui_profile_total_reviews".localized)
+                        Spacer()
+                        Text("\(center.reviewCount)")
+                    }
+                    HStack {
+                        Text("ui_profile_instructors".localized)
+                        Spacer()
+                        Text("\(center.instructors.count)")
+                    }
+                    HStack {
+                        Text("ui_profile_affiliated_sites".localized)
+                        Spacer()
+                        Text("\(center.affiliatedSites.count)")
+                    }
+                }
+
+                Section("ui_profile_instructors".localized) {
+                    NavigationLink(destination: ManageInstructorsView(center: center)) {
+                        Label("ui_profile_manage_instructors".localized, systemImage: "person.2")
+                    }
+                    if center.instructors.isEmpty {
+                        Text("ui_profile_no_instructors_added_yet".localized)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(center.instructors.count) \(LocalizationService.shared.localizedString("ui_profile_instructors", table: "ui").lowercased())")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Section("ui_affiliated_dive_sites".localized) {
+                    NavigationLink(destination: ManageAffiliatedSitesView(center: center)) {
+                        Label("ui_profile_manage_dive_sites".localized, systemImage: "map")
+                    }
+                    if center.affiliatedSites.isEmpty {
+                        Text("ui_profile_no_dive_sites_added_yet".localized)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    } else {
+                        Text("\(center.affiliatedSites.count) \(LocalizationService.shared.localizedString("ui_profile_affiliated_sites", table: "ui").lowercased())")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+
+                Section("ui_management".localized) {
+                    NavigationLink(destination: AdminDashboardView(embedNavigationChrome: false)) {
+                        Label("ui_profile_admin_dashboard".localized, systemImage: "chart.bar")
+                    }
+                }
+            } else {
+                Section {
+                    Text("ui_profile_no_dive_center_associated_with_your_account".localized)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+    }
+}
 
 #Preview {
     NavigationView {

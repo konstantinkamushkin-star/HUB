@@ -42,6 +42,7 @@ import com.divehub.app.ui.Routes
 import com.divehub.app.ui.main.SessionViewModel
 import com.divehub.app.ui.navigation.InnerRoutes
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 @Composable
 fun ProfileScreen(
@@ -52,6 +53,7 @@ fun ProfileScreen(
     rootNav: NavController,
     onLoggedOut: () -> Unit,
 ) {
+    val profileEntity = user.toProfileEntity()
     val scope = rememberCoroutineScope()
     val authRepo = remember { AuthRepository(graph) }
     var overrideUrl by remember { mutableStateOf("") }
@@ -79,7 +81,11 @@ fun ProfileScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
         ) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(stringResource(R.string.profile_title), style = MaterialTheme.typography.headlineSmall)
+                val profileTitle = when (profileEntity) {
+                    is ProfileEntity.DiveCenter -> stringResource(R.string.dive_center_admin_title)
+                    is ProfileEntity.Diver -> stringResource(R.string.profile_title)
+                }
+                Text(profileTitle, style = MaterialTheme.typography.headlineSmall)
                 Spacer(modifier = Modifier.height(16.dp))
                 if (user != null) {
                     Text(user.displayName(), style = MaterialTheme.typography.titleMedium)
@@ -108,23 +114,27 @@ fun ProfileScreen(
                 ) {
                     Text(stringResource(R.string.search_screen_title))
                 }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.Subscription) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_subscription))
+                if (profileEntity is ProfileEntity.Diver) {
+                    TextButton(
+                        onClick = { innerNav.navigate(InnerRoutes.Subscription) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.screen_subscription))
+                    }
                 }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.Certifications) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_certifications))
-                }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.GearProfiles) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_gear_profiles))
+                if (profileEntity is ProfileEntity.Diver) {
+                    TextButton(
+                        onClick = { innerNav.navigate(InnerRoutes.Certifications) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.screen_certifications))
+                    }
+                    TextButton(
+                        onClick = { innerNav.navigate(InnerRoutes.GearProfiles) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.screen_gear_profiles))
+                    }
                 }
 
                 TextButton(
@@ -132,6 +142,14 @@ fun ProfileScreen(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.nav_trips))
+                }
+                if (profileEntity is ProfileEntity.Diver) {
+                    TextButton(
+                        onClick = { innerNav.navigate(InnerRoutes.MyBookings) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.screen_my_bookings))
+                    }
                 }
                 TextButton(
                     onClick = { innerNav.navigate(InnerRoutes.Notifications) },
@@ -169,11 +187,13 @@ fun ProfileScreen(
                 ) {
                     Text(stringResource(R.string.screen_statistics))
                 }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.Achievements) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_achievements))
+                if (profileEntity is ProfileEntity.Diver) {
+                    TextButton(
+                        onClick = { innerNav.navigate(InnerRoutes.Achievements) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.screen_achievements))
+                    }
                 }
                 TextButton(
                     onClick = { innerNav.navigate(InnerRoutes.Help) },
@@ -181,8 +201,47 @@ fun ProfileScreen(
                 ) {
                     Text(stringResource(R.string.screen_help))
                 }
+                if (profileEntity is ProfileEntity.Diver) {
+                    TextButton(
+                        onClick = { innerNav.navigate(InnerRoutes.MyDiveSiteContributions) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.screen_my_dive_site_contributions))
+                    }
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
+
+                val roleUpper = profileEntity.user?.role?.trim()?.uppercase(Locale.ROOT).orEmpty()
+                val canOpenPartnerPortal = roleUpper == "DIVE_CENTER_ADMIN" ||
+                    roleUpper == "SUPER_ADMIN" ||
+                    roleUpper == "SHOP_ADMIN" ||
+                    roleUpper == "INSTRUCTOR"
+                val canOpenDiveCenterAdmin = profileEntity is ProfileEntity.DiveCenter &&
+                    !profileEntity.diveCenterId.isNullOrBlank()
+                if (canOpenDiveCenterAdmin) {
+                    OutlinedButton(
+                        onClick = { innerNav.navigate(InnerRoutes.DiveCenterAdminProfile) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.profile_open_dive_center_admin))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                if (canOpenPartnerPortal) {
+                    OutlinedButton(
+                        onClick = {
+                            sessionVm.setPreferDiverShell(false)
+                            innerNav.navigate(InnerRoutes.Home) {
+                                launchSingleTop = true
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.profile_open_partner_portal))
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
 
                 OutlinedButton(
                     onClick = { rootNav.navigate(Routes.ChangePassword) },
@@ -228,7 +287,7 @@ fun ProfileScreen(
                         value = overrideUrl,
                         onValueChange = { overrideUrl = it },
                         label = { Text(stringResource(R.string.profile_debug_url_label)) },
-                        placeholder = { Text("http://192.168.1.10:3000") },
+                        placeholder = { Text(stringResource(R.string.settings_debug_api_placeholder)) },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                     )

@@ -24,7 +24,8 @@ struct LoginView: View {
             // Logo/Header
             VStack(spacing: 8) {
                 DiveHubLogoMark(color: .divePrimary)
-                    .frame(width: 92, height: 74)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(width: 92, height: 92)
                 Text(localizationService.localizedString("appName"))
                     .font(.largeTitle)
                     .fontWeight(.bold)

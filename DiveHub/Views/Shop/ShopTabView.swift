@@ -66,25 +66,25 @@ struct ShopDashboardView: View {
                     // Stats Cards
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                         ShopStatCard(
-                            title: "Total Orders",
+                            title: "ui_shop_total_orders".localized,
                             value: "\(viewModel.stats.totalOrders)",
                             icon: "cart",
                             color: .blue
                         )
                         ShopStatCard(
-                            title: "Pending Orders",
+                            title: "ui_shop_pending_orders".localized,
                             value: "\(viewModel.stats.pendingOrders)",
                             icon: "clock",
                             color: .orange
                         )
                         ShopStatCard(
-                            title: "Today's Revenue",
+                            title: "ui_shop_today_revenue".localized,
                             value: String(format: "$%.0f", viewModel.stats.todayRevenue),
                             icon: "dollarsign.circle",
                             color: .green
                         )
                         ShopStatCard(
-                            title: "Total Products",
+                            title: "ui_shop_total_products".localized,
                             value: "\(viewModel.stats.totalProducts)",
                             icon: "cube.box",
                             color: .purple
@@ -98,22 +98,22 @@ struct ShopDashboardView: View {
                         .padding(.horizontal)) {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
                             QuickActionButton(
-                                title: "My Shop",
+                                title: "ui_shop_my_shop".localized,
                                 icon: "storefront",
                                 destination: AnyView(ShopsManagementView())
                             )
                             QuickActionButton(
-                                title: "Products",
+                                title: "ui_shop_products".localized,
                                 icon: "cube.box",
                                 destination: AnyView(ShopProductsView())
                             )
                             QuickActionButton(
-                                title: "Orders",
+                                title: "ui_shop_orders".localized,
                                 icon: "cart",
                                 destination: AnyView(ShopOrdersView())
                             )
                             QuickActionButton(
-                                title: "Analytics",
+                                title: "ui_shop_analytics".localized,
                                 icon: "chart.bar",
                                 destination: AnyView(ShopAnalyticsView())
                             )
@@ -156,6 +156,32 @@ struct ShopStatCard: View {
         .padding()
         .background(Color(.systemGray6))
         .cornerRadius(12)
+    }
+}
+
+struct QuickActionButton: View {
+    let title: String
+    let icon: String
+    let destination: AnyView
+    
+    var body: some View {
+        NavigationLink(destination: destination) {
+            VStack(spacing: 8) {
+                Image(systemName: icon)
+                    .font(.title2)
+                    .foregroundColor(.divePrimary)
+                
+                Text(title)
+                    .font(.subheadline)
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.center)
+            }
+            .frame(maxWidth: .infinity, minHeight: 90)
+            .padding(.horizontal, 8)
+            .background(Color(.systemGray6))
+            .cornerRadius(12)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -287,14 +313,15 @@ struct ShopOrdersView: View {
 
 struct OrderRowView: View {
     let order: ShopOrder
+    @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Text("ui_shop_order_value".localized)
+                Text("\(localizationService.localizedString("ui_shop_order_prefix", table: "ui"))\(order.id.prefix(8))")
                     .font(.headline)
                 Spacer()
-                Text(order.status.rawValue.capitalized)
+                Text(localizedOrderStatus(order.status))
                     .font(.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
@@ -308,6 +335,21 @@ struct OrderRowView: View {
                 .font(.headline)
         }
         .padding(.vertical, 4)
+    }
+
+    private func localizedOrderStatus(_ status: ShopOrder.OrderStatus) -> String {
+        switch status {
+        case .pending:
+            return localizationService.localizedString("ui_shop_order_status_pending", table: "ui")
+        case .processing:
+            return localizationService.localizedString("ui_shop_order_status_processing", table: "ui")
+        case .shipped:
+            return localizationService.localizedString("ui_shop_order_status_shipped", table: "ui")
+        case .delivered:
+            return localizationService.localizedString("ui_shop_order_status_delivered", table: "ui")
+        case .cancelled:
+            return localizationService.localizedString("ui_shop_order_status_cancelled", table: "ui")
+        }
     }
 }
 

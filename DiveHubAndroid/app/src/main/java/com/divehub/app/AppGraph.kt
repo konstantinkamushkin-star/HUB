@@ -6,6 +6,7 @@ import com.divehub.app.data.remote.ApiClientFactory
 import com.divehub.app.data.remote.AdminDashboardApi
 import com.divehub.app.data.remote.AuthApi
 import com.divehub.app.data.remote.BookingApi
+import com.divehub.app.data.remote.CenterServicesApi
 import com.divehub.app.data.remote.ChatApi
 import com.divehub.app.data.remote.CoursesApi
 import com.divehub.app.data.remote.DiveLogsApi
@@ -17,6 +18,7 @@ import com.divehub.app.data.remote.PartnerRegistrationApi
 import com.divehub.app.data.remote.ReviewsApi
 import com.divehub.app.data.remote.ShopsApi
 import com.divehub.app.data.remote.SocialApi
+import com.divehub.app.data.remote.SupportApi
 import com.divehub.app.data.remote.TripsApi
 import com.divehub.app.data.remote.UsersApi
 import com.google.gson.Gson
@@ -66,6 +68,14 @@ class AppGraph(application: Application) {
 
     suspend fun chatApi(): ChatApi {
         return api(ChatApi::class.java)
+    }
+
+    suspend fun supportApi(): SupportApi {
+        return api(SupportApi::class.java)
+    }
+
+    suspend fun centerServicesApi(): CenterServicesApi {
+        return api(CenterServicesApi::class.java)
     }
 
     suspend fun reviewsApi(): ReviewsApi {

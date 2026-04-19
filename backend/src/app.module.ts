@@ -33,6 +33,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { CenterServicesModule } from './center-services/center-services.module';
 import { TranslateModule } from './translate/translate.module';
+import { SupportModule } from './support/support.module';
 
 @Module({
   controllers: [AppController, LegalPagesController, LocalizationController],
@@ -139,6 +140,7 @@ import { TranslateModule } from './translate/translate.module';
     BookingsModule,
     CenterServicesModule,
     TranslateModule,
+    SupportModule,
   ],
   providers: [
     {

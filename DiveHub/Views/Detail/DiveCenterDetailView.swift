@@ -10,7 +10,6 @@ import SwiftUI
 struct DiveCenterDetailView: View {
     let center: DiveCenter
     var onShowOnMap: (() -> Void)? = nil
-    @State private var showBooking = false
     @State private var showMessage = false
     
     var body: some View {
@@ -58,6 +57,8 @@ struct DiveCenterDetailView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+
+                    DiveCenterPromoCard()
                     
                     Divider()
                     
@@ -123,14 +124,7 @@ struct DiveCenterDetailView: View {
                 Button(action: { showMessage = true }) {
                     Image(systemName: "message.fill")
                 }
-                Button(action: { showBooking = true }) {
-                    Text(LocalizationService.shared.localizedString("book"))
-                        .fontWeight(.semibold)
-                }
             }
-        }
-        .sheet(isPresented: $showBooking) {
-            BookingWizardView(diveCenterId: center.id)
         }
         .sheet(isPresented: $showMessage) {
             NavigationStack {

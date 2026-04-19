@@ -237,6 +237,12 @@ class SettingsService: ObservableObject {
 
 extension Notification.Name {
     static let measurementUnitsChanged = Notification.Name("measurementUnitsChanged")
+    /// Switch main tab to Explore (posted from Feed recommendations, etc.).
+    static let diveHubNavigateToExploreDiveSitesMap = Notification.Name("diveHubNavigateToExploreDiveSitesMap")
+    /// Apply map mode + dive sites after Explore tab is visible (posted from DiverTabView).
+    static let diveHubExploreApplyDiveSitesMap = Notification.Name("diveHubExploreApplyDiveSitesMap")
+    /// Switch main tab to Social (Feed friend recommendation).
+    static let diveHubNavigateToSocial = Notification.Name("diveHubNavigateToSocial")
 }
 
 struct NotificationSettings: Codable {

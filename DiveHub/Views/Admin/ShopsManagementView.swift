@@ -28,7 +28,7 @@ struct ShopsManagementView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
+            VStack(spacing: 0) {
                 if viewModel.isLoading {
                     ProgressView()
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -61,10 +61,12 @@ struct ShopsManagementView: View {
                 }
             }
             .navigationTitle("ui_admin_shops_management".localized)
+            .diveHubNavigationChrome()
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button(action: { showingAddShop = true }) {
-                        Image(systemName: "plus")
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
                     }
                 }
             }

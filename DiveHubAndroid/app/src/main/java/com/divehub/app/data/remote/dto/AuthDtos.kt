@@ -21,6 +21,27 @@ data class RefreshRequest(
     @SerializedName("refreshToken") val refreshToken: String,
 )
 
+/** `POST auth/apple` — matches `AppleAuthDto` on the backend. */
+data class AppleAuthRequest(
+    @SerializedName("idToken") val idToken: String,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("firstName") val firstName: String? = null,
+    @SerializedName("lastName") val lastName: String? = null,
+    @SerializedName("personalDataConsent") val personalDataConsent: Boolean,
+    @SerializedName("personalDataConsentText") val personalDataConsentText: String,
+)
+
+/** `POST auth/google` — matches `GoogleAuthDto` on the backend. */
+data class GoogleAuthRequest(
+    @SerializedName("idToken") val idToken: String,
+    @SerializedName("accessToken") val accessToken: String? = null,
+    @SerializedName("email") val email: String? = null,
+    @SerializedName("firstName") val firstName: String? = null,
+    @SerializedName("lastName") val lastName: String? = null,
+    @SerializedName("personalDataConsent") val personalDataConsent: Boolean,
+    @SerializedName("personalDataConsentText") val personalDataConsentText: String,
+)
+
 data class AuthSessionResponse(
     @SerializedName("accessToken") val accessToken: String,
     @SerializedName("refreshToken") val refreshToken: String,

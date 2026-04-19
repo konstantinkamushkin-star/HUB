@@ -150,7 +150,9 @@ class FeedViewModel: ObservableObject {
             type: .location,
             title: loc.localizedString("recNearbyTitle", table: "feed"),
             description: loc.localizedString("recNearbySubtitle", table: "feed"),
-            action: {}
+            action: {
+                NotificationCenter.default.post(name: .diveHubNavigateToExploreDiveSitesMap, object: nil)
+            }
         ))
         
         // Example: Friend recommendations
@@ -160,7 +162,9 @@ class FeedViewModel: ObservableObject {
             type: .friend,
             title: loc.localizedString("recDiversTitle", table: "feed"),
             description: loc.localizedString("recDiversSubtitle", table: "feed"),
-            action: {}
+            action: {
+                NotificationCenter.default.post(name: .diveHubNavigateToSocial, object: nil)
+            }
         ))
         
         recommendations = recs

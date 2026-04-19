@@ -1,6 +1,7 @@
 package com.divehub.app.ui.admin
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -55,6 +57,7 @@ import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.AdminGearRepository
+import com.divehub.app.data.AuthRepository
 import com.divehub.app.data.remote.dto.AdminGearItemLocal
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -73,6 +76,7 @@ data class AdminGearUiState(
 
 class AdminGearViewModel(
     private val repo: AdminGearRepository,
+    private val auth: AuthRepository,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AdminGearUiState())
     val state: StateFlow<AdminGearUiState> = _state.asStateFlow()
@@ -85,7 +89,10 @@ class AdminGearViewModel(
         viewModelScope.launch {
             val prev = _state.value
             _state.value = prev.copy(loading = true, error = null)
-            runCatching { repo.loadAll() }
+            val centerId = auth.cachedUser()?.diveCenterId?.trim().orEmpty()
+            runCatching {
+                if (centerId.isNotBlank()) repo.syncFromRemoteOrCache(centerId) else repo.loadAll()
+            }
                 .onSuccess { list ->
                     _state.value = _state.value.copy(loading = false, error = null, items = list)
                 }
@@ -97,10 +104,19 @@ class AdminGearViewModel(
 
     fun setStatus(itemId: String, status: String) {
         viewModelScope.launch {
-            _state.update { st ->
-                st.copy(items = st.items.map { if (it.id == itemId) it.copy(status = status) else it })
+            val centerId = auth.cachedUser()?.diveCenterId?.trim().orEmpty()
+            if (centerId.isNotBlank()) {
+                runCatching { repo.patchStatusRemote(itemId, status, centerId) }
+                    .onSuccess { refresh() }
+                    .onFailure { e ->
+                        _state.update { it.copy(error = e.message ?: "Error") }
+                    }
+            } else {
+                _state.update { st ->
+                    st.copy(items = st.items.map { if (it.id == itemId) it.copy(status = status) else it })
+                }
+                repo.saveAll(_state.value.items)
             }
-            repo.saveAll(_state.value.items)
         }
     }
 
@@ -108,15 +124,25 @@ class AdminGearViewModel(
         val cleanName = name.trim()
         if (cleanName.isEmpty()) return
         viewModelScope.launch {
-            val item = AdminGearItemLocal(
-                id = UUID.randomUUID().toString(),
-                name = cleanName,
-                category = category.trim().ifBlank { "other" },
-                manufacturer = manufacturer?.trim()?.takeIf { it.isNotEmpty() },
-                status = "available",
-            )
-            _state.update { st -> st.copy(items = listOf(item) + st.items) }
-            repo.saveAll(_state.value.items)
+            val centerId = auth.cachedUser()?.diveCenterId?.trim().orEmpty()
+            if (centerId.isNotBlank()) {
+                runCatching {
+                    repo.createRemote(centerId, cleanName, category, manufacturer)
+                }.onSuccess { refresh() }
+                    .onFailure { e ->
+                        _state.update { it.copy(error = e.message ?: "Error") }
+                    }
+            } else {
+                val item = AdminGearItemLocal(
+                    id = UUID.randomUUID().toString(),
+                    name = cleanName,
+                    category = category.trim().ifBlank { "other" },
+                    manufacturer = manufacturer?.trim()?.takeIf { it.isNotEmpty() },
+                    status = "available",
+                )
+                _state.update { st -> st.copy(items = listOf(item) + st.items) }
+                repo.saveAll(_state.value.items)
+            }
         }
     }
 
@@ -124,7 +150,7 @@ class AdminGearViewModel(
         fun factory(graph: AppGraph) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                return AdminGearViewModel(AdminGearRepository(graph)) as T
+                return AdminGearViewModel(AdminGearRepository(graph), AuthRepository(graph)) as T
             }
         }
     }
@@ -136,11 +162,26 @@ fun AdminGearManagementRoute(graph: AppGraph, innerNav: NavController) {
     val vm: AdminGearViewModel = viewModel(factory = AdminGearViewModel.factory(graph))
     val state by vm.state.collectAsState()
     var statusFilter by remember { mutableStateOf(STATUS_ALL) }
+    var searchQuery by remember { mutableStateOf("") }
     var showAddSheet by remember { mutableStateOf(false) }
 
-    val visible = remember(state.items, statusFilter) {
-        if (statusFilter == STATUS_ALL) state.items else state.items.filter { it.status == statusFilter }
+    val visible = remember(state.items, statusFilter, searchQuery) {
+        val q = searchQuery.trim().lowercase()
+        state.items.filter { item ->
+            val passStatus = statusFilter == STATUS_ALL || item.status == statusFilter
+            val passSearch = q.isBlank() || listOf(
+                item.name,
+                item.category,
+                item.manufacturer.orEmpty(),
+                item.id,
+            ).joinToString(" ").lowercase().contains(q)
+            passStatus && passSearch
+        }
     }
+    val kpiAvailable = visible.count { it.status == "available" }
+    val kpiIssued = visible.count { it.status == "issued" }
+    val kpiMaintenance = visible.count { it.status == "maintenance" }
+    val kpiScrapped = visible.count { it.status == "scrapped" }
 
     Scaffold(
         topBar = {
@@ -153,7 +194,7 @@ fun AdminGearManagementRoute(graph: AppGraph, innerNav: NavController) {
                 },
                 actions = {
                     IconButton(onClick = { vm.refresh() }, enabled = !state.loading) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.common_refresh_list))
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.common_refresh))
                     }
                     IconButton(onClick = { showAddSheet = true }) {
                         Icon(Icons.Default.Add, contentDescription = stringResource(R.string.admin_gear_add))
@@ -188,12 +229,44 @@ fun AdminGearManagementRoute(graph: AppGraph, innerNav: NavController) {
                 ) {
                     item {
                         Text(
+                            stringResource(R.string.admin_gear_local_only_subtitle),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(bottom = 10.dp),
+                        )
+                        OutlinedTextField(
+                            value = searchQuery,
+                            onValueChange = { searchQuery = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.admin_gear_search_label)) },
+                            singleLine = true,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(
+                                R.string.admin_gear_kpi_line,
+                                visible.size,
+                                kpiAvailable,
+                                kpiIssued,
+                                kpiMaintenance,
+                                kpiScrapped,
+                            ),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        Text(
                             stringResource(R.string.admin_gear_filter_status),
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.SemiBold,
                         )
                         Spacer(Modifier.height(8.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
                             listOf(STATUS_ALL, "available", "issued", "maintenance", "scrapped").forEach { key ->
                                 FilterChip(
                                     selected = statusFilter == key,

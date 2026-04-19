@@ -24,6 +24,7 @@ struct ExploreTabView: View {
     @State private var selectedCenter: DiveCenter?
     @State private var showOnMapSite: DiveSite?
     @State private var showOnMapCenter: DiveCenter?
+    @State private var showSuggestNewDiveSite = false
     
     var body: some View {
         NavigationView {
@@ -40,6 +41,9 @@ struct ExploreTabView: View {
                 }
                 .sheet(item: $selectedCenter) { center in
                     centerDetailSheet(center: center)
+                }
+                .sheet(isPresented: $showSuggestNewDiveSite) {
+                    DiveSiteContributionSheet(mode: .newSite)
                 }
                 .onChange(of: showOnMapSite) { oldValue, site in
                     handleShowOnMapSite(site)
@@ -132,6 +136,14 @@ struct ExploreTabView: View {
         ToolbarItem(placement: .navigationBarLeading) {
             NavigationLink(destination: SearchView()) {
                 Image(systemName: "magnifyingglass")
+            }
+        }
+        ToolbarItem(placement: .navigationBarTrailing) {
+            if AuthenticationService.shared.isAuthenticated {
+                Button(action: { showSuggestNewDiveSite = true }) {
+                    Image(systemName: "plus.rectangle.on.folder")
+                }
+                .accessibilityLabel(localizationService.localizedString("suggestNewDiveSite", table: "diveSite"))
             }
         }
         ToolbarItem(placement: .navigationBarTrailing) {
@@ -247,6 +259,15 @@ struct ExploreTabView: View {
                     }
                 }
             )
+            .onChange(of: mapViewModel.region.center.latitude) { _, _ in
+                if viewMode == .map { mapViewModel.scheduleBoundsReload() }
+            }
+            .onChange(of: mapViewModel.region.center.longitude) { _, _ in
+                if viewMode == .map { mapViewModel.scheduleBoundsReload() }
+            }
+            .onChange(of: mapViewModel.region.zoom) { _, _ in
+                if viewMode == .map { mapViewModel.scheduleBoundsReload() }
+            }
             .ignoresSafeArea()
             
             VStack {
@@ -301,14 +322,14 @@ struct DiveSiteRow: View {
                 HStack {
                     Label(String(format: "%.1f", site.averageRating), systemImage: "star.fill")
                         .font(.caption)
-                    Text("ui_explore_value_6".localized)
+                    Text("(\(site.reviewCount))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
             }
             Spacer()
             VStack(alignment: .trailing) {
-                Text("ui_explore_value_m".localized)
+                Text("\(Int(site.maxDepth))m")
                     .font(.headline)
                 Text(site.difficulty.displayName)
                     .font(.caption)
@@ -333,7 +354,7 @@ struct DiveCenterRow: View {
                 HStack {
                     Label(String(format: "%.1f", center.averageRating), systemImage: "star.fill")
                         .font(.caption)
-                    Text("ui_explore_value".localized)
+                    Text("(\(center.reviewCount))")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }

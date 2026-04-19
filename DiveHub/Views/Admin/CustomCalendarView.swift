@@ -10,16 +10,11 @@ import SwiftUI
 struct CustomCalendarView: View {
     @Binding var selectedDate: Date
     let bookings: [Booking]
+    @StateObject private var localizationService = LocalizationService.shared
     
     @State private var currentMonth: Date = Date()
     
     private let calendar = Calendar.current
-    private let dateFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMMM yyyy"
-        return formatter
-    }()
-
     var body: some View {
         VStack(spacing: 16) {
             // Month Navigation
@@ -31,7 +26,7 @@ struct CustomCalendarView: View {
                 
                 Spacer()
                 
-                Text(dateFormatter.string(from: currentMonth))
+                Text(monthTitle)
                     .font(.headline)
                     .fontWeight(.semibold)
                 
@@ -79,19 +74,35 @@ struct CustomCalendarView: View {
             
             // Legend
             HStack(spacing: 16) {
-                LegendItem(color: .orange, label: "Pending")
-                LegendItem(color: .blue, label: "Confirmed")
-                LegendItem(color: .green, label: "Completed")
-                LegendItem(color: .red, label: "Cancelled")
+                LegendItem(color: .orange, label: localizationService.localizedString("bookingStatusPending", table: "admin"))
+                LegendItem(color: .blue, label: localizationService.localizedString("bookingStatusConfirmed", table: "admin"))
+                LegendItem(color: .green, label: localizationService.localizedString("bookingStatusCompleted", table: "admin"))
+                LegendItem(color: .red, label: localizationService.localizedString("bookingStatusCancelled", table: "admin"))
             }
             .font(.caption)
             .padding(.horizontal)
         }
     }
+
+    private var monthTitle: String {
+        let formatter = DateFormatter()
+        formatter.locale = localeForLanguage
+        formatter.setLocalizedDateFormatFromTemplate("LLLL yyyy")
+        return formatter.string(from: currentMonth)
+    }
+
+    private var localeForLanguage: Locale {
+        switch localizationService.currentLanguage {
+        case .chinese:
+            return Locale(identifier: "zh_Hans")
+        default:
+            return Locale(identifier: localizationService.currentLanguage.rawValue)
+        }
+    }
     
     private var weekdaySymbols: [String] {
         let formatter = DateFormatter()
-        formatter.locale = Locale.current
+        formatter.locale = localeForLanguage
         return formatter.shortWeekdaySymbols
     }
     

@@ -65,6 +65,7 @@ import java.text.NumberFormat
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import java.util.Currency
 import java.util.Locale
 
 private val ScreenBg = Color(0xFFF2F2F7)
@@ -192,7 +193,69 @@ fun BookingWizardRoute(
                 innerNav.popBackStack()
             },
             title = { Text(stringResource(R.string.booking_confirmed_title)) },
-            text = { Text(stringResource(R.string.booking_confirmed_body)) },
+            text = {
+                val summary = state.confirmationSummary
+                Column(
+                    Modifier
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text(
+                        stringResource(R.string.booking_confirmed_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    if (summary != null) {
+                        val paymentLabel = stringResource(
+                            when (summary.paymentMethod) {
+                                "on_site" -> R.string.booking_pay_onsite
+                                "google_pay" -> R.string.booking_pay_google
+                                else -> R.string.booking_pay_online
+                            },
+                        )
+                        HorizontalDivider()
+                        Text(
+                            stringResource(R.string.booking_confirmed_booking_id, summary.bookingId),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            stringResource(R.string.booking_confirmed_center, summary.centerName),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            stringResource(R.string.booking_confirmed_service, summary.serviceName),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            stringResource(R.string.booking_confirmed_when, summary.date, summary.time),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            stringResource(R.string.booking_confirmed_payment, paymentLabel),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        Text(
+                            stringResource(R.string.booking_confirmed_participants, summary.participantCount),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        summary.gearSummary?.let { gear ->
+                            Text(
+                                stringResource(R.string.booking_confirmed_gear, gear),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        summary.notes?.let { n ->
+                            Text(
+                                stringResource(R.string.booking_confirmed_notes, n),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -258,20 +321,50 @@ private fun StepSelectService(state: BookingWizardUiState, vm: BookingWizardView
             modifier = Modifier.padding(bottom = 8.dp),
         )
     }
-    state.services.forEach { s ->
-        val priceLine =
-            if (s.priceUsd <= 0.0 && s.durationMin <= 0) {
-                stringResource(R.string.booking_price_on_request)
-            } else {
-                "$${"%.0f".format(s.priceUsd)} · ${s.durationMin} min"
+    when {
+        state.servicesLoading -> {
+            LinearProgressIndicator(Modifier.fillMaxWidth().padding(vertical = 8.dp))
+            Text(
+                stringResource(R.string.booking_services_loading),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        state.servicesError != null -> {
+            Text(
+                state.servicesError ?: "",
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedButton(onClick = { vm.retryLoadServices() }, modifier = Modifier.padding(top = 8.dp)) {
+                Text(stringResource(R.string.common_retry))
             }
-        val subtitle = listOfNotNull(s.subtitleExtra?.takeIf { it.isNotBlank() }, priceLine).joinToString(" · ")
-        SelectableCard(
-            title = s.name,
-            subtitle = subtitle,
-            selected = state.selectedServiceId == s.id,
-            onClick = { vm.selectService(s.id) },
-        )
+        }
+        state.services.isEmpty() -> {
+            Text(
+                stringResource(R.string.booking_no_services_for_center),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        else -> {
+            state.services.forEach { s ->
+                val priceLine = when {
+                    s.priceAmount <= 0.0 && s.durationMin <= 0 ->
+                        stringResource(R.string.booking_price_on_request)
+                    s.durationMin > 0 ->
+                        "${formatMoney(s.priceAmount, s.currency)} · ${s.durationMin} min"
+                    else -> formatMoney(s.priceAmount, s.currency)
+                }
+                val subtitle = listOfNotNull(s.subtitleExtra?.takeIf { it.isNotBlank() }, priceLine).joinToString(" · ")
+                SelectableCard(
+                    title = s.name,
+                    subtitle = subtitle,
+                    selected = state.selectedServiceId == s.id,
+                    onClick = { vm.selectService(s.id) },
+                )
+            }
+        }
     }
 }
 
@@ -334,6 +427,14 @@ private fun StepDiveSite(state: BookingWizardUiState, vm: BookingWizardViewModel
 @Composable
 private fun StepGear(state: BookingWizardUiState, vm: BookingWizardViewModel) {
     Text(stringResource(R.string.booking_step_gear), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    if (state.gearCatalog.isEmpty()) {
+        Text(
+            stringResource(R.string.booking_gear_none_available),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        return
+    }
     state.gearCatalog.forEach { g ->
         Row(
             Modifier.fillMaxWidth(),
@@ -403,33 +504,42 @@ private fun StepPayment(state: BookingWizardUiState, vm: BookingWizardViewModel)
     Text(stringResource(R.string.booking_step_payment), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     Row(verticalAlignment = Alignment.CenterVertically) {
         RadioButton(
-            selected = state.paymentOnline,
-            onClick = { vm.setPaymentOnline(true) },
+            selected = state.paymentMethod == "online",
+            onClick = { vm.setPaymentMethod("online") },
             colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary),
         )
         Text(stringResource(R.string.booking_pay_online), modifier = Modifier.padding(start = 8.dp))
     }
     Row(verticalAlignment = Alignment.CenterVertically) {
         RadioButton(
-            selected = !state.paymentOnline,
-            onClick = { vm.setPaymentOnline(false) },
+            selected = state.paymentMethod == "on_site",
+            onClick = { vm.setPaymentMethod("on_site") },
             colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary),
         )
         Text(stringResource(R.string.booking_pay_onsite), modifier = Modifier.padding(start = 8.dp))
     }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        RadioButton(
+            selected = state.paymentMethod == "google_pay",
+            onClick = { vm.setPaymentMethod("google_pay") },
+            colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary),
+        )
+        Text(stringResource(R.string.booking_pay_google), modifier = Modifier.padding(start = 8.dp))
+    }
     Spacer(Modifier.height(16.dp))
     Text(stringResource(R.string.booking_summary), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     val service = state.services.find { it.id == state.selectedServiceId }
+    val payCurrency = service?.currency?.trim()?.takeIf { it.isNotEmpty() } ?: "USD"
     val gearTotal = state.gearCatalog.filter { state.selectedGearIds.contains(it.id) }.sumOf { it.price }
     val serviceRight = when {
         service == null -> "—"
-        service.priceUsd <= 0.0 && service.durationMin <= 0 -> stringResource(R.string.booking_price_on_request)
-        else -> formatUsd(service.priceUsd)
+        service.priceAmount <= 0.0 && service.durationMin <= 0 -> stringResource(R.string.booking_price_on_request)
+        else -> formatMoney(service.priceAmount, service.currency)
     }
     val serviceAmountNumeric = when {
         service == null -> 0.0
-        service.priceUsd <= 0.0 && service.durationMin <= 0 -> 0.0
-        else -> service.priceUsd
+        service.priceAmount <= 0.0 && service.durationMin <= 0 -> 0.0
+        else -> service.priceAmount
     }
     val totalNumeric = serviceAmountNumeric + gearTotal
     BookingSummaryRow(
@@ -438,12 +548,12 @@ private fun StepPayment(state: BookingWizardUiState, vm: BookingWizardViewModel)
     )
     BookingSummaryRow(
         label = stringResource(R.string.booking_summary_line_gear),
-        value = formatUsd(gearTotal),
+        value = formatMoney(gearTotal, payCurrency),
     )
     HorizontalDivider(Modifier.padding(vertical = 8.dp))
     BookingSummaryTotalRow(
         label = stringResource(R.string.booking_summary_line_total),
-        value = formatUsd(totalNumeric),
+        value = formatMoney(totalNumeric, payCurrency),
     )
     Spacer(Modifier.height(16.dp))
     Text(stringResource(R.string.booking_notes_label), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
@@ -504,8 +614,12 @@ private fun BookingSummaryTotalRow(label: String, value: String) {
     }
 }
 
-private fun formatUsd(amount: Double): String =
-    NumberFormat.getCurrencyInstance(Locale.US).format(amount)
+private fun formatMoney(amount: Double, currencyCode: String): String =
+    runCatching {
+        NumberFormat.getCurrencyInstance(Locale.getDefault()).apply {
+            currency = Currency.getInstance(currencyCode.uppercase(Locale.ROOT))
+        }.format(amount)
+    }.getOrElse { "${currencyCode.uppercase(Locale.ROOT)} ${"%.2f".format(amount)}" }
 
 @Composable
 private fun SelectableCard(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {

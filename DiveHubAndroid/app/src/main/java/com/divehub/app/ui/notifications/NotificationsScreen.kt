@@ -53,7 +53,6 @@ import com.divehub.app.data.remote.dto.AppNotificationDto
 fun NotificationsRoute(graph: AppGraph, innerNav: NavController) {
     val vm: NotificationsViewModel = viewModel(factory = NotificationsViewModel.factory(graph))
     val state by vm.state.collectAsState()
-    val context = LocalContext.current
 
     Scaffold(
         topBar = {
@@ -84,61 +83,127 @@ fun NotificationsRoute(graph: AppGraph, innerNav: NavController) {
             )
         },
     ) { padding ->
-        when {
-            state.loading && state.notifications.isEmpty() -> Box(
-                Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
+        val context = LocalContext.current
+        NotificationsTabPanel(
+            state = state,
+            onRefresh = { vm.refresh() },
+            onDelete = { vm.delete(it) },
+            openActionUrl = { url -> context.handleAppActionUrl(url) },
+            modifier = Modifier.fillMaxSize().padding(padding),
+        )
+    }
+}
+
+/**
+ * Inbox list for embedding under the Chat tab (segment «Push / notifications»).
+ */
+@Composable
+fun NotificationsTabEmbed(graph: AppGraph, modifier: Modifier = Modifier) {
+    val vm: NotificationsViewModel = viewModel(factory = NotificationsViewModel.factory(graph))
+    val state by vm.state.collectAsState()
+    val context = LocalContext.current
+
+    Column(modifier = modifier.fillMaxSize()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.End,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(
+                onClick = { vm.refresh() },
+                enabled = !state.loading,
             ) {
-                CircularProgressIndicator()
-            }
-            state.error != null && state.notifications.isEmpty() && !state.loading -> Column(
-                Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(state.error ?: stringResource(R.string.common_error))
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = { vm.refresh() }) {
-                    Text(stringResource(R.string.common_retry))
-                }
-            }
-            state.notifications.isEmpty() -> Box(
-                Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    stringResource(R.string.notifications_empty),
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Icon(
+                    Icons.Default.Refresh,
+                    contentDescription = stringResource(R.string.common_refresh_list),
                 )
             }
-            else -> PullToRefreshBox(
-                isRefreshing = state.loading && state.notifications.isNotEmpty(),
-                onRefresh = { vm.refresh() },
-                modifier = Modifier.fillMaxSize().padding(padding),
+            TextButton(
+                onClick = { vm.markAllRead() },
+                enabled = state.notifications.any { !it.isRead },
             ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    if (state.error != null) {
-                        item {
-                            Text(
-                                state.error ?: "",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(bottom = 8.dp),
-                            )
-                        }
-                    }
-                    items(state.notifications, key = { it.id }) { n ->
-                        NotificationRow(
-                            notification = n,
-                            onDelete = { vm.delete(n.id) },
-                            onOpenAction = { context.handleAppActionUrl(n.actionUrl) },
+                Text(stringResource(R.string.notifications_mark_all_read))
+            }
+        }
+        NotificationsTabPanel(
+            state = state,
+            onRefresh = { vm.refresh() },
+            onDelete = { vm.delete(it) },
+            openActionUrl = { url -> context.handleAppActionUrl(url) },
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NotificationsTabPanel(
+    state: NotificationsUiState,
+    onRefresh: () -> Unit,
+    onDelete: (String) -> Unit,
+    openActionUrl: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    when {
+        state.loading && state.notifications.isEmpty() -> Box(
+            modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
+        state.error != null && state.notifications.isEmpty() && !state.loading -> Column(
+            modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(state.error ?: stringResource(R.string.common_error))
+            Spacer(Modifier.height(12.dp))
+            TextButton(onClick = onRefresh) {
+                Text(stringResource(R.string.common_retry))
+            }
+        }
+        state.notifications.isEmpty() -> Box(
+            modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                stringResource(R.string.notifications_empty),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        else -> PullToRefreshBox(
+            isRefreshing = state.loading && state.notifications.isNotEmpty(),
+            onRefresh = onRefresh,
+            modifier = modifier.fillMaxSize(),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                if (state.error != null) {
+                    item {
+                        Text(
+                            state.error ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(bottom = 8.dp),
                         )
                     }
+                }
+                items(state.notifications, key = { it.id }) { n ->
+                    NotificationRow(
+                        notification = n,
+                        onDelete = { onDelete(n.id) },
+                        onOpenAction = { openActionUrl(n.actionUrl) },
+                    )
                 }
             }
         }

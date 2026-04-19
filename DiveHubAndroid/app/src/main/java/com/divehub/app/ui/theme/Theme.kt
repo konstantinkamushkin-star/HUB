@@ -3,6 +3,7 @@ package com.divehub.app.ui.theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
+import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -23,6 +24,20 @@ private val LightColors = lightColorScheme(
     surface = Color.White,
     surfaceVariant = Color(0xFFF2F2F7),
     outline = Color(0xFFD1D1D6),
+)
+
+private val DarkColors = darkColorScheme(
+    primary = Color(0xFF4FC3F7),
+    onPrimary = Color(0xFF001018),
+    secondary = Color(0xFF26C6DA),
+    tertiary = Color(0xFFFFB74D),
+    background = Color(0xFF121212),
+    onBackground = Color(0xFFE8E8E8),
+    surface = Color(0xFF1E1E1E),
+    onSurface = Color(0xFFE8E8E8),
+    surfaceVariant = Color(0xFF2C2C2C),
+    onSurfaceVariant = Color(0xFFCACACA),
+    outline = Color(0xFF555555),
 )
 
 private val DiveTypography = Typography(
@@ -103,9 +118,12 @@ private val DiveShapes = Shapes(
 )
 
 @Composable
-fun DiveHubTheme(content: @Composable () -> Unit) {
+fun DiveHubTheme(
+    darkTheme: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     MaterialTheme(
-        colorScheme = LightColors,
+        colorScheme = if (darkTheme) DarkColors else LightColors,
         typography = DiveTypography,
         shapes = DiveShapes,
         content = content,

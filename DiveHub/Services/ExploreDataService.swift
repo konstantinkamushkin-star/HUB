@@ -13,133 +13,23 @@ actor ExploreDataService {
     
     private init() {}
     
-    func getDiveSites(filters: DiveSiteFilters, searchQuery: String = "", page: Int = 1, userLocation: CLLocation? = nil) async throws -> [DiveSite] {
-        var allSites: [DiveSite] = []
-        
-        // Use geo search if location is available and geo search is enabled
-        // If maxDistance is nil, it means user wants global search (all countries)
-        if filters.shouldUseGeoSearch,
-           let lat = filters.centerLatitude,
-           let lng = filters.centerLongitude,
-           filters.maxDistance != nil {
-            // Use optimized geo search API
-            do {
-                var cursor: String? = nil
-                var hasMore = true
-                
-                // Load all pages using cursor pagination
-                while hasMore {
-                    let result = try await NetworkService.shared.searchDiveSitesByLocation(
-                        latitude: lat,
-                        longitude: lng,
-                        radius: filters.radiusMeters,
-                        filters: filters,
-                        sortBy: "distance",
-                        limit: 100, // Max limit per request
-                        cursor: cursor
-                    )
-                    
-                    allSites.append(contentsOf: result.data)
-                    
-                    // Check if there's more data
-                    if let pagination = result.pagination, pagination.hasMore, let nextCursor = pagination.nextCursor {
-                        cursor = nextCursor
-                    } else {
-                        hasMore = false
-                    }
-                }
-            } catch {
-                // Fallback to legacy API
-                let pageSites = try await NetworkService.shared.getDiveSites(filters: filters, page: page, limit: 50)
-                allSites = pageSites
-            }
-        } else {
-            // No location — legacy `/api/dive-sites` (server caps 500/response; fetch in pages).
-            allSites = try await NetworkService.shared.getAllDiveSitesLegacy(filters: filters)
-        }
-        
-        var filteredSites = allSites
-        
-        // Apply client-side filters (in case backend doesn't support all filters)
-        // Note: Most filters are already applied on backend, but we keep this for safety
-        if let siteType = filters.siteType {
-            // Filter by checking if diveTypes array contains the selected type (not just siteType)
-            // This allows sites with ["wreck", "reef"] to match filter "wreck"
-            filteredSites = filteredSites.filter { $0.diveTypes.contains(siteType.rawValue) }
-        }
-        if let difficulty = filters.difficulty {
-            filteredSites = filteredSites.filter { $0.difficulty == difficulty }
-        }
-        if let minDepth = filters.minDepth {
-            filteredSites = filteredSites.filter { $0.maxDepth >= minDepth }
-        }
-        if let maxDepth = filters.maxDepth {
-            filteredSites = filteredSites.filter { $0.maxDepth <= maxDepth }
-        }
-        if let minRating = filters.minRating {
-            filteredSites = filteredSites.filter { $0.averageRating >= minRating }
-        }
-        if let country = filters.country, !country.isEmpty {
-            filteredSites = filteredSites.filter { $0.country.localizedCaseInsensitiveContains(country) }
-        }
-        
-        // Apply search
-        if !searchQuery.isEmpty {
-            let sitesToSearch = filteredSites
-            let query = searchQuery
-            filteredSites = await MainActor.run {
-                sitesToSearch.filter { site in
-                    site.displayName.localizedCaseInsensitiveContains(query) ||
-                    site.description.localizedCaseInsensitiveContains(query)
-                }
-            }
-        }
-        
-        // Note: We return ALL filtered sites here, not paginated
-        // Pagination and sorting are handled in GenericExploreViewModel
-        // This allows sorting to work on ALL sites, not just the first page
-        return filteredSites
-    }
-    
-    func getTotalDiveSitesCount(filters: DiveSiteFilters, searchQuery: String = "") async throws -> Int {
-        let uniqueSites = try await NetworkService.shared.getAllDiveSitesLegacy(filters: filters)
-        var filteredSites = uniqueSites
-        
-        // Apply filters (same logic as getDiveSites)
-        if let siteType = filters.siteType {
-            // Filter by checking if diveTypes array contains the selected type (not just siteType)
-            // This allows sites with ["wreck", "reef"] to match filter "wreck"
-            filteredSites = filteredSites.filter { $0.diveTypes.contains(siteType.rawValue) }
-        }
-        if let difficulty = filters.difficulty {
-            filteredSites = filteredSites.filter { $0.difficulty == difficulty }
-        }
-        if let minDepth = filters.minDepth {
-            filteredSites = filteredSites.filter { $0.maxDepth >= minDepth }
-        }
-        if let maxDepth = filters.maxDepth {
-            filteredSites = filteredSites.filter { $0.maxDepth <= maxDepth }
-        }
-        if let minRating = filters.minRating {
-            filteredSites = filteredSites.filter { $0.averageRating >= minRating }
-        }
-        if let country = filters.country, !country.isEmpty {
-            filteredSites = filteredSites.filter { $0.country.localizedCaseInsensitiveContains(country) }
-        }
-        
-        // Apply search
-        if !searchQuery.isEmpty {
-            let sitesToSearch = filteredSites
-            let query = searchQuery
-            filteredSites = await MainActor.run {
-                sitesToSearch.filter { site in
-                    site.displayName.localizedCaseInsensitiveContains(query) ||
-                    site.description.localizedCaseInsensitiveContains(query)
-                }
-            }
-        }
-        
-        return filteredSites.count
+    /// Server-side filters, sort, pagination, and total count (`GET /api/dive-sites/explore`).
+    func getDiveSitesPage(
+        filters: DiveSiteFilters,
+        searchQuery: String,
+        page: Int,
+        limit: Int,
+        sortOption: ExploreSortOption,
+        userLocation: CLLocation?
+    ) async throws -> (sites: [DiveSite], total: Int) {
+        try await NetworkService.shared.getDiveSitesExplorePage(
+            filters: filters,
+            searchQuery: searchQuery,
+            page: page,
+            limit: limit,
+            sortOption: sortOption,
+            userLocation: userLocation
+        )
     }
     
     func getDiveCenters(filters: DiveCenterFilters, searchQuery: String = "", page: Int = 1) async throws -> [DiveCenter] {

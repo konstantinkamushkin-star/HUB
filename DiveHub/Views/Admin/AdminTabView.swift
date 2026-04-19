@@ -17,6 +17,22 @@ struct AdminTabView: View {
         authService.currentUser?.role == .superAdmin
     }
 
+    private var diveCenterLayout: AdminDashboardLayoutPayload {
+        authService.currentUser?.diverProfile?.adminDashboardLayout ?? AdminDashboardLayoutPayload()
+    }
+
+    private var visibleDiveCenterTabKeys: [String] {
+        PartnerShellTab.visibleKeys(from: diveCenterLayout)
+    }
+
+    private var bottomBarScrollNonce: Int {
+        var hasher = Hasher()
+        hasher.combine(visibleDiveCenterTabKeys)
+        hasher.combine(diveCenterLayout.bottomBarHiddenTabs ?? [])
+        hasher.combine(diveCenterLayout.bottomBarOrder ?? [])
+        return hasher.finalize()
+    }
+
     private var tabContentBottomPad: CGFloat {
         DiveHubCarouselTabBar.contentBottomInset(displayScale: displayScale)
     }
@@ -33,6 +49,31 @@ struct AdminTabView: View {
         .ignoresSafeArea(edges: .bottom)
         .tint(.divePrimary)
         .sensoryFeedback(.selection, trigger: selectedTab)
+        .onChange(of: bottomBarScrollNonce) { _, _ in
+            if selectedTab >= visibleDiveCenterTabKeys.count {
+                selectedTab = max(0, visibleDiveCenterTabKeys.count - 1)
+            }
+        }
+        .onChange(of: visibleDiveCenterTabKeys.count) { _, newCount in
+            if selectedTab >= newCount {
+                selectedTab = max(0, newCount - 1)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .diveHubNavigateToExploreDiveSitesMap)) { _ in
+            guard !isSuperAdmin else { return }
+            if let idx = visibleDiveCenterTabKeys.firstIndex(of: "explore") {
+                selectedTab = idx
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                    NotificationCenter.default.post(name: .diveHubExploreApplyDiveSitesMap, object: nil)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .diveHubNavigateToSocial)) { _ in
+            guard !isSuperAdmin else { return }
+            if let idx = visibleDiveCenterTabKeys.firstIndex(of: "chats") {
+                selectedTab = idx
+            }
+        }
     }
 
     private func superAdminCarouselItems() -> [CarouselTabItem] {
@@ -48,49 +89,27 @@ struct AdminTabView: View {
                 title: localizationService.localizedString("profile", table: "common"),
                 systemImage: "person.circle",
                 accessibilityLabel: nil
-            )
+            ),
         ]
     }
 
     private func diveCenterCarouselItems() -> [CarouselTabItem] {
-        [
-            CarouselTabItem(
-                id: 0,
-                title: localizationService.localizedString("dashboard", table: "admin"),
-                systemImage: "house.fill",
-                accessibilityLabel: nil
-            ),
-            CarouselTabItem(
-                id: 1,
-                title: localizationService.localizedString("feed", table: "feed"),
-                systemImage: "newspaper",
-                accessibilityLabel: nil
-            ),
-            CarouselTabItem(
-                id: 2,
-                title: localizationService.localizedString("courses", table: "courses"),
-                systemImage: "book.closed",
-                accessibilityLabel: nil
-            ),
-            CarouselTabItem(
-                id: 3,
-                title: localizationService.localizedString("trips", table: "trips"),
-                systemImage: "airplane.departure",
-                accessibilityLabel: nil
-            ),
-            CarouselTabItem(
-                id: 4,
-                title: localizationService.localizedString("photoProcessing"),
-                systemImage: "wand.and.stars",
-                accessibilityLabel: nil
-            ),
-            CarouselTabItem(
-                id: 5,
-                title: localizationService.localizedString("profile", table: "common"),
-                systemImage: "person.circle",
-                accessibilityLabel: nil
-            )
-        ]
+        visibleDiveCenterTabKeys.enumerated().map { idx, key in
+            PartnerShellTab.carouselItem(id: idx, key: key, localization: localizationService)
+        }
+    }
+
+    private func navigateDiveCenter(to target: String) {
+        let t = target.lowercased()
+        if t == "instructors" {
+            if let idx = visibleDiveCenterTabKeys.firstIndex(of: "profile") {
+                selectedTab = idx
+            }
+            return
+        }
+        if let idx = visibleDiveCenterTabKeys.firstIndex(of: t) {
+            selectedTab = idx
+        }
     }
 
     private var superAdminShell: some View {
@@ -118,7 +137,7 @@ struct AdminTabView: View {
                 items: diveCenterCarouselItems(),
                 selectedTab: $selectedTab,
                 visibleColumnBasis: nil,
-                scrollAnchorNonce: 0
+                scrollAnchorNonce: bottomBarScrollNonce
             )
         }
     }
@@ -137,23 +156,43 @@ struct AdminTabView: View {
 
     @ViewBuilder
     private var diveCenterTabContent: some View {
-        switch selectedTab {
-        case 0:
-            AdminDashboardView()
-        case 1:
+        let keys = visibleDiveCenterTabKeys
+        if keys.isEmpty {
+            AdminDashboardView(onNavigateToTabKey: { _ in })
+        } else {
+            let idx = min(max(0, selectedTab), keys.count - 1)
+            diveCenterPage(for: keys[idx])
+        }
+    }
+
+    @ViewBuilder
+    private func diveCenterPage(for key: String) -> some View {
+        switch key {
+        case "dashboard":
+            AdminDashboardView(onNavigateToTabKey: navigateDiveCenter)
+        case "explore":
+            ExploreView()
+        case "feed":
             FeedView()
-        case 2:
+        case "courses":
             CoursesManagementView()
                 .environmentObject(authService)
-        case 3:
+        case "trips":
             TripsManagementView()
                 .environmentObject(authService)
-        case 4:
+        case "photo":
             PhotoProcessingView()
-        case 5:
+        case "services":
+            ServicesManagementView()
+                .environmentObject(authService)
+        case "chats":
+            NavigationStack {
+                ChatHubView()
+            }
+        case "profile":
             ProfileTabView()
         default:
-            AdminDashboardView()
+            AdminDashboardView(onNavigateToTabKey: navigateDiveCenter)
         }
     }
 }

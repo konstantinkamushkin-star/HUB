@@ -23,6 +23,18 @@ export class CreateSupportTicketDto {
   @IsString()
   @IsIn(['low', 'normal', 'high', 'urgent'])
   priority?: string;
+
+  @IsOptional()
+  @IsString()
+  @IsIn(['feedback', 'bug', 'other'])
+  category?: string;
+
+  @IsOptional()
+  @IsUUID()
+  conversationId?: string | null;
+
+  @IsOptional()
+  metadata?: Record<string, unknown>;
 }
 
 export class UpdateSupportTicketDto {

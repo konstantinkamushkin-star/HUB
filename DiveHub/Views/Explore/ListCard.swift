@@ -132,14 +132,15 @@ struct ListCard: View {
                 HStack(spacing: 8) {
                     HStack(spacing: 4) {
                         DiveHubLogoMark(color: .secondary)
-                            .frame(width: 16, height: 12)
+                            .aspectRatio(1, contentMode: .fit)
+                            .frame(width: 16, height: 16)
                         Text(site.siteType.displayName)
                     }
                     .font(.caption)
                     .foregroundColor(.secondary)
                     Text("ui_explore_a".localized)
                         .foregroundColor(.secondary)
-                    Label("ui_explore_value_m".localized, systemImage: "arrow.down")
+                    Label("\(Int(site.maxDepth))m", systemImage: "arrow.down")
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -233,7 +234,7 @@ struct RatingView: View {
             Text(String(format: "%.1f", rating))
                 .font(.subheadline)
                 .fontWeight(.semibold)
-            Text("ui_explore_value_5".localized)
+            Text("(\(reviewCount))")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -259,12 +260,13 @@ struct RecommendationBadge: View {
 
 struct FriendsVisitedBadge: View {
     let count: Int
+    @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: "person.2.fill")
                 .font(.caption2)
-            Text("ui_explore_value_friends".localized)
+            Text("\(count) \(localizationService.localizedString("friends", table: "social"))")
                 .font(.caption2)
                 .fontWeight(.medium)
         }

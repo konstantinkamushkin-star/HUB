@@ -473,7 +473,7 @@ struct DiveCenterPickerView: View {
                                     Text(center.name)
                                         .font(.headline)
                                         .foregroundColor(.primary)
-                                    Text("ui_logbook_value_value".localized)
+                                    Text("\(center.location.city), \(center.location.country)")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }

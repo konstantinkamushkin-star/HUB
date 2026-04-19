@@ -13,6 +13,7 @@ struct BookingConfirmationView: View {
     let booking: Booking
     var onOpenChat: (() -> Void)? = nil
     @Environment(\.dismiss) var dismiss
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var showShareSheet = false
     @State private var showCalendarAlert = false
     @State private var calendarAlertMessage = ""
@@ -26,14 +27,14 @@ struct BookingConfirmationView: View {
                     .foregroundColor(.green)
                     .padding(.top, 40)
                 
-                Text(booking.status == .pending ? "Booking Sent!" : "Booking Confirmed!")
+                Text(booking.status == .pending ? "ui_booking_sent_title".localized : "ui_booking_confirmed_title".localized)
                     .font(.title)
                     .fontWeight(.bold)
                 
                 Text(
                     booking.status == .pending
-                    ? "Your request has been sent to the dive center. Continue in chat to confirm details."
-                    : "Your dive booking has been confirmed. We'll send you a confirmation email shortly."
+                    ? "ui_booking_sent_message".localized
+                    : "ui_booking_confirmed_message".localized
                 )
                     .font(.body)
                     .foregroundColor(.secondary)
@@ -56,20 +57,20 @@ struct BookingConfirmationView: View {
                         }
                     }
                     
-                    DetailRow(label: "Booking ID", value: booking.id.prefix(8).uppercased())
-                    DetailRow(label: "Date", value: booking.date.formatted(date: .long, time: .none))
-                    DetailRow(label: "Time", value: booking.startTime)
-                    DetailRow(label: "Participants", value: "\(booking.participants.count)")
-                    DetailRow(label: "Status", value: booking.status.rawValue.capitalized)
+                    DetailRow(label: "ui_booking_detail_id".localized, value: booking.id.prefix(8).uppercased())
+                    DetailRow(label: "ui_booking_detail_date".localized, value: booking.date.formatted(date: .long, time: .none))
+                    DetailRow(label: "ui_booking_detail_time".localized, value: booking.startTime)
+                    DetailRow(label: "ui_booking_detail_participants".localized, value: "\(booking.participants.count)")
+                    DetailRow(label: "ui_booking_detail_status".localized, value: localizedBookingStatus(booking.status))
                     
                     Divider()
                     if let verifiedPrice = booking.manualVerifiedPriceText {
-                        DetailRow(label: "Final verified price", value: verifiedPrice)
+                        DetailRow(label: "ui_booking_detail_final_verified_price".localized, value: verifiedPrice)
                     }
-                    DetailRow(label: "Amount", value: String(format: "%.2f %@", booking.payment.amount, booking.payment.currency))
-                    DetailRow(label: "Payment Method", value: booking.payment.method.rawValue.capitalized)
+                    DetailRow(label: "ui_booking_detail_amount".localized, value: String(format: "%.2f %@", booking.payment.amount, booking.payment.currency))
+                    DetailRow(label: "ui_booking_detail_payment_method".localized, value: localizedPaymentMethod(booking.payment.method))
                     if let verificationNote = booking.manualVerificationNote {
-                        DetailRow(label: "Center note", value: verificationNote)
+                        DetailRow(label: "ui_booking_detail_center_note".localized, value: verificationNote)
                     }
                 }
                 .padding()
@@ -148,26 +149,26 @@ struct BookingConfirmationView: View {
                     await MainActor.run {
                         if granted {
                             let event = EKEvent(eventStore: eventStore)
-                            event.title = "Dive Booking"
+                            event.title = "ui_booking_calendar_event_title".localized
                             event.startDate = booking.date
                             event.endDate = Calendar.current.date(byAdding: .hour, value: 3, to: booking.date) ?? booking.date
-                            event.notes = "Booking ID: \(booking.id)"
+                            event.notes = "\("ui_booking_detail_id".localized): \(booking.id)"
                             event.calendar = eventStore.defaultCalendarForNewEvents
                             
                             do {
                                 try eventStore.save(event, span: .thisEvent)
-                                calendarAlertMessage = "Booking added to calendar successfully!"
+                                calendarAlertMessage = "ui_booking_calendar_added_success".localized
                             } catch {
-                                calendarAlertMessage = "Failed to add to calendar: \(error.localizedDescription)"
+                                calendarAlertMessage = "\("ui_booking_calendar_add_failed".localized): \(error.localizedDescription)"
                             }
                         } else {
-                            calendarAlertMessage = "Calendar access denied. Please enable it in Settings."
+                            calendarAlertMessage = "ui_booking_calendar_access_denied".localized
                         }
                         showCalendarAlert = true
                     }
                 } catch {
                     await MainActor.run {
-                        calendarAlertMessage = "Failed to request calendar access: \(error.localizedDescription)"
+                        calendarAlertMessage = "\("ui_booking_calendar_access_request_failed".localized): \(error.localizedDescription)"
                         showCalendarAlert = true
                     }
                 }
@@ -177,24 +178,54 @@ struct BookingConfirmationView: View {
                 DispatchQueue.main.async {
                     if granted {
                         let event = EKEvent(eventStore: eventStore)
-                        event.title = "Dive Booking"
+                        event.title = "ui_booking_calendar_event_title".localized
                         event.startDate = self.booking.date
                         event.endDate = Calendar.current.date(byAdding: .hour, value: 3, to: self.booking.date) ?? self.booking.date
-                        event.notes = "Booking ID: \(self.booking.id)"
+                        event.notes = "\("ui_booking_detail_id".localized): \(self.booking.id)"
                         event.calendar = eventStore.defaultCalendarForNewEvents
                         
                         do {
                             try eventStore.save(event, span: .thisEvent)
-                            self.calendarAlertMessage = "Booking added to calendar successfully!"
+                            self.calendarAlertMessage = "ui_booking_calendar_added_success".localized
                         } catch {
-                            self.calendarAlertMessage = "Failed to add to calendar: \(error.localizedDescription)"
+                            self.calendarAlertMessage = "\("ui_booking_calendar_add_failed".localized): \(error.localizedDescription)"
                         }
                     } else {
-                        self.calendarAlertMessage = "Calendar access denied. Please enable it in Settings."
+                        self.calendarAlertMessage = "ui_booking_calendar_access_denied".localized
                     }
                     self.showCalendarAlert = true
                 }
             }
+        }
+    }
+
+    private func localizedBookingStatus(_ status: Booking.BookingStatus) -> String {
+        switch status {
+        case .pending:
+            return localizationService.localizedString("bookingStatusPending", table: "admin")
+        case .quoted:
+            return localizationService.localizedString("bookingStatusQuoted", table: "admin")
+        case .confirmed:
+            return localizationService.localizedString("bookingStatusConfirmed", table: "admin")
+        case .completed:
+            return localizationService.localizedString("bookingStatusCompleted", table: "admin")
+        case .cancelled:
+            return localizationService.localizedString("bookingStatusCancelled", table: "admin")
+        case .refunded:
+            return localizationService.localizedString("bookingStatusRefunded", table: "admin")
+        }
+    }
+
+    private func localizedPaymentMethod(_ method: Booking.Payment.PaymentMethod) -> String {
+        switch method {
+        case .online:
+            return localizationService.localizedString("ui_booking_value_2", table: "ui")
+        case .onSite:
+            return localizationService.localizedString("ui_booking_on_site", table: "ui")
+        case .applePay:
+            return localizationService.localizedString("ui_booking_apple_pay", table: "ui")
+        case .googlePay:
+            return localizationService.localizedString("ui_booking_google_pay", table: "ui")
         }
     }
 }

@@ -45,6 +45,49 @@ class AuthViewModel(
         }
     }
 
+    fun signInWithGoogle(
+        idToken: String,
+        email: String?,
+        firstName: String?,
+        lastName: String?,
+        onSuccess: (mustChangePassword: Boolean) -> Unit,
+    ) {
+        viewModelScope.launch {
+            _state.value = AuthUiState(loading = true)
+            runCatching { repo.loginWithGoogle(idToken, email, firstName, lastName) }
+                .onSuccess {
+                    val must = repo.cachedUser()?.mustChangePassword == true
+                    _state.value = AuthUiState(loading = false)
+                    onSuccess(must)
+                }
+                .onFailure { e ->
+                    _state.value = AuthUiState(loading = false, error = repo.parseErrorMessage(e))
+                }
+        }
+    }
+
+    /** Used when the client obtains an Apple identity token (e.g. future WebView / SDK integration). */
+    fun signInWithApple(
+        idToken: String,
+        email: String?,
+        firstName: String?,
+        lastName: String?,
+        onSuccess: (mustChangePassword: Boolean) -> Unit,
+    ) {
+        viewModelScope.launch {
+            _state.value = AuthUiState(loading = true)
+            runCatching { repo.loginWithApple(idToken, email, firstName, lastName) }
+                .onSuccess {
+                    val must = repo.cachedUser()?.mustChangePassword == true
+                    _state.value = AuthUiState(loading = false)
+                    onSuccess(must)
+                }
+                .onFailure { e ->
+                    _state.value = AuthUiState(loading = false, error = repo.parseErrorMessage(e))
+                }
+        }
+    }
+
     fun register(
         email: String,
         password: String,

@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -216,6 +217,8 @@ private fun AddDiveLogSheet(vm: LogbookViewModel, onDismiss: () -> Unit) {
     var current by remember { mutableStateOf("") }
     var diveType by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    var selectedSpecies by remember { mutableStateOf<List<String>>(emptyList()) }
+    var showSpeciesPicker by remember { mutableStateOf(false) }
     var photos by remember { mutableStateOf<List<Uri>>(emptyList()) }
 
     val picker = rememberLauncherForActivityResult(
@@ -242,6 +245,24 @@ private fun AddDiveLogSheet(vm: LogbookViewModel, onDismiss: () -> Unit) {
             Spacer(Modifier.height(8.dp))
             OutlinedTextField(value = diveType, onValueChange = { diveType = it }, label = { Text(stringResource(R.string.logbook_dive_type_label)) }, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(8.dp))
+            OutlinedButton(onClick = { showSpeciesPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    if (selectedSpecies.isEmpty()) {
+                        stringResource(R.string.logbook_select_fish_species)
+                    } else {
+                        stringResource(R.string.logbook_selected_fish_species_count, selectedSpecies.size)
+                    },
+                )
+            }
+            if (selectedSpecies.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    selectedSpecies.joinToString(", "),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
             OutlinedTextField(value = notes, onValueChange = { notes = it }, label = { Text(stringResource(R.string.logbook_notes_label)) }, modifier = Modifier.fillMaxWidth(), minLines = 3)
             Spacer(Modifier.height(8.dp))
             OutlinedButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }) {
@@ -260,7 +281,15 @@ private fun AddDiveLogSheet(vm: LogbookViewModel, onDismiss: () -> Unit) {
                         visibility = visibility.toDoubleOrNull(),
                         current = current,
                         diveType = diveType,
-                        notes = notes,
+                        notes = buildString {
+                            append(notes.trim())
+                            if (selectedSpecies.isNotEmpty()) {
+                                if (isNotBlank()) append("\n\n")
+                                append(context.getString(R.string.logbook_fish_species_notes_prefix))
+                                append(": ")
+                                append(selectedSpecies.joinToString(", "))
+                            }
+                        },
                         photoUris = photos,
                         onDone = onDismiss,
                     )
@@ -268,6 +297,73 @@ private fun AddDiveLogSheet(vm: LogbookViewModel, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth(),
             ) { Text(stringResource(R.string.logbook_save_dive)) }
             Spacer(Modifier.height(8.dp))
+        }
+    }
+
+    if (showSpeciesPicker) {
+        FishSpeciesPickerSheet(
+            selected = selectedSpecies,
+            onSelectedChange = { selectedSpecies = it },
+            onDismiss = { showSpeciesPicker = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FishSpeciesPickerSheet(
+    selected: List<String>,
+    onSelectedChange: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var q by remember { mutableStateOf("") }
+    val allSpecies = remember {
+        listOf(
+            "Clownfish", "Angelfish", "Butterflyfish", "Parrotfish", "Triggerfish",
+            "Surgeonfish", "Wrasse", "Grouper", "Snapper", "Barracuda",
+            "Shark", "Ray", "Turtle", "Moray Eel", "Lionfish",
+            "Pufferfish", "Seahorse", "Octopus", "Squid", "Cuttlefish",
+            "Lobster", "Crab", "Shrimp", "Nudibranch", "Sea Star",
+            "Sea Urchin", "Jellyfish", "Manta Ray", "Whale Shark", "Dolphin",
+            "Tuna", "Mackerel", "Jackfish", "Trevally", "Emperor",
+            "Sweetlips", "Goatfish", "Squirrelfish", "Cardinalfish", "Damselfish",
+        )
+    }
+    val filtered = remember(q, allSpecies) {
+        if (q.isBlank()) allSpecies
+        else allSpecies.filter { it.contains(q.trim(), ignoreCase = true) }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
+            Text(stringResource(R.string.logbook_select_fish_species), style = MaterialTheme.typography.titleLarge)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = q,
+                onValueChange = { q = it },
+                label = { Text(stringResource(R.string.logbook_search_fish_species)) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(modifier = Modifier.height(320.dp)) {
+                items(filtered) { species ->
+                    val checked = selected.contains(species)
+                    ListItem(
+                        headlineContent = { Text(species) },
+                        trailingContent = {
+                            if (checked) Text("✓", color = MaterialTheme.colorScheme.primary)
+                        },
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            if (checked) onSelectedChange(selected.filterNot { it == species })
+                            else onSelectedChange(selected + species)
+                        },
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_close)) }
+            }
         }
     }
 }

@@ -107,14 +107,6 @@ class GenericExploreViewModel: ObservableObject {
                 let hadLocation = self.userLocation != nil
                 self.userLocation = location
                 
-                // Update filters with user location for geo search
-                // Only update location if geo search is enabled (maxDistance is not nil)
-                if self.diveSiteFilters.maxDistance != nil {
-                    self.diveSiteFilters.centerLatitude = location.coordinate.latitude
-                    self.diveSiteFilters.centerLongitude = location.coordinate.longitude
-                }
-                // Don't set default maxDistance here - let user control it via filters
-                
                 self.diveCenterFilters.centerLatitude = location.coordinate.latitude
                 self.diveCenterFilters.centerLongitude = location.coordinate.longitude
                 if self.diveCenterFilters.maxDistance == nil {
@@ -214,86 +206,27 @@ class GenericExploreViewModel: ObservableObject {
         }
     }
     
+    private static let diveSitesPageSize = 20
+
     private func loadDiveSites(page: Int, append: Bool = false) async throws {
-        // Try cache first
-        if page == 1, let cached = await cacheService.getDiveSites(filters: diveSiteFilters) {
-            // Sort + apply search + pagination for cache path.
-            // Without this, search on Explore can show unfiltered cached data.
-            let sortedSites = sortItems(cached, userLocation: userLocation, sortOption: currentSortOption) as? [DiveSite] ?? cached
-            let query = currentSearchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
-            let filteredSites: [DiveSite]
-            if query.isEmpty {
-                filteredSites = sortedSites
-            } else {
-                filteredSites = sortedSites.filter { site in
-                    site.displayName.localizedCaseInsensitiveContains(query) ||
-                    site.description.localizedCaseInsensitiveContains(query)
-                }
-            }
-            
-            let itemsPerPage = 20
-            let endIndex = min(itemsPerPage, filteredSites.count)
-            diveSites = Array(filteredSites.prefix(endIndex))
-            totalCounts[selectedCategory] = filteredSites.count
-            hasMorePages[selectedCategory] = filteredSites.count > itemsPerPage
-            return
-        }
-        
-        // Load from network
-        let sites = try await ExploreDataService.shared.getDiveSites(
+        let itemsPerPage = Self.diveSitesPageSize
+        let (sites, total) = try await ExploreDataService.shared.getDiveSitesPage(
             filters: diveSiteFilters,
             searchQuery: currentSearchQuery,
             page: page,
+            limit: itemsPerPage,
+            sortOption: currentSortOption,
             userLocation: userLocation
         )
-        // Sort ALL sites before pagination (important for distance sorting to work correctly)
-        let sortedSites = sortItems(sites, userLocation: userLocation, sortOption: currentSortOption) as? [DiveSite] ?? sites
-        
-        // Apply client-side pagination AFTER sorting
-        let itemsPerPage = 20
-        let startIndex = (page - 1) * itemsPerPage
-        let endIndex = min(startIndex + itemsPerPage, sortedSites.count)
-        
-        let paginatedSites: [DiveSite]
-        if startIndex >= sortedSites.count {
-            paginatedSites = []
-        } else {
-            paginatedSites = Array(sortedSites[startIndex..<endIndex])
-        }
-        
+
         if append {
-            diveSites.append(contentsOf: paginatedSites)
+            diveSites.append(contentsOf: sites)
         } else {
-            diveSites = paginatedSites
-            // Cache all sites (not just first page) for sorting
-            if page == 1 {
-                await cacheService.cacheDiveSites(sortedSites, filters: diveSiteFilters)
-            }
+            diveSites = sites
         }
-        
-        // Check if there are more pages
-        // Since we get all data from API and paginate on client, we need to check total count
-        // Only check on first page to avoid multiple API calls
-        if page == 1 {
-            let totalFilteredCount = try await ExploreDataService.shared.getTotalDiveSitesCount(
-                filters: diveSiteFilters,
-                searchQuery: currentSearchQuery
-            )
-            totalCounts[selectedCategory] = totalFilteredCount
-            let itemsPerPage = 20
-            let totalPages = (totalFilteredCount + itemsPerPage - 1) / itemsPerPage
-            hasMorePages[selectedCategory] = page < totalPages
-        } else {
-            // For subsequent pages, use stored total count
-            if let totalCount = totalCounts[selectedCategory] {
-                let itemsPerPage = 20
-                let totalPages = (totalCount + itemsPerPage - 1) / itemsPerPage
-                hasMorePages[selectedCategory] = page < totalPages
-            } else {
-                // Fallback: check if we got a full page
-                hasMorePages[selectedCategory] = sites.count >= 20
-            }
-        }
+
+        totalCounts[selectedCategory] = total
+        hasMorePages[selectedCategory] = page * itemsPerPage < total
     }
     
     private func loadDiveCenters(page: Int, append: Bool = false) async throws {
@@ -381,34 +314,7 @@ class GenericExploreViewModel: ObservableObject {
     private func applySorting() async {
         switch selectedCategory {
         case .diveSites:
-            // Reload all sites, sort them, then re-apply pagination
-            // This ensures sorting works on ALL sites, not just the current page
-            do {
-                let allSites = try await ExploreDataService.shared.getDiveSites(
-                    filters: diveSiteFilters,
-                    searchQuery: currentSearchQuery,
-                    page: 1, // Get all sites (no pagination in service)
-                    userLocation: userLocation
-                )
-                
-                // Sort all sites
-                let sortedSites = sortItems(allSites, userLocation: userLocation, sortOption: currentSortOption) as? [DiveSite] ?? allSites
-                
-                // Re-apply pagination for current page
-                let currentPageNum = currentPage[selectedCategory] ?? 1
-                let itemsPerPage = 20
-                let startIndex = (currentPageNum - 1) * itemsPerPage
-                let endIndex = min(startIndex + itemsPerPage, sortedSites.count)
-                
-                if startIndex < sortedSites.count {
-                    diveSites = Array(sortedSites[startIndex..<endIndex])
-                } else {
-                    diveSites = []
-                }
-            } catch {
-                // Fallback: just sort current page if reload fails
-                diveSites = sortItems(diveSites, userLocation: userLocation, sortOption: currentSortOption) as? [DiveSite] ?? diveSites
-            }
+            await loadData(refresh: true)
         case .diveCenters:
             diveCenters = sortItems(diveCenters, userLocation: userLocation, sortOption: currentSortOption) as? [DiveCenter] ?? diveCenters
         case .shops:
@@ -502,7 +408,6 @@ extension DiveSiteFilters {
         if minDepth != nil { count += 1 }
         if maxDepth != nil { count += 1 }
         if minRating != nil { count += 1 }
-        if maxDistance != nil { count += 1 }
         if country != nil { count += 1 }
         return count
     }

@@ -15,26 +15,30 @@ struct InstructorManagementView: View {
     @State private var showAddInstructor = false
     
     var body: some View {
-        List {
-            Section {
-                ForEach(viewModel.instructors) { instructor in
-                    if let centerId = authService.currentUser?.diveCenterId {
-                        NavigationLink {
-                            AdminInstructorDetailView(diveCenterId: centerId, instructor: instructor)
-                        } label: {
+        VStack(spacing: 0) {
+            List {
+                Section {
+                    ForEach(viewModel.instructors) { instructor in
+                        if let centerId = authService.currentUser?.diveCenterId {
+                            NavigationLink {
+                                AdminInstructorDetailView(diveCenterId: centerId, instructor: instructor)
+                            } label: {
+                                InstructorManagementRow(instructor: instructor)
+                            }
+                        } else {
                             InstructorManagementRow(instructor: instructor)
                         }
-                    } else {
-                        InstructorManagementRow(instructor: instructor)
                     }
                 }
             }
         }
         .navigationTitle(localizationService.localizedString("instructors", table: "admin"))
+        .diveHubNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddInstructor = true }) {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
                 }
             }
         }

@@ -19,9 +19,11 @@ struct ChatConversation: Identifiable, Codable, Hashable {
     var updatedAt: Date
     /// Server-provided title for list and navigation (friends use display name).
     var peerDisplayName: String?
+    /// Present for `APP_SUPPORT_TOPIC` threads (`POST /api/chat/support/topics`).
+    var topicId: String?
     
     enum CodingKeys: String, CodingKey {
-        case id, participants, diveCenterId, shopId, bookingId, lastMessage, unreadCount, createdAt, updatedAt, peerDisplayName
+        case id, participants, diveCenterId, shopId, bookingId, lastMessage, unreadCount, createdAt, updatedAt, peerDisplayName, topicId
     }
     
     static func == (lhs: ChatConversation, rhs: ChatConversation) -> Bool {

@@ -189,7 +189,8 @@ struct OnboardingPage: View {
         VStack(spacing: 30) {
             if imageName == "water.waves" || imageName == "divehub.logo" {
                 DiveHubLogoMark(color: .divePrimary)
-                    .frame(width: 120, height: 90)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(width: 120, height: 120)
             } else {
                 Image(systemName: imageName)
                     .font(.system(size: 80))

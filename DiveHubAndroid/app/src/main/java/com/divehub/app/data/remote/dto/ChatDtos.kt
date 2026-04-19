@@ -23,6 +23,12 @@ data class ChatConversationDto(
     @SerializedName("unreadCount") val unreadCount: Int = 0,
     @SerializedName("createdAt") val createdAt: String? = null,
     @SerializedName("updatedAt") val updatedAt: String? = null,
+    @SerializedName("topicId") val topicId: String? = null,
+)
+
+data class OpenAppSupportTopicRequest(
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("topicId") val topicId: String? = null,
 )
 
 data class ChatMessagesPageDto(

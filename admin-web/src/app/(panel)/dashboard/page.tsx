@@ -56,7 +56,14 @@ export default function DashboardPage() {
   }, []);
 
   if (loading) {
-    return <p className="text-zinc-400">Загрузка дашборда…</p>;
+    return (
+      <div
+        className="min-h-[40vh] text-zinc-400"
+        style={{ color: "#a1a1aa", fontFamily: "system-ui, sans-serif" }}
+      >
+        Загрузка дашборда…
+      </div>
+    );
   }
   if (err) {
     return (

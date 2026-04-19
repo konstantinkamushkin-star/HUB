@@ -20,61 +20,63 @@ struct ManageInstructorsView: View {
     @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
-        List {
-            if isLoading {
-                ProgressView()
-            } else if let error = errorMessage {
-                Text("\(localizationService.localizedString("error", table: "common")): \(error)")
-                    .foregroundColor(.red)
-            } else {
-                Section {
-                    Button(action: {
-                        showAddInstructor = true
-                    }) {
-                        HStack {
-                            Image(systemName: "person.badge.plus")
-                            Text(localizationService.localizedString("addInstructor", table: "admin"))
+        VStack(spacing: 0) {
+            List {
+                if isLoading {
+                    ProgressView()
+                } else if let error = errorMessage {
+                    Text("\(localizationService.localizedString("error", table: "common")): \(error)")
+                        .foregroundColor(.red)
+                } else {
+                    Section {
+                        Button(action: {
+                            showAddInstructor = true
+                        }) {
+                            HStack {
+                                Image(systemName: "person.badge.plus")
+                                Text(localizationService.localizedString("addInstructor", table: "admin"))
+                            }
                         }
                     }
-                }
-                
-                Section(localizationService.localizedString("instructors", table: "admin")) {
-                    if instructors.isEmpty {
-                        Text(localizationService.localizedString("noInstructors", table: "admin"))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(instructors) { instructor in
-                            NavigationLink(destination: InstructorDetailView(instructor: instructor)) {
-                                HStack {
-                                    AsyncImage(url: URL(string: NetworkService.shared.fullImageURL(from: instructor.photoURL ?? instructor.avatarURL) ?? "")) { image in
-                                        image
-                                            .resizable()
-                                            .aspectRatio(contentMode: .fill)
-                                    } placeholder: {
-                                        Image(systemName: "person.circle.fill")
-                                            .foregroundColor(.secondary)
-                                    }
-                                    .frame(width: 50, height: 50)
-                                    .clipShape(Circle())
-                                    
-                                    VStack(alignment: .leading, spacing: 4) {
-                                        Text(instructor.name)
-                                            .font(.headline)
-                                        if !instructor.trainingSystems.isEmpty {
-                                            Text(instructor.trainingSystems.joined(separator: ", "))
-                                                .font(.caption)
+
+                    Section(localizationService.localizedString("instructors", table: "admin")) {
+                        if instructors.isEmpty {
+                            Text(localizationService.localizedString("noInstructors", table: "admin"))
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(instructors) { instructor in
+                                NavigationLink(destination: InstructorDetailView(instructor: instructor)) {
+                                    HStack {
+                                        AsyncImage(url: URL(string: NetworkService.shared.fullImageURL(from: instructor.photoURL ?? instructor.avatarURL) ?? "")) { image in
+                                            image
+                                                .resizable()
+                                                .aspectRatio(contentMode: .fill)
+                                        } placeholder: {
+                                            Image(systemName: "person.circle.fill")
                                                 .foregroundColor(.secondary)
                                         }
-                                    }
-                                    
-                                    Spacer()
-                                    
-                                    Button(action: {
-                                        removeInstructor(instructor)
-                                    }) {
-                                        Image(systemName: "trash")
-                                            .foregroundColor(.red)
+                                        .frame(width: 50, height: 50)
+                                        .clipShape(Circle())
+
+                                        VStack(alignment: .leading, spacing: 4) {
+                                            Text(instructor.name)
+                                                .font(.headline)
+                                            if !instructor.trainingSystems.isEmpty {
+                                                Text(instructor.trainingSystems.joined(separator: ", "))
+                                                    .font(.caption)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+
+                                        Spacer()
+
+                                        Button(action: {
+                                            removeInstructor(instructor)
+                                        }) {
+                                            Image(systemName: "trash")
+                                                .foregroundColor(.red)
+                                        }
                                     }
                                 }
                             }
@@ -84,7 +86,7 @@ struct ManageInstructorsView: View {
             }
         }
         .navigationTitle(localizationService.localizedString("manageInstructors", table: "admin"))
-        .navigationBarTitleDisplayMode(.inline)
+        .diveHubNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(localizationService.localizedString("done", table: "common")) {

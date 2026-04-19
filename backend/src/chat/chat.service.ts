@@ -22,6 +22,7 @@ import { ChatParticipant } from './entities/chat-participant.entity';
 import { ChatMessageEntity } from './entities/chat-message.entity';
 import { ChatPeerTypeDto, OpenChatDto } from './dto/open-chat.dto';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
+import { randomUUID } from 'crypto';
 
 function pgDriverMeta(err: unknown): {
   code?: string;
@@ -35,6 +36,21 @@ function pgDriverMeta(err: unknown): {
     .driverError;
   return d ?? {};
 }
+
+/** Shown instead of admin/support staff real names in support threads (client-facing). */
+export const CHAT_SUPPORT_DISPLAY_NAME = 'DiveHub Support';
+
+const SUPPORT_CONVERSATION_KINDS = new Set([
+  'CONTRIBUTION_SUPPORT',
+  'APP_SUPPORT_TOPIC',
+]);
+
+const SUPPORT_STAFF_ROLES = [
+  'SUPER_ADMIN',
+  'ADMIN',
+  'MODERATOR',
+  'SUPPORT',
+] as const;
 
 function senderDisplayName(
   senderType: string,
@@ -83,6 +99,45 @@ export class ChatService {
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
+
+  private isSupportConversationKind(kind: string | undefined): boolean {
+    if (!kind) return false;
+    return SUPPORT_CONVERSATION_KINDS.has(kind);
+  }
+
+  /** User IDs that count as “support staff” for depersonalization (env + roles). */
+  private async resolveSupportStaffIds(userIds: string[]): Promise<Set<string>> {
+    const uniq = [...new Set(userIds)].filter(Boolean);
+    const out = new Set<string>();
+    const envId = process.env.DIVE_SITE_SUPPORT_ADMIN_USER_ID?.trim();
+    for (const id of uniq) {
+      if (envId && id === envId) {
+        out.add(id);
+      }
+    }
+    if (!uniq.length) {
+      return out;
+    }
+    const rows = await this.userRepository.find({
+      where: { id: In(uniq) },
+      select: ['id', 'role'],
+    });
+    for (const r of rows) {
+      if (
+        SUPPORT_STAFF_ROLES.includes(
+          r.role as (typeof SUPPORT_STAFF_ROLES)[number],
+        )
+      ) {
+        out.add(r.id);
+      }
+    }
+    return out;
+  }
+
+  private async userIsSupportStaff(userId: string): Promise<boolean> {
+    const s = await this.resolveSupportStaffIds([userId]);
+    return s.has(userId);
+  }
 
   private canonicalKey(
     peerType: ChatPeerTypeDto,
@@ -298,19 +353,33 @@ export class ChatService {
       .getCount();
   }
 
-  private serializeMessage(
+  private buildSerializedMessage(
     m: ChatMessageEntity,
     userCache: Map<string, User>,
     centerCache: Map<string, DiveCenterEntity>,
     shopCache: Map<string, ShopEntity>,
+    mask?: {
+      conversationKind: string;
+      viewerUserId: string;
+      staffIds: Set<string>;
+    },
   ) {
-    const senderName = senderDisplayName(
+    let senderName = senderDisplayName(
       m.senderType,
       m.senderId,
       userCache,
       centerCache,
       shopCache,
     );
+    if (
+      mask &&
+      this.isSupportConversationKind(mask.conversationKind) &&
+      m.senderType === 'user' &&
+      mask.staffIds.has(m.senderId) &&
+      !mask.staffIds.has(mask.viewerUserId)
+    ) {
+      senderName = CHAT_SUPPORT_DISPLAY_NAME;
+    }
     return {
       id: m.id,
       conversationId: m.conversationId,
@@ -353,6 +422,17 @@ export class ChatService {
 
     const peerIds: string[] = [];
     let peerDisplayName = 'Chat';
+    const peerUserIds: string[] = [];
+    for (const p of parts) {
+      if (p.participantType === 'user' && p.participantId !== viewerId) {
+        peerUserIds.push(p.participantId);
+      }
+    }
+    const staffIdsForPeer = await this.resolveSupportStaffIds([
+      viewerId,
+      ...peerUserIds,
+    ]);
+    const viewerIsStaff = staffIdsForPeer.has(viewerId);
 
     for (const p of parts) {
       if (p.participantType === 'user' && p.participantId !== viewerId) {
@@ -361,7 +441,18 @@ export class ChatService {
           where: { id: p.participantId },
         });
         if (u) {
-          peerDisplayName = `${u.firstName} ${u.lastName}`.trim() || u.email;
+          const raw =
+            `${u.firstName} ${u.lastName}`.trim() || u.email;
+          const peerIsStaff = staffIdsForPeer.has(p.participantId);
+          if (
+            this.isSupportConversationKind(conv.kind) &&
+            peerIsStaff &&
+            !viewerIsStaff
+          ) {
+            peerDisplayName = CHAT_SUPPORT_DISPLAY_NAME;
+          } else {
+            peerDisplayName = raw;
+          }
         }
       } else if (p.participantType === 'dive_center') {
         peerIds.push(p.participantId);
@@ -415,11 +506,20 @@ export class ChatService {
           shopCache.set(s.id, s);
         }
       }
-      lastMessage = this.serializeMessage(
+      const lastStaffIds = await this.resolveSupportStaffIds([
+        viewerId,
+        last.senderType === 'user' ? last.senderId : viewerId,
+      ]);
+      lastMessage = this.buildSerializedMessage(
         last,
         userCache,
         centerCache,
         shopCache,
+        {
+          conversationKind: conv.kind,
+          viewerUserId: viewerId,
+          staffIds: lastStaffIds,
+        },
       );
     }
 
@@ -465,6 +565,10 @@ export class ChatService {
     },
   ) {
     await this.assertParticipant(conversationId, userId);
+
+    const conv = await this.convRepository.findOne({
+      where: { id: conversationId },
+    });
 
     const limit = Math.min(Math.max(options?.limit ?? 40, 1), 100);
     const markRead = options?.markRead ?? options?.beforeMessageId == null;
@@ -545,8 +649,27 @@ export class ChatService {
       }
     }
 
+    const staffIdsForPage = await this.resolveSupportStaffIds([
+      userId,
+      ...page.filter((m) => m.senderType === 'user').map((m) => m.senderId),
+    ]);
+    const mask =
+      conv && this.isSupportConversationKind(conv.kind)
+        ? {
+            conversationKind: conv.kind,
+            viewerUserId: userId,
+            staffIds: staffIdsForPage,
+          }
+        : undefined;
+
     const messages = page.map((m) =>
-      this.serializeMessage(m, userCache, centerCache, shopCache),
+      this.buildSerializedMessage(
+        m,
+        userCache,
+        centerCache,
+        shopCache,
+        mask,
+      ),
     );
     const nextBefore =
       hasMore && page.length ? (page[0] as ChatMessageEntity).id : null;
@@ -592,12 +715,29 @@ export class ChatService {
       if (u) {
         userCache.set(u.id, u);
       }
-      const serialized = this.serializeMessage(
+      const conv = await this.convRepository.findOne({
+        where: { id: dto.conversationId },
+      });
+      const staffIdsSend = await this.resolveSupportStaffIds([userId]);
+      const serialized = this.buildSerializedMessage(
         saved,
         userCache,
         new Map(),
         new Map(),
+        conv && this.isSupportConversationKind(conv.kind)
+          ? {
+              conversationKind: conv.kind,
+              viewerUserId: userId,
+              staffIds: staffIdsSend,
+            }
+          : undefined,
       );
+      const pushSenderTitle =
+        conv &&
+        this.isSupportConversationKind(conv.kind) &&
+        staffIdsSend.has(userId)
+          ? CHAT_SUPPORT_DISPLAY_NAME
+          : serialized.senderName;
 
       try {
         this.eventEmitter.emit('chat.message', {
@@ -622,7 +762,7 @@ export class ChatService {
         try {
           await this.pushService.notifyUsers(
             recipients,
-            serialized.senderName,
+            pushSenderTitle,
             preview,
           );
         } catch (pushErr) {
@@ -633,7 +773,7 @@ export class ChatService {
         for (const rid of recipients) {
           await this.notificationsService.createForUser(rid, {
             type: 'message',
-            title: serialized.senderName,
+            title: pushSenderTitle,
             message: preview,
             icon: 'message',
             actionUrl: `divehub://chat?conversationId=${dto.conversationId}`,
@@ -710,7 +850,11 @@ export class ChatService {
     const conv = await this.convRepository.findOne({
       where: { id: conversationId },
     });
-    if (!conv || conv.kind !== 'CONTRIBUTION_SUPPORT') {
+    if (
+      !conv ||
+      (conv.kind !== 'CONTRIBUTION_SUPPORT' &&
+        conv.kind !== 'APP_SUPPORT_TOPIC')
+    ) {
       throw new NotFoundException('Conversation not found');
     }
     const existing = await this.participantRepository.findOne({
@@ -813,7 +957,12 @@ export class ChatService {
         attachments: null,
       });
       await this.messageRepository.save(msg);
-      await this.deliverChatPushAndInboxForMessage(conv.id, supportId, welcome);
+      await this.deliverChatPushAndInboxForMessage(
+        conv.id,
+        supportId,
+        welcome,
+        CHAT_SUPPORT_DISPLAY_NAME,
+      );
     } catch (err: unknown) {
       const { code } = pgDriverMeta(err);
       if (code === '23505') {
@@ -826,6 +975,109 @@ export class ChatService {
       return null;
     }
     return conv!.id;
+  }
+
+  appSupportTopicCanonicalKey(userId: string, topicId: string): string {
+    return `app:${userId}:topic:${topicId}`;
+  }
+
+  /**
+   * Общая поддержка приложения: отдельный тред на тему (новая тема = новый topicId).
+   */
+  async ensureAppSupportTopicThread(
+    userId: string,
+    topicId: string,
+    title?: string | null,
+    supportUserId?: string,
+  ): Promise<string | null> {
+    const supportId = supportUserId ?? (await this.resolveSupportAdminUserId());
+    if (!supportId) {
+      this.logger.warn('ensureAppSupportTopicThread: no support admin');
+      return null;
+    }
+    const key = this.appSupportTopicCanonicalKey(userId, topicId);
+    let conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+    if (conv) {
+      return conv.id;
+    }
+    try {
+      conv = this.convRepository.create({
+        kind: 'APP_SUPPORT_TOPIC',
+        canonicalKey: key,
+        diveCenterId: null,
+        shopId: null,
+        bookingId: null,
+      });
+      await this.convRepository.save(conv);
+      await this.participantRepository.save([
+        this.participantRepository.create({
+          conversationId: conv.id,
+          participantType: 'user',
+          participantId: userId,
+          lastReadAt: new Date(),
+        }),
+        this.participantRepository.create({
+          conversationId: conv.id,
+          participantType: 'user',
+          participantId: supportId,
+          lastReadAt: null,
+        }),
+      ]);
+      const t = title?.trim();
+      const welcome = t
+        ? `${t}\n\nНапишите здесь детали — команда поддержки ответит в этом чате.`
+        : 'Здравствуйте! Опишите проблему или вопрос — ответит команда поддержки.';
+      const msg = this.messageRepository.create({
+        conversationId: conv.id,
+        senderType: 'user',
+        senderId: supportId,
+        content: welcome,
+        messageType: 'text',
+        attachments: null,
+      });
+      await this.messageRepository.save(msg);
+      await this.deliverChatPushAndInboxForMessage(
+        conv.id,
+        supportId,
+        welcome,
+        CHAT_SUPPORT_DISPLAY_NAME,
+      );
+    } catch (err: unknown) {
+      const { code } = pgDriverMeta(err);
+      if (code === '23505') {
+        conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+        return conv?.id ?? null;
+      }
+      this.logger.warn(
+        `ensureAppSupportTopicThread failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
+    return conv!.id;
+  }
+
+  async openAppSupportTopicChat(
+    userId: string,
+    topicId?: string,
+    title?: string | null,
+  ) {
+    const tid = topicId ?? randomUUID();
+    const supportId = await this.resolveSupportAdminUserId();
+    if (!supportId) {
+      throw new ServiceUnavailableException(
+        'No support admin user (set DIVE_SITE_SUPPORT_ADMIN_USER_ID or ensure an ADMIN/SUPER_ADMIN exists).',
+      );
+    }
+    await this.ensureAppSupportTopicThread(userId, tid, title, supportId);
+    const key = this.appSupportTopicCanonicalKey(userId, tid);
+    const conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+    if (!conv) {
+      throw new ServiceUnavailableException('Could not open app support topic chat.');
+    }
+    return {
+      ...(await this.serializeConversation(conv.id, userId)),
+      topicId: tid,
+    };
   }
 
   /**
@@ -858,11 +1110,25 @@ export class ChatService {
     const u = await this.userRepository.findOne({ where: { id: reviewerUserId } });
     const userCache = new Map<string, User>();
     if (u) userCache.set(u.id, u);
-    const serialized = this.serializeMessage(
+    const parts = await this.participantRepository.find({
+      where: { conversationId: cid },
+    });
+    const userPartIds = parts
+      .filter((p) => p.participantType === 'user')
+      .map((p) => p.participantId);
+    const staffIdsReview = await this.resolveSupportStaffIds(userPartIds);
+    const submitterViewer =
+      userPartIds.find((id) => !staffIdsReview.has(id)) ?? userPartIds[0];
+    const serialized = this.buildSerializedMessage(
       saved,
       userCache,
       new Map(),
       new Map(),
+      {
+        conversationKind: 'CONTRIBUTION_SUPPORT',
+        viewerUserId: submitterViewer,
+        staffIds: staffIdsReview,
+      },
     );
     try {
       this.eventEmitter.emit('chat.message', {
@@ -874,7 +1140,12 @@ export class ChatService {
         `chat.message emit failed: ${emitErr instanceof Error ? emitErr.message : String(emitErr)}`,
       );
     }
-    await this.deliverChatPushAndInboxForMessage(cid, reviewerUserId, text, serialized.senderName);
+    await this.deliverChatPushAndInboxForMessage(
+      cid,
+      reviewerUserId,
+      text,
+      CHAT_SUPPORT_DISPLAY_NAME,
+    );
     return true;
   }
 

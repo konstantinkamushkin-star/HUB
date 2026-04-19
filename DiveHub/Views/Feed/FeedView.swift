@@ -177,7 +177,7 @@ struct FeedPostRow: View {
                     HStack(spacing: 4) {
                         Image(systemName: post.isLiked == true ? "heart.fill" : "heart")
                             .foregroundStyle(post.isLiked == true ? Color.red : Color.primary)
-                        Text("ui_feed_value_5".localized)
+                        Text("\(post.likes)")
                             .font(.caption)
                             .foregroundStyle(.primary)
                     }
@@ -188,7 +188,7 @@ struct FeedPostRow: View {
                 }) {
                     HStack(spacing: 4) {
                         Image(systemName: "bubble.right")
-                        Text("ui_feed_value_4".localized)
+                        Text("\(post.comments)")
                             .font(.caption)
                     }
                     .foregroundStyle(.primary)
@@ -215,7 +215,8 @@ struct DiveLogPostPreview: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 DiveHubLogoMark(color: .divePrimary)
-                    .frame(width: 22, height: 18)
+                    .aspectRatio(1, contentMode: .fit)
+                    .frame(width: 22, height: 22)
                 Text(localizationService.localizedString("diveLog", table: "feed"))
                     .font(.headline)
                     .foregroundStyle(.primary)
@@ -249,7 +250,7 @@ struct DiveLogPostPreview: View {
                         Text(localizationService.localizedString("fish", table: "feed"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text("ui_feed_value".localized)
+                        Text("\(diveLog.fishSpecies.count)")
                             .font(.headline)
                             .foregroundStyle(.primary)
                     }

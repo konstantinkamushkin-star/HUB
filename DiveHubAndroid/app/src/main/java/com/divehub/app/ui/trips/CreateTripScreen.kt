@@ -1585,7 +1585,7 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                     value = state.startDate,
                     onValueChange = vm::setStartDate,
                     label = { Text(stringResource(R.string.trip_create_start_date)) },
-                    placeholder = { Text("2026-06-01") },
+                    placeholder = { Text(stringResource(R.string.trip_create_date_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )
@@ -1593,7 +1593,7 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                     value = state.endDate,
                     onValueChange = vm::setEndDate,
                     label = { Text(stringResource(R.string.trip_create_end_date)) },
-                    placeholder = { Text("2026-06-07") },
+                    placeholder = { Text(stringResource(R.string.trip_create_date_placeholder)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                 )

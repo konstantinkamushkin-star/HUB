@@ -168,7 +168,7 @@ struct CheckoutView: View {
                 HStack {
                     Text(inv("items"))
                     Spacer()
-                    Text("ui_inventory_value".localized)
+                    Text("\(items.count)")
                 }
                 
                 HStack {

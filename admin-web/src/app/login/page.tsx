@@ -50,7 +50,14 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-4">
+    <div
+      className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-4"
+      style={{
+        minHeight: "100vh",
+        backgroundColor: "#09090b",
+        fontFamily: "system-ui, sans-serif",
+      }}
+    >
       <div className="w-full max-w-sm rounded-xl border border-zinc-800 bg-zinc-900/60 p-8 shadow-xl">
         <div className="flex justify-center">
           <div className="rounded-xl bg-white px-4 py-3">

@@ -930,7 +930,7 @@ struct CreateTripView: View {
                             .foregroundColor(.secondary)
                     }
                     Spacer()
-                    Text("ui_trips_value".localized)
+                    Text("\(expense.cost, format: .currency(code: expense.currency))")
                 }
                 .onTapGesture {
                     editingExpense = expense

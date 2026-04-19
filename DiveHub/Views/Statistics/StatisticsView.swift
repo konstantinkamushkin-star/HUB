@@ -10,20 +10,21 @@ import Combine
 
 struct StatisticsView: View {
     @StateObject private var viewModel = StatisticsViewModel()
+    @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
         ScrollView {
                 VStack(spacing: 24) {
                     // Summary Cards
                     HStack(spacing: 16) {
-                        StatCard(title: "Total Dives", value: "\(viewModel.statistics.totalDives)", icon: "divehub.logo", color: .blue)
-                        StatCard(title: "Bottom Time", value: "\(viewModel.statistics.totalBottomTime)h", icon: "clock", color: .green)
+                        StatCard(title: localizationService.localizedString("totalDives", table: "statistics"), value: "\(viewModel.statistics.totalDives)", icon: "divehub.logo", color: .blue)
+                        StatCard(title: localizationService.localizedString("bottomTime", table: "statistics"), value: "\(viewModel.statistics.totalBottomTime)h", icon: "clock", color: .green)
                     }
                     .padding(.horizontal)
                     
                     HStack(spacing: 16) {
-                        StatCard(title: "Deepest", value: "\(Int(viewModel.statistics.deepestDive))m", icon: "arrow.down", color: .purple)
-                        StatCard(title: "Longest", value: "\(viewModel.statistics.longestDive)min", icon: "timer", color: .orange)
+                        StatCard(title: localizationService.localizedString("deepest", table: "statistics"), value: "\(Int(viewModel.statistics.deepestDive))m", icon: "arrow.down", color: .purple)
+                        StatCard(title: localizationService.localizedString("duration", table: "courses"), value: "\(viewModel.statistics.longestDive)min", icon: "timer", color: .orange)
                     }
                     .padding(.horizontal)
                     
@@ -50,7 +51,7 @@ struct StatisticsView: View {
                                     }
                                     .frame(height: 20)
                                     
-                                    Text("ui_statistics_value".localized)
+                                    Text("\(viewModel.statistics.diveByMonth[month] ?? 0)")
                                         .font(.caption)
                                         .frame(width: 30, alignment: .trailing)
                                 }

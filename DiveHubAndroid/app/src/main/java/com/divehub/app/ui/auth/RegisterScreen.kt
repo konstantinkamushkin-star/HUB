@@ -42,11 +42,13 @@ import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
+import androidx.credentials.exceptions.GetCredentialCancellationException
 import com.divehub.app.AppGraph
 import com.divehub.app.BuildConfig
 import com.divehub.app.R
 import com.divehub.app.ui.Routes
 import com.divehub.app.ui.components.AuthScaffold
+import com.divehub.app.ui.components.GoogleSignInBrandButtonLabel
 import kotlinx.coroutines.launch
 
 @Composable
@@ -74,6 +76,37 @@ fun RegisterRoute(nav: NavHostController, graph: AppGraph) {
 
         val uriHandler = LocalUriHandler.current
         val legalBase = BuildConfig.LEGAL_DOCS_BASE_URL.trimEnd('/')
+        val webClientId = stringResource(R.string.google_oauth_web_client_id)
+        val startGoogleSignIn = rememberGoogleSignInStarter(webClientId = webClientId) { result ->
+            result
+                .onSuccess { p ->
+                    vm.signInWithGoogle(
+                        idToken = p.idToken,
+                        email = p.email,
+                        firstName = p.givenName,
+                        lastName = p.familyName,
+                    ) { mustChange ->
+                        if (mustChange) {
+                            nav.navigate(Routes.ChangePassword) { launchSingleTop = true }
+                        } else {
+                            nav.navigate(Routes.Main) {
+                                popUpTo(Routes.Register) { inclusive = true }
+                            }
+                        }
+                    }
+                }
+                .onFailure { e ->
+                    if (e is GetCredentialCancellationException) return@onFailure
+                    scope.launch {
+                        val msg = when {
+                            e.message == "web_client_id_missing" ->
+                                graph.application.getString(R.string.auth_google_not_configured)
+                            else -> e.message ?: graph.application.getString(R.string.common_error)
+                        }
+                        snackbar.showSnackbar(msg)
+                    }
+                }
+        }
 
         val emailTrim = email.trim()
         val passTrim = password.trim()
@@ -108,25 +141,15 @@ fun RegisterRoute(nav: NavHostController, graph: AppGraph) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Button(
-                    onClick = {
-                        scope.launch {
-                            snackbar.showSnackbar(graph.application.getString(R.string.auth_oauth_apple_soon))
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
+                TextButton(
+                    onClick = { startGoogleSignIn() },
+                    enabled = !state.loading,
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(stringResource(R.string.auth_continue_apple))
-                }
-                Button(
-                    onClick = {
-                        scope.launch {
-                            snackbar.showSnackbar(graph.application.getString(R.string.auth_oauth_google_soon))
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
-                ) {
-                    Text(stringResource(R.string.auth_continue_google))
+                    GoogleSignInBrandButtonLabel(
+                        title = stringResource(R.string.auth_continue_google),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
 
                 Row(
@@ -147,7 +170,7 @@ fun RegisterRoute(nav: NavHostController, graph: AppGraph) {
                     value = email,
                     onValueChange = { email = it; emailError = null },
                     label = { Text(stringResource(R.string.auth_email_label)) },
-                    placeholder = { Text("name@example.com") },
+                    placeholder = { Text(stringResource(R.string.auth_email_placeholder)) },
                     singleLine = true,
                     isError = emailError != null,
                     supportingText = emailError?.let { err -> { Text(err) } },

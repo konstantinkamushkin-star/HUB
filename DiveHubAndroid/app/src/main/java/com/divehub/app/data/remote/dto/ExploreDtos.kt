@@ -47,6 +47,9 @@ data class DiveCenterItemDto(
     @SerializedName("review_count") val reviewCount: Int? = null,
     @SerializedName("nitrox_available") val nitroxAvailable: Boolean? = null,
     @SerializedName("description") val description: String? = null,
+    @SerializedName("services") val services: List<String>? = null,
+    @SerializedName("certification_agency") val certificationAgency: String? = null,
+    @SerializedName("price_from") val priceFrom: Double? = null,
     @SerializedName("photos") val photos: List<String>? = null,
     @SerializedName("thumbnail_url") val thumbnailUrl: String? = null,
 )
@@ -154,4 +157,36 @@ fun ShopItemDto.toExploreDiveSite(): ExploreDiveSite = ExploreDiveSite(
     rating = averageRating ?: 0.0,
     reviewCount = reviewCount ?: 0,
     kind = ExploreItemKind.SHOP,
+)
+
+fun AdminShopDraftLocal.toExploreDraftShop(): ExploreDiveSite = ExploreDiveSite(
+    id = id,
+    name = name,
+    description = "",
+    country = country,
+    region = region,
+    latitude = 0.0,
+    longitude = 0.0,
+    diveType = "Shop",
+    difficulty = "Draft",
+    depthMax = 0.0,
+    rating = 0.0,
+    reviewCount = 0,
+    kind = ExploreItemKind.SHOP,
+)
+
+/** `GET v1/dive-sites/contributions/mine` */
+data class DiveSiteContributionsMineEnvelopeDto(
+    @SerializedName("success") val success: Boolean = false,
+    @SerializedName("data") val data: List<DiveSiteContributionMineDto> = emptyList(),
+)
+
+data class DiveSiteContributionMineDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("contribution_type") val contributionType: String,
+    @SerializedName("dive_site_id") val diveSiteId: String? = null,
+    @SerializedName("message") val message: String? = null,
+    @SerializedName("status") val status: String,
+    @SerializedName("rejection_reason") val rejectionReason: String? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
 )

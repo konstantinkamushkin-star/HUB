@@ -1,11 +1,26 @@
-import { JsonPanel } from "@/components/panel/JsonPanel";
+import { Suspense } from "react";
+import { SupportTicketsClient } from "./SupportTicketsClient";
+
+export const dynamic = "force-dynamic";
 
 export default function SupportPage() {
   return (
-    <JsonPanel
-      title="Поддержка (тикеты)"
-      description="GET/POST/PATCH /admin/support/tickets. Фильтры: status, priority, assignedAdminId. Право: manage:support."
-      apiPath="/admin/support/tickets?limit=50"
-    />
+    <Suspense
+      fallback={
+        <div
+          style={{
+            minHeight: "40vh",
+            backgroundColor: "#09090b",
+            color: "#a1a1aa",
+            fontFamily: "system-ui, sans-serif",
+            padding: 24,
+          }}
+        >
+          Загрузка…
+        </div>
+      }
+    >
+      <SupportTicketsClient />
+    </Suspense>
   );
 }

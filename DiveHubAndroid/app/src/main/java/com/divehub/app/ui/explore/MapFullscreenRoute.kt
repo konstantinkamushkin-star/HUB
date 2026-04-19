@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,6 +56,7 @@ import com.divehub.app.R
 import com.divehub.app.data.ExploreRepository
 import com.divehub.app.data.remote.dto.ExploreDiveSite
 import com.divehub.app.data.remote.dto.ExploreItemKind
+import com.divehub.app.ui.map.MapSiteDetailSheet
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.theme.IosDesign
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -91,6 +93,7 @@ fun MapFullscreenRoute(graph: AppGraph, innerNav: NavController) {
     var loadError by remember { mutableStateOf<String?>(null) }
     var mapActions by remember { mutableStateOf<ExploreMapActions?>(null) }
     var pendingCenterOnUser by remember { mutableStateOf(false) }
+    var selectedDiveSite by remember { mutableStateOf<ExploreDiveSite?>(null) }
 
     LaunchedEffect(Unit) {
         loading = true
@@ -190,10 +193,7 @@ fun MapFullscreenRoute(graph: AppGraph, innerNav: NavController) {
                         sites = sites,
                         onSiteTap = { site ->
                             when (site.kind) {
-                                ExploreItemKind.DIVE_SITE ->
-                                    innerNav.navigate(
-                                        InnerRoutes.bookingWizard(centerId = null, siteId = site.id, instructorId = null),
-                                    )
+                                ExploreItemKind.DIVE_SITE -> selectedDiveSite = site
                                 ExploreItemKind.DIVE_CENTER ->
                                     innerNav.navigate(InnerRoutes.diveCenterPublic(site.id))
                                 ExploreItemKind.SHOP ->
@@ -222,6 +222,19 @@ fun MapFullscreenRoute(graph: AppGraph, innerNav: NavController) {
                         },
                     )
                 }
+            }
+        }
+
+        selectedDiveSite?.let { site ->
+            ModalBottomSheet(onDismissRequest = { selectedDiveSite = null }) {
+                MapSiteDetailSheet(
+                    site = site,
+                    onBook = null,
+                    onOpenProfile = null,
+                    onMessage = null,
+                    onReportInaccuracy = null,
+                    onClose = { selectedDiveSite = null },
+                )
             }
         }
     }

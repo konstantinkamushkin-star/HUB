@@ -59,6 +59,7 @@ import com.divehub.app.data.ReviewsRepository
 import com.divehub.app.data.remote.dto.CourseListItemDto
 import com.divehub.app.data.remote.dto.DiveCenterInstructorDto
 import com.divehub.app.data.remote.dto.ReviewDto
+import com.divehub.app.ui.components.DiveCenterPromoCard
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.reviews.AddReviewableDialog
 import com.divehub.app.ui.reviews.ReviewListRow
@@ -125,15 +126,6 @@ fun DiveCenterPublicRoute(
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.dive_center_public_cd_message))
                         }
-                    }
-                    TextButton(
-                        onClick = {
-                            innerNav.navigate(
-                                InnerRoutes.bookingWizard(centerId = centerId, siteId = null, instructorId = null),
-                            )
-                        },
-                    ) {
-                        Text(stringResource(R.string.explore_book))
                     }
                 },
             )
@@ -227,6 +219,8 @@ fun DiveCenterPublicRoute(
                             }
                             HorizontalDivider()
                             Spacer(Modifier.height(8.dp))
+                            DiveCenterPromoCard()
+                            Spacer(Modifier.height(12.dp))
                             Text(
                                 c.description?.trim().orEmpty().ifBlank { stringResource(R.string.explore_no_description) },
                                 style = MaterialTheme.typography.bodyMedium,
@@ -338,7 +332,9 @@ fun DiveCenterPublicRoute(
                             InstructorRow(
                                 instructor = inst,
                                 imageRoot = state.imageApiRoot,
-                                onClick = { innerNav.navigate(InnerRoutes.userProfile(inst.id)) },
+                                onClick = {
+                                    innerNav.navigate(InnerRoutes.instructorPublic(inst.id, centerId))
+                                },
                             )
                         }
                     }

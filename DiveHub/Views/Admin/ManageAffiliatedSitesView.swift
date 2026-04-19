@@ -22,38 +22,40 @@ struct ManageAffiliatedSitesView: View {
     }
     
     var body: some View {
-        List {
-            if isLoading {
-                ProgressView()
-            } else if let error = errorMessage {
-                Text("\(localizationService.localizedString("error", table: "common")): \(error)")
-                    .foregroundColor(.red)
-            } else {
-                Section {
-                    Text(localizationService.localizedString("selectDiveSitesForCenter", table: "admin"))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Section(localizationService.localizedString("availableDiveSites", table: "admin")) {
-                    ForEach(exploreViewModel.diveSites) { site in
-                        Toggle(isOn: Binding(
-                            get: { affiliatedSiteIds.contains(site.id) },
-                            set: { isSelected in
-                                if isSelected {
-                                    affiliatedSiteIds.insert(site.id)
-                                } else {
-                                    affiliatedSiteIds.remove(site.id)
+        VStack(spacing: 0) {
+            List {
+                if isLoading {
+                    ProgressView()
+                } else if let error = errorMessage {
+                    Text("\(localizationService.localizedString("error", table: "common")): \(error)")
+                        .foregroundColor(.red)
+                } else {
+                    Section {
+                        Text(localizationService.localizedString("selectDiveSitesForCenter", table: "admin"))
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Section(localizationService.localizedString("availableDiveSites", table: "admin")) {
+                        ForEach(exploreViewModel.diveSites) { site in
+                            Toggle(isOn: Binding(
+                                get: { affiliatedSiteIds.contains(site.id) },
+                                set: { isSelected in
+                                    if isSelected {
+                                        affiliatedSiteIds.insert(site.id)
+                                    } else {
+                                        affiliatedSiteIds.remove(site.id)
+                                    }
+                                    saveAffiliatedSites()
                                 }
-                                saveAffiliatedSites()
-                            }
-                        )) {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(site.displayName)
-                                    .font(.headline)
-                                Text(site.siteType.displayName)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
+                            )) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text(site.displayName)
+                                        .font(.headline)
+                                    Text(site.siteType.displayName)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
                             }
                         }
                     }
@@ -61,7 +63,7 @@ struct ManageAffiliatedSitesView: View {
             }
         }
         .navigationTitle(localizationService.localizedString("manageDiveSites", table: "admin"))
-        .navigationBarTitleDisplayMode(.inline)
+        .diveHubNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(localizationService.localizedString("done", table: "common")) {

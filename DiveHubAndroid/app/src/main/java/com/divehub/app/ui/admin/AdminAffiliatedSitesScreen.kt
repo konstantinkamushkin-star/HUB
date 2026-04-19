@@ -3,7 +3,9 @@ package com.divehub.app.ui.admin
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -60,6 +62,7 @@ import com.divehub.app.data.remote.dto.ExploreItemKind
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class AdminAffiliatedSitesUiState(
@@ -101,11 +104,16 @@ class AdminAffiliatedSitesViewModel(
         }
     }
 
-    suspend fun loadCenterSites(centerId: String): Set<String> = repo.getCenterSites(centerId).toSet()
+    suspend fun loadCenterSites(centerId: String): Set<String> =
+        repo.loadRemoteOrCache(centerId).toSet()
 
     fun saveCenterSites(centerId: String, siteIds: Set<String>) {
         viewModelScope.launch {
-            repo.saveCenterSites(centerId, siteIds.toList())
+            runCatching { repo.saveCenterSites(centerId, siteIds.toList()) }
+                .onSuccess { _state.update { it.copy(error = null) } }
+                .onFailure { e ->
+                    _state.update { it.copy(error = e.message ?: e::class.java.simpleName) }
+                }
         }
     }
 
@@ -132,6 +140,22 @@ fun AdminAffiliatedSitesRoute(graph: AppGraph, innerNav: NavController) {
     var selectedCenterId by remember { mutableStateOf<String?>(null) }
     var centerExpanded by remember { mutableStateOf(false) }
     val selectedSiteIds = remember { mutableStateMapOf<String, Boolean>() }
+    var siteQuery by remember { mutableStateOf("") }
+
+    val filteredSites = remember(state.sites, siteQuery) {
+        val q = siteQuery.trim()
+        if (q.isEmpty()) state.sites
+        else state.sites.filter { s ->
+            s.name.contains(q, ignoreCase = true) ||
+                s.country.contains(q, ignoreCase = true) ||
+                s.region.contains(q, ignoreCase = true) ||
+                s.id.contains(q, ignoreCase = true)
+        }
+    }
+
+    val linkedCount = remember(state.sites, selectedSiteIds) {
+        state.sites.count { selectedSiteIds[it.id] == true }
+    }
 
     LaunchedEffect(state.centers) {
         if (selectedCenterId == null) {
@@ -156,7 +180,7 @@ fun AdminAffiliatedSitesRoute(graph: AppGraph, innerNav: NavController) {
                 },
                 actions = {
                     IconButton(onClick = { vm.refresh() }, enabled = !state.loading) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.common_refresh_list))
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.common_refresh))
                     }
                 },
             )
@@ -186,6 +210,14 @@ fun AdminAffiliatedSitesRoute(graph: AppGraph, innerNav: NavController) {
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
+                    item {
+                        Text(
+                            stringResource(R.string.admin_affiliated_sites_sync_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(12.dp))
+                    }
                     item {
                         Text(
                             stringResource(R.string.admin_affiliated_sites_center_label),
@@ -235,7 +267,48 @@ fun AdminAffiliatedSitesRoute(graph: AppGraph, innerNav: NavController) {
                     if (selectedCenterId == null) {
                         item { Text(stringResource(R.string.admin_affiliated_sites_no_centers)) }
                     } else {
-                        items(state.sites, key = { it.id }) { site ->
+                        item {
+                            OutlinedTextField(
+                                value = siteQuery,
+                                onValueChange = { siteQuery = it },
+                                label = { Text(stringResource(R.string.admin_affiliated_sites_search_hint)) },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                stringResource(R.string.admin_affiliated_sites_kpi, linkedCount, filteredSites.size),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                TextButton(
+                                    onClick = {
+                                        filteredSites.forEach { selectedSiteIds[it.id] = true }
+                                        vm.saveCenterSites(selectedCenterId!!, selectedSiteIds.keys.toSet())
+                                    },
+                                    enabled = filteredSites.isNotEmpty(),
+                                ) {
+                                    Text(stringResource(R.string.admin_affiliated_sites_select_shown))
+                                }
+                                TextButton(
+                                    onClick = {
+                                        filteredSites.forEach { selectedSiteIds.remove(it.id) }
+                                        vm.saveCenterSites(selectedCenterId!!, selectedSiteIds.keys.toSet())
+                                    },
+                                    enabled = filteredSites.isNotEmpty(),
+                                ) {
+                                    Text(stringResource(R.string.admin_affiliated_sites_clear_shown))
+                                }
+                            }
+                        }
+                        items(filteredSites, key = { it.id }) { site ->
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically,
@@ -244,7 +317,7 @@ fun AdminAffiliatedSitesRoute(graph: AppGraph, innerNav: NavController) {
                                     checked = selectedSiteIds[site.id] == true,
                                     onCheckedChange = { checked ->
                                         if (checked) selectedSiteIds[site.id] = true else selectedSiteIds.remove(site.id)
-                                        vm.saveCenterSites(selectedCenterId!!, selectedSiteIds.keys)
+                                        vm.saveCenterSites(selectedCenterId!!, selectedSiteIds.keys.toSet())
                                     },
                                 )
                                 Column(Modifier.weight(1f)) {

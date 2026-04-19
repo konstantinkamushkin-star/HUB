@@ -7,6 +7,7 @@ import SwiftUI
 
 struct NewChatWithFriendView: View {
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var friends: [User] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
@@ -24,7 +25,7 @@ struct NewChatWithFriendView: View {
                         .padding()
                 } else if friends.isEmpty {
                     ContentUnavailableView(
-                        "No friends yet",
+                        localizationService.localizedString("noFriends", table: "social"),
                         systemImage: "person.2.slash",
                         description: Text("ui_chat_add_friends_in_the_social_tab_to_start_a_chat".localized)
                     )

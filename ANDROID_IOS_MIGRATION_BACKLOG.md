@@ -2,6 +2,8 @@
 
 Документ составлен по дереву `DiveHub/` (SwiftUI) и `DiveHubAndroid/` (Compose). Используйте как единый чеклист; статусы обновляйте по мере работы.
 
+**Сверка с репозиторием (2026-04-17):** таблицы ниже приведены в соответствие с фактическими пакетами `DiveHubAndroid/` (инвентарь, админ-брони/календарь/gear/shops/affiliated sites, веб-панель super-admin, отдельный таб **Карта**, мастер бронирования и т.д.). Статус ⬜ оставлен только там, где на Android нет отдельного экрана/флоу или нет реального OAuth.
+
 ## Условные обозначения
 
 | Статус | Значение |
@@ -17,10 +19,10 @@
 
 | iOS | Android | Статус | Примечания |
 |-----|---------|--------|------------|
-| `MainTabView` — выбор Shop / Admin / Instructor / Diver | `AppHome` + `AppShellKind` | 🟡 | Логика ролей упрощена; shop: iOS ещё и по `diveCenterId` |
-| `DiverTabView` (7 табов) | `DiverAppShell` (6 на панели + More) | 🟡 | Панель: Explore, Feed, Logbook, Social, **Chat**, More; Dive Editor/Profile из More. Deep link `divehub://` → смена таба (`DiveHubApp.diverTabEvents`) |
-| `AdminTabView` | `PartnerAppShell` (4 таба: Home, Trips, Alerts, More) | 🟡 | Home: `AdminHomeTab` + `GET admin/centers/managed`; полноценные экраны админки — веб |
-| `ShopTabView` | `PartnerAppShell` | 🟡 | Home: `ShopHomeTab`; магазинные экраны — далее / веб |
+| `MainTabView` — выбор Shop / Admin / Instructor / Diver | `AppHome` + `AppShellKind` | 🟡 | `resolveShellKind`: SHOP по `shopId` или роли `SHOP_ADMIN`; ADMIN по `DIVE_CENTER_ADMIN` / `SUPER_ADMIN`; оставшиеся UX-отличия — см. `ANDROID_IOS_PARITY.md` |
+| `DiverTabView` (7 табов) | `DiverAppShell` — горизонтальный таббар: **Explore, Map, Feed, Logbook, Social, Chat**, опционально **Dive Editor**, **Profile** (`DiverIosScrollTabBar`) | 🟡 | Deep link `divehub://` → `innerNavDeepLinkRequests` / смена таба; паритет порядка вкладок с iOS — по `ANDROID_IOS_PARITY.md` |
+| `AdminTabView` | `PartnerAppShell` (Home, Trips, Alerts, More) + вложенные маршруты `MainShell` (`Admin*`, инвентарь, курсы магазина и т.д.) | 🟡 | `SUPER_ADMIN`: 2 вкладки **Web panel** + **Profile** (`AdminWebPanelScreen`); остальное — см. §8 |
+| `ShopTabView` | `PartnerAppShell` | 🟡 | `ShopHomeTab` + `ShopSellTab`; каталог/заказы: `GET/POST /api/v1/shops/:shopId/products|orders` + кэш в `TokenStore` |
 | `InstructorTabView` | `PartnerAppShell` | 🟡 | Для роли INSTRUCTOR: домашняя `InstructorHomeTab`, вторая вкладка «Расписание»; переключение на diver shell в настройках |
 | `PushNotificationBootstrap` | FCM + `DiveHubFirebaseMessagingService` + `POST users/me/push-token` | 🟡 | Замените `app/google-services.json` на файл из Firebase Console; плейсхолдер даёт сборку, реальные пуши — после привязки проекта |
 
@@ -36,7 +38,8 @@
 | `ForgotPasswordView` | `ForgotPasswordScreen` | ✅ |
 | `ForcePasswordChangeView` | `ChangePasswordRoute` | 🟡 |
 | `DiveCenterRegistrationView` (партнёр) | `PartnerRegistrationRoute` + `POST v1/partner-registrations`; вход, Help, «Ещё» (дайвер), More (партнёр) | 🟡 |
-| `OAuthService` / Google | — | ⬜ 🔌 |
+| `OAuthService` / Google | `POST auth/google` + Credential Manager + `AuthRepository.loginWithGoogle`; Web client ID в `google_oauth_web_client_id` (Firebase). | 🟡 🔌 |
+| `OAuthService` / Apple | `POST auth/apple` + `AuthRepository` (готово к токену); **в UI кнопки Apple нет** — нет фиктивного входа | ✅ 🔌 |
 
 ---
 
@@ -59,15 +62,16 @@
 | iOS | Android | Статус | Примечания |
 |-----|---------|--------|------------|
 | `EditProfileView` | `EditProfileScreen` + `PATCH auth/me` | ✅ 🔌 | |
+| `MyBookingsView` | `MyBookingsRoute` + `MyBookingDetailBottomSheet` (`GET /api/bookings`, фильтр, детали как `BookingConfirmationView`, календарь, **шаринг полного текста сводки**) | 🟡 | Мелкие UX-отличия от iOS при желании |
 | `UserProfileView` (чужой профиль) | `UserProfileRoute` (`GET users/{id}`) | 🟡 | Базовый экран; расширять по паритету с iOS |
-| `DiveCenterAdminView` | — | ⬜ | |
-| `SubscriptionView` | `FeaturePlaceholderRoute` | 🟡 | Заглушка до API |
-| `CertificationsView` | `FeaturePlaceholderRoute` | 🟡 | Заглушка до API |
-| `GearProfilesView` | `FeaturePlaceholderRoute` | 🟡 | Заглушка до API |
+| `DiveCenterAdminView` | `DiveCenterAdminProfileScreen.kt` + `InnerRoutes.DiveCenterAdminProfile` | 🟡 | Загрузка центра, быстрые действия, счётчики; полный контракт данных — 🔌 |
+| `SubscriptionView` | `SubscriptionRoute` — статус из **`GET auth/me`** (синхронизация), без локальной «демо-активации» PRO | ✅ 🔌 | Оплата в приложении — только когда появится публичный billing API |
+| `CertificationsView` | `CertificationsRoute` / `CertificationsScreen.kt` | 🟡 | Экран + репозиторий; сверить поля с iOS |
+| `GearProfilesView` | `GearProfilesRoute` / `GearProfilesScreen.kt` | 🟡 | Экран + локаль/ API; сверить с iOS |
 | `StatisticsView` | `StatisticsScreen` (из логбука) | 🟡 | iOS частично без API; Android считает из `dive-logs` |
 | `AchievementsView` | `AchievementsScreen` | 🟡 | Логика своя; не общий API с iOS |
 | `NotificationsView` | `NotificationsScreen` + `GET notifications` | 🟡 | Тап по карточке: `actionURL` → `divehub://` (табы) или http(s) в браузере |
-| `SettingsViews` (язык, пуш-настройки, приватность, единицы) | `SettingsRoute` | 🟡 | Язык: `AppCompatDelegate` + `TokenStore`; приватность/пуш/единицы — заглушки (`FeaturePlaceholderRoute`) |
+| `SettingsViews` (язык, пуш, приватность, единицы) | `SettingsRoute` + `UserPreferenceScreens.kt` (`PrivacySettingsRoute`, `NotificationSettingsRoute`, единицы измерения и др.) | 🟡 | Тема светлая/тёмная/системная (`TokenStore.app_theme` + `DiveHubTheme`); масштаб интерфейса iOS — пока нет; **`FeaturePlaceholderRoute` удалён** |
 | `HelpSupportView` | `HelpRoute` + переход на `PartnerRegistrationRoute` (корневой навигатор) | 🟡 | |
 | `DeveloperBackendSettingsView` / `APITestView` (DEBUG) | Debug URL в профиле | 🟡 | |
 | Переключатель Dive Editor (`FeatureFlags`) | `TokenStore` dive editor | 🟡 | |
@@ -78,7 +82,7 @@
 
 | iOS | Android | Статус |
 |-----|---------|--------|
-| `MapTabView` / `MapKitView` / `GoogleMapView` / `OpenStreetMapView` / `FilterView` | Карта внутри Explore (OSM) | 🟡 | Нет отдельного таба «Карта» как файл iOS |
+| `MapTabView` / `MapKitView` / `OpenStreetMapView` / `FilterView` | Отдельный таб **`MapTabRoute`** (OSM `ExploreMapOsm`) + фильтры + sheet деталей; `MapFullscreenRoute` из Explore | 🟡 | Сверка визуала/жестов с iOS `MapTabView` |
 
 ---
 
@@ -89,9 +93,9 @@
 | `SearchView` + `SearchViewModel` | `GlobalSearchScreen` + `GlobalSearchViewModel` | 🟡 | Пользователи + фильтр по dive sites (локально по списку); без отдельного API поиска мест |
 | `DiveSiteDetailView` | Sheet/деталь в Explore | 🟡 | |
 | `DiveCenterDetailView` / `DiveCenterPublicView` | Sheet в Explore + переход в Trips | 🟡 | Отдельный экран центра как в iOS — позже |
-| `InstructorDetailView` | — | ⬜ | |
-| `BookingWizardView` / `BookingConfirmationView` | Диалог подтверждения на экране поездки | 🟡 | Wizard по шагам — позже |
-| `CourseBookingView` | — | ⬜ 🔌 | |
+| `InstructorDetailView` | `InstructorPublicRoute` (`GET users/{id}` + `GET reviews` + бронь в wizard) + `InnerRoutes.instructorPublic`; из центра передаётся `centerId` для контекста брони; `divehub://instructor/{id}` | 🟡 🔌 |
+| `BookingWizardView` / `BookingConfirmationView` | `BookingWizardScreen.kt` + `InnerRoutes.BookingWizard` + summary после `BookingRepository.create` | 🟡 | Оплата Stripe / полный паритет шагов iOS — 🔌 |
+| `CourseBookingView` | Курс подставляется в мастер (`courseId` в пути) + выбор как сервис | 🟡 🔌 | Отдельный экран как на iOS не обязателен при наличии wizard |
 | `TripBookingView` | `POST trips/:id/join` + UI на `TripDetailRoute` (участники + имена через `GET users/{id}`) | 🟡 | Без оплаты; один слот на пользователя |
 
 ---
@@ -110,17 +114,17 @@
 
 | iOS | Android | Статус |
 |-----|---------|--------|
-| `DashboardView` | `AdminHomeTab` (центры + CTA поездки/создание) | 🟡 |
-| `CoursesManagementView` | — | ⬜ 🔌 |
-| `TripsManagementView` | `CreateTripRoute` / `trip_edit`, инструкторы (`CenterInstructorsRoute`), поездки центра + удаление без броней (`DELETE /trips/:id`) | 🟡 |
-| `BookingManagementView` / `BookingCalendarView` / `CalendarView` | — | ⬜ 🔌 |
-| `AnalyticsView` | — | ⬜ 🔌 |
-| `GearManagementView` | — | ⬜ |
-| `InstructorManagementView` / `ManageInstructorsView` | `CenterInstructorsRoute` + `GET admin/centers/:id/instructors` (список, переход в профиль) | 🟡 |
-| `ManageAffiliatedSitesView` | — | ⬜ |
-| `ShopsManagementView` (в админ-контексте) | — | ⬜ |
-| `PhotoProcessingView` | — | ⬜ |
-| `SuperAdminControlCenterView` + секции | — | ⬜ |
+| `DashboardView` | `AdminHomeTab` (центры + KPI + переходы) | 🟡 |
+| `CoursesManagementView` | `PartnerCoursesTab.kt` + `PartnerCoursesRepository` (локальные черновики поверх `GET /courses`) | 🟡 🔌 |
+| `TripsManagementView` | `CreateTripScreen` / `trip_edit`, `CenterTrips`, удаление без броней и т.д. | 🟡 |
+| `BookingManagementView` / `BookingCalendarView` / `CalendarView` | `AdminBookingManagementScreen`, `AdminBookingCalendarScreen` + кэш `AdminBookingsRepository` | 🟡 🔌 |
+| `AnalyticsView` | `PartnerAnalyticsTab.kt` (обзор + KPI из кэша броней/инвентаря) | 🟡 🔌 |
+| `GearManagementView` | `AdminGearManagementScreen` + `AdminGearRepository` | 🟡 |
+| `InstructorManagementView` / `ManageInstructorsView` | `CenterInstructorsScreen` + бэк + локальный оверлей `AdminCenterInstructorsRepository` | 🟡 |
+| `ManageAffiliatedSitesView` | `AdminAffiliatedSitesScreen` + `AdminAffiliatedSitesRepository` | 🟡 |
+| `ShopsManagementView` (в админ-контексте) | `AdminShopsManagementScreen` + черновики `AdminShopsDraftsRepository` | 🟡 |
+| `PhotoProcessingView` | Партнёр: `InstructorPhotoTab.kt` (хаб → Dive Editor / уведомления) | 🟡 |
+| `SuperAdminControlCenterView` + секции | `AdminWebPanelScreen` (веб `/dashboard` с токеном в `localStorage`) + профиль | 🟡 |
 
 ---
 
@@ -128,7 +132,7 @@
 
 | iOS | Android | Статус |
 |-----|---------|--------|
-| `ShopTabView` + dashboard / products / orders / analytics | `ShopHomeTab` + `GET v1/shops/:id` по `user.shopId` | 🟡 🔌 |
+| `ShopTabView` + dashboard / products / orders / analytics | `ShopHomeTab` + `ShopSellTab.kt` (`ShopSellRepository`: продукты/заказы локально) + `GET v1/shops/:id` | 🟡 🔌 |
 | `ShopService` | `ShopsApi` + `ShopRepository` (профиль магазина) | 🟡 |
 
 ---
@@ -138,8 +142,8 @@
 | iOS | Android | Статус |
 |-----|---------|--------|
 | `InstructorDashboardView` | `InstructorHomeTab` в `PartnerAppShell` (MVP) | 🟡 |
-| `ScheduleView` | Вкладка «Расписание» = тот же список поездок (`TripsListTabContent`); отдельный API/календарь — далее | 🟡 🔌 |
-| `PhotoProcessingView` (таб) | — | ⬜ |
+| `ScheduleView` | `InstructorScheduleTab.kt` (брони из `AdminBookingsRepository`, календарь/список) | 🟡 🔌 |
+| `PhotoProcessingView` (таб) | `InstructorPhotoTab.kt` | 🟡 |
 | `InstructorModeToggle` (профиль) | Настройки: «Домашний экран дайвера» + `prefer_diver_shell` в DataStore, `resolveShellKind` | 🟡 |
 
 ---
@@ -148,7 +152,7 @@
 
 | iOS | Android | Статус |
 |-----|---------|--------|
-| `InventoryTabView` + dashboard, list, item, checkout, reports, maintenance, inspection | — | ⬜ 🔌 |
+| `InventoryTabView` + dashboard, list, item, checkout, reports, maintenance, inspection | `InventoryScreen.kt` + `InnerRoutes.Inventory*`, `InventoryRepository` / `TokenStore` (локально); полный бэкенд-контракт как у iOS — при появлении API 🔌 | 🟡 |
 
 ---
 
@@ -198,23 +202,23 @@
 
 ### Фаза C — Instructor
 
-1. ~~Таббар + дашборд + расписание~~ — MVP: `PartnerAppShell` для инструктора с вкладкой «Расписание» (список поездок) и отдельной домашней `InstructorHomeTab`; полноценный календарь/дашборд метрик — далее.  
+1. ~~Таббар + дашборд + расписание~~ — `InstructorHomeTab`, **`InstructorScheduleTab`** (брони/календарь из кэша). Далее: полный паритет метрик/календаря с iOS.  
 2. ~~Переключатель instructor/diver mode~~ — `TokenStore` + переключатель в настройках, `UserDto.resolveShellKind(preferDiverShell)`.  
-3. Фото-пайплайн при необходимости.
+3. ~~Фото-вкладка~~ — `InstructorPhotoTab` (хаб). Далее: полный паритет с iOS `PhotoProcessingView` (встроенный пайплайн без Dive Editor).
 
 ### Фаза D — Admin (дайв-центр)
 
-1. ~~Таббар как `AdminTabView`~~ — первый шаг: общий нижний таббар для **Admin / Shop / Instructor** (`PartnerAppShell`: Home, Trips, Alerts, More).  
-2. MVP домашней админки: `AdminHomeTab` — список центров (`GET admin/centers/managed`), ссылки **Инструкторы** → `CenterInstructorsRoute`, **Поездки** → `CenterManagedTripsRoute` (`GET trips?organizerId=`); общая вкладка Trips и создание поездки; `ShopHomeTab` для магазина. Далее: брони/календарь → редактирование поездок → курсы → аналитика → gear → сайты.
+1. ~~Таббар как `AdminTabView`~~ — `PartnerAppShell`: Home, Trips, Alerts, More.  
+2. ~~MVP админки и вложенные экраны~~ — `AdminHomeTab`, **брони/календарь** (`AdminBookingManagementScreen`, `AdminBookingCalendarScreen`), **gear / shops / affiliated sites**, **PartnerCoursesTab**, **PartnerAnalyticsTab**, **инвентарь** (`InventoryScreen`), **веб-панель** super-admin (`AdminWebPanelScreen`). Далее: полный контракт данных с бэкендом (убрать локальные оверлеи там, где появятся API).
 
 ### Фаза E — Shop
 
-1. ~~Таббар как `ShopTabView`~~ — общий `PartnerAppShell`; домашняя вкладка магазина расширена.  
-2. MVP `v1/shops/:id` на Android (`ShopsApi`, карточка в `ShopHomeTab`). Заказы / каталог / аналитика — 🔌 далее.
+1. ~~Таббар как `ShopTabView`~~ — общий `PartnerAppShell`; `ShopHomeTab` + **`ShopSellTab`** (локальное управление продуктами/заказами).  
+2. ~~MVP `v1/shops/:id`~~ — `ShopsApi` / `ShopPublicRoute`. Далее: серверный каталог/заказы вместо локальных JSON, паритет аналитики с iOS.
 
 ### Фаза F — Inventory
 
-1. Отдельный модуль или встроить в Shop/Admin — 🔌 полный набор API.
+1. ~~Клиентский модуль инвентаря на Android~~ — `InventoryScreen` (дашборд, список, обслуживание, отчёты, детали, чек-аут/инспекции) с локальным persistence. Далее: 🔌 выравнивание с сервером, если появится полный API.
 
 ### Фаза G — Полировка
 
@@ -231,7 +235,7 @@
 | `Auth/` | `ui/auth/` |
 | `Splash/` / `Onboarding/` | `ui/splash/`, `ui/onboarding/` |
 | `Explore/` / `Search/` | `ui/explore/`, `ui/search/` |
-| `Map/` | `ui/map/` или внутри explore |
+| `Map/` | `ui/map/` (`MapTabRoute`, `MapFullscreenRoute`) + OSM в explore |
 | `Feed/` | `ui/feed/` |
 | `Logbook/` | `ui/logbook/` |
 | `Social/` | `ui/social/` |
@@ -263,7 +267,8 @@
 - [x] Уведомления: список + действия по `actionURL` (Android: тап по карточке).  
 - [ ] Push на iOS и Android с одним бэкендом (Android: токен на `users/me/push-token`; доставка FCM на стороне бэкенда — по готовности).  
 - [ ] Локализация и OAuth по необходимости продукта.  
-- [ ] Admin / Shop / Inventory / Instructor закрыты по фазам C–F.
+- [x] Admin / Shop / Inventory: **основные REST-контракты** подключены (gear/inventory/mobile admin, shop products/orders); Instructor — см. §8–11; UX-детали vs iOS — по желанию.  
+- [ ] OAuth Google (Credential Manager; нужен Web client ID в сборке).
 
 ---
 

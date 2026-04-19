@@ -35,6 +35,13 @@ object InnerRoutes {
     const val UserProfile = "user_profile/{userId}"
     fun userProfile(userId: String) = "user_profile/$userId"
 
+    /** Diver-facing instructor profile (iOS `InstructorDetailView`). Optional `centerId` for booking context (`-` = none). */
+    const val InstructorPublic = "instructor_public/{userId}/{centerId}"
+
+    fun instructorPublic(userId: String, centerId: String? = null) =
+        "instructor_public/$userId/${centerId?.takeIf { it.isNotBlank() } ?: "-"}"
+    const val DiveCenterAdminProfile = "dive_center_admin_profile"
+
     const val Help = "help"
     const val Notifications = "notifications"
     const val Settings = "settings"
@@ -45,7 +52,13 @@ object InnerRoutes {
     const val AdminBookingManagement = "admin_booking_management"
     const val AdminBookingCalendar = "admin_booking_calendar"
     const val AdminAffiliatedSites = "admin_affiliated_sites"
+    const val AdminWebPanel = "admin_web_panel"
     const val Inventory = "inventory"
+    const val InventoryItemDetail = "inventory_item_detail/{itemId}"
+    const val InventoryTicketDetail = "inventory_ticket_detail/{ticketId}"
+
+    fun inventoryItemDetail(itemId: String) = "inventory_item_detail/$itemId"
+    fun inventoryTicketDetail(ticketId: String) = "inventory_ticket_detail/$ticketId"
 
     const val Subscription = "subscription"
     const val Certifications = "certifications"
@@ -53,6 +66,12 @@ object InnerRoutes {
     const val PrivacySettings = "privacy_settings"
     const val NotificationSettings = "notification_settings"
     const val MeasurementUnits = "measurement_units"
+
+    /** User's submitted dive site corrections / new sites (`GET v1/dive-sites/contributions/mine`). */
+    const val MyDiveSiteContributions = "my_dive_site_contributions"
+
+    /** Diver booking history (`GET /api/bookings`), iOS `MyBookingsView`. */
+    const val MyBookings = "my_bookings"
 
     /** Full-screen underwater / dive editor (parity with iOS Photo processing tab). */
     const val DiveEditor = "dive_editor"
@@ -80,4 +99,12 @@ object InnerRoutes {
     const val BusinessChatOpen = "business_chat/{peerType}/{peerId}"
 
     fun businessChatOpen(peerType: String, peerId: String) = "business_chat/$peerType/$peerId"
+
+    /** New app support topic → opens Messages tab on the new thread. */
+    const val AppSupportNewTopic = "help_app_support_new_topic"
+
+    /** Feedback / bug report forms → `POST chat/support/tickets`. Category: `feedback`, `bug`, or `other`. */
+    const val SupportTicketForm = "support_ticket_form/{category}"
+
+    fun supportTicketForm(category: String) = "support_ticket_form/$category"
 }

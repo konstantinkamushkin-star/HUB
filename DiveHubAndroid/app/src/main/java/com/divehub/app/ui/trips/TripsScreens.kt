@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
@@ -30,9 +31,11 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -63,6 +66,9 @@ import com.divehub.app.data.remote.dto.participantUserRows
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.util.absoluteMediaUrl
 import java.util.Locale
+import java.time.LocalDate
+
+private enum class TripsListFilter { ALL, UPCOMING, FULL, DAILY, SAFARI }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -305,6 +311,37 @@ fun TripsListTabContent(
         factory = TripsListViewModel.factory(graph),
     )
     val state by vm.state.collectAsState()
+    var q by remember { mutableStateOf("") }
+    var filter by remember { mutableStateOf(TripsListFilter.ALL) }
+
+    val today = remember { runCatching { LocalDate.now() }.getOrNull() }
+    val filteredTrips = remember(state.trips, q, filter, today) {
+        val query = q.trim().lowercase()
+        state.trips.filter { t ->
+            val passQuery = query.isBlank() || listOfNotNull(
+                t.country,
+                t.region,
+                t.tripType,
+                t.description,
+                t.id,
+            ).joinToString(" ").lowercase().contains(query)
+
+            val total = t.totalSpots ?: 0
+            val booked = t.bookedSpots ?: 0
+            val tripDate = t.startDate?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+            val passFilter = when (filter) {
+                TripsListFilter.ALL -> true
+                TripsListFilter.UPCOMING -> today == null || tripDate == null || !tripDate.isBefore(today)
+                TripsListFilter.FULL -> total > 0 && booked >= total
+                TripsListFilter.DAILY -> t.tripType.equals("daily", ignoreCase = true)
+                TripsListFilter.SAFARI -> t.tripType.equals("safari", ignoreCase = true)
+            }
+            passQuery && passFilter
+        }
+    }
+    val totalTrips = filteredTrips.size
+    val fullTrips = filteredTrips.count { (it.totalSpots ?: 0) > 0 && (it.bookedSpots ?: 0) >= (it.totalSpots ?: 0) }
+    val openTrips = totalTrips - fullTrips
 
     Scaffold(
         topBar = {
@@ -362,7 +399,56 @@ fun TripsListTabContent(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    items(state.trips, key = { it.id }) { trip ->
+                    item("search_filters") {
+                        OutlinedTextField(
+                            value = q,
+                            onValueChange = { q = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text(stringResource(R.string.trip_list_search_label)) },
+                            singleLine = true,
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            FilterChip(
+                                selected = filter == TripsListFilter.ALL,
+                                onClick = { filter = TripsListFilter.ALL },
+                                label = { Text(stringResource(R.string.trip_list_filter_all)) },
+                            )
+                            FilterChip(
+                                selected = filter == TripsListFilter.UPCOMING,
+                                onClick = { filter = TripsListFilter.UPCOMING },
+                                label = { Text(stringResource(R.string.trip_list_filter_upcoming)) },
+                            )
+                            FilterChip(
+                                selected = filter == TripsListFilter.FULL,
+                                onClick = { filter = TripsListFilter.FULL },
+                                label = { Text(stringResource(R.string.trip_list_filter_full)) },
+                            )
+                            FilterChip(
+                                selected = filter == TripsListFilter.DAILY,
+                                onClick = { filter = TripsListFilter.DAILY },
+                                label = { Text(stringResource(R.string.trip_create_type_daily)) },
+                            )
+                            FilterChip(
+                                selected = filter == TripsListFilter.SAFARI,
+                                onClick = { filter = TripsListFilter.SAFARI },
+                                label = { Text(stringResource(R.string.trip_create_type_safari)) },
+                            )
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        Text(
+                            stringResource(R.string.trip_list_kpi_line, totalTrips, openTrips, fullTrips),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(4.dp))
+                    }
+                    items(filteredTrips, key = { it.id }) { trip ->
                         TripListCard(trip = trip, onClick = {
                             innerNav.navigate(InnerRoutes.tripDetail(trip.id))
                         })

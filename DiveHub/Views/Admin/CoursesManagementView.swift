@@ -22,31 +22,33 @@ struct CoursesManagementView: View {
     
     var body: some View {
         NavigationView {
-            contentView
-                .navigationTitle(localizationService.localizedString("courses", table: "courses"))
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarTrailing) {
-                        Button(action: {
-                            showCreateCourse = true
-                        }) {
-                            Image(systemName: "plus")
-                        }
+            VStack(spacing: 0) {
+                contentView
+            }
+            .navigationTitle(localizationService.localizedString("courses", table: "courses"))
+            .diveHubNavigationChrome()
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showCreateCourse = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
                     }
                 }
-                .sheet(isPresented: $showCreateCourse) {
-                    CreateCourseView(viewModel: viewModel)
-                }
-                .sheet(item: $selectedCourse) { course in
-                    CourseDetailView(course: course, viewModel: viewModel)
-                        .onDisappear {
-                            Task {
-                                await loadCoursesIfNeeded()
-                            }
+            }
+            .sheet(isPresented: $showCreateCourse) {
+                CreateCourseView(viewModel: viewModel)
+            }
+            .sheet(item: $selectedCourse) { course in
+                CourseDetailView(course: course, viewModel: viewModel)
+                    .onDisappear {
+                        Task {
+                            await loadCoursesIfNeeded()
                         }
-                }
-                .task {
-                    await loadCoursesIfNeeded()
-                }
+                    }
+            }
+            .task {
+                await loadCoursesIfNeeded()
+            }
         }
         .onChange(of: showCreateCourse) { oldValue, newValue in
             if oldValue == true && newValue == false {
@@ -287,7 +289,7 @@ struct CourseDetailView: View {
                             Text(localizationService.localizedString("prerequisites", table: "courses"))
                                 .font(.headline)
                             ForEach(prerequisites, id: \.self) { prereq in
-                                Text("ui_admin_a_value".localized)
+                                Text("• \\(prereq)")
                                     .font(.subheadline)
                             }
                         }

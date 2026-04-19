@@ -117,34 +117,6 @@ struct FilterView: View {
                             .frame(width: 80)
                     }
                 }
-                
-                Section("ui_search_options".localized) {
-                    Toggle("ui_map_show_all_countries_disable_location_based_search".localized, isOn: Binding(
-                        get: { filters.maxDistance == nil },
-                        set: { enabled in
-                            if enabled {
-                                // Disable geo search by setting maxDistance to nil
-                                filters.maxDistance = nil
-                                filters.centerLatitude = nil
-                                filters.centerLongitude = nil
-                            } else {
-                                // Re-enable geo search with default radius
-                                filters.maxDistance = 500 // 500km default
-                            }
-                        }
-                    ))
-                    
-                    if filters.maxDistance != nil {
-                        HStack {
-                            Text(localizationService.localizedString("searchRadius", table: "explore"))
-                            Spacer()
-                            TextField("ui_map_value".localized, value: $filters.maxDistance, format: .number)
-                                .keyboardType(.decimalPad)
-                                .frame(width: 80)
-                            Text(localizationService.localizedString("km", table: "explore"))
-                        }
-                    }
-                }
             }
             .onAppear {
                 countryHelper.ensureLoaded()

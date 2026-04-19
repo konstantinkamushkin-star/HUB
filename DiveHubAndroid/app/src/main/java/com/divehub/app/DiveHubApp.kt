@@ -136,6 +136,9 @@ class DiveHubApp : Application(), ImageLoaderFactory {
                 "user" -> firstPathOrQueryId(uri)?.let { id ->
                     requestInnerNavRoute(InnerRoutes.userProfile(id))
                 }
+                "instructor" -> firstPathOrQueryId(uri)?.let { id ->
+                    requestInnerNavRoute(InnerRoutes.instructorPublic(id, null))
+                }
                 "search" -> {
                     val q = uri.getQueryParameter("q")?.trim()?.takeIf { it.isNotEmpty() }
                     if (q != null) {

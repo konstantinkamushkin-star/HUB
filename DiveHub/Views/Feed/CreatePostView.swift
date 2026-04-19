@@ -166,9 +166,9 @@ struct CreatePostView: View {
                         VStack(alignment: .leading, spacing: 6) {
                             Text("Dive: \(dive.location.name.isEmpty ? "Unknown site" : dive.location.name)")
                                 .font(.headline)
-                            Text("ui_feed_depth_value_m".localized)
+                            Text("\(localizationService.localizedString("maxDepth", table: "logbook")): \(Int(dive.maxDepth))m")
                                 .font(.subheadline)
-                            Text("ui_feed_time_value_min".localized)
+                            Text("\(localizationService.localizedString("bottomTime", table: "logbook")): \(dive.bottomTime) min")
                                 .font(.subheadline)
                             Text("📍 \(dive.location.name.isEmpty ? "Unknown" : dive.location.name)")
                                 .font(.subheadline)
@@ -188,8 +188,8 @@ struct CreatePostView: View {
                         .background(Color.diveBackground)
                         .cornerRadius(12)
                         
-                        if dive.waterTemperature != nil {
-                            Text("ui_feed_water_value_aac".localized)
+                        if let temperature = dive.waterTemperature {
+                            Text("\(localizationService.localizedString("waterTemp", table: "statistics")): \(Int(temperature))°C")
                                 .font(.footnote)
                                 .foregroundColor(.secondary)
                         }
@@ -214,7 +214,7 @@ struct CreatePostView: View {
                             }
                             HStack(spacing: 10) {
                                 if !selectedPhotoImages.isEmpty {
-                                    Text("ui_feed_aaaa_value".localized)
+                                    Text("📷 \(selectedPhotoImages.count)")
                                 }
                                 if selectedDiveLog != nil {
                                     Text("ui_feed_aaaa_dive_attached".localized)
@@ -352,6 +352,7 @@ struct DiveLogPickerView: View {
     let diveLogs: [DiveLog]
     @Binding var selectedLog: DiveLog?
     @Environment(\.dismiss) var dismiss
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var searchText = ""
     
     var filteredLogs: [DiveLog] {
@@ -391,7 +392,7 @@ struct DiveLogPickerView: View {
             }
             .navigationTitle("ui_feed_select_dive_log".localized)
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $searchText, prompt: "Search dive logs")
+            .searchable(text: $searchText, prompt: localizationService.localizedString("search"))
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("ui_feed_done".localized) {

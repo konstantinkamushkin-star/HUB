@@ -3,7 +3,6 @@
 //  DiveHub
 //
 
-import AVFoundation
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -13,26 +12,6 @@ private struct DiveEditorImagePayload: Identifiable {
     let image: UIImage
 }
 
-private struct DiveEditorVideoPayload: Identifiable {
-    let id = UUID()
-    let url: URL
-}
-
-private enum DiveEditorPickMedia {
-    static let maxVideoDurationSeconds: Double = 5 * 60
-
-    static func videoWithinDurationLimit(url: URL) async -> Bool {
-        let asset = AVURLAsset(url: url)
-        do {
-            let duration = try await asset.load(.duration)
-            let s = CMTimeGetSeconds(duration)
-            return s.isFinite && !s.isNaN && s > 0 && s <= maxVideoDurationSeconds
-        } catch {
-            return false
-        }
-    }
-}
-
 struct DiveEditorTabView: View {
     @StateObject private var localizationService = LocalizationService.shared
     @State private var mediaItem: PhotosPickerItem?
@@ -40,7 +19,6 @@ struct DiveEditorTabView: View {
     @State private var errorMessage: String?
     @State private var showAppGallery = false
     @State private var editorPayload: DiveEditorImagePayload?
-    @State private var videoEditorPayload: DiveEditorVideoPayload?
     @State private var recent: [DiveEditorRecentEntry] = []
 
     var body: some View {
@@ -57,11 +35,11 @@ struct DiveEditorTabView: View {
                     VStack(spacing: 12) {
                         PhotosPicker(
                             selection: $mediaItem,
-                            matching: .any(of: [.images, .videos]),
+                            matching: .images,
                             photoLibrary: .shared()
                         ) {
                             Label(
-                                localizationService.localizedString("diveEditorChoosePhotoOrVideo", table: "imageEditing"),
+                                localizationService.localizedString("diveEditorChoosePhoto", table: "imageEditing"),
                                 systemImage: "photo.on.rectangle.angled"
                             )
                             .font(.headline)
@@ -85,6 +63,8 @@ struct DiveEditorTabView: View {
                                 .foregroundColor(.diveText)
                                 .cornerRadius(12)
                         }
+
+                        diveEditorVideoComingSoonTeaser
                     }
 
                     diveEditorSampleBlock
@@ -133,13 +113,6 @@ struct DiveEditorTabView: View {
                     }
                 }
             }
-            .fullScreenCover(item: $videoEditorPayload) { payload in
-                NavigationStack {
-                    DiveEditorVideoEditorView(videoURL: payload.url) {
-                        videoEditorPayload = nil
-                    }
-                }
-            }
             .overlay {
                 if isLoadingPick {
                     ZStack {
@@ -157,6 +130,28 @@ struct DiveEditorTabView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+    }
+
+    private var diveEditorVideoComingSoonTeaser: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: "video.fill")
+                .font(.title3)
+                .foregroundColor(.divePrimary)
+                .frame(width: 28, alignment: .center)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(localizationService.localizedString("underwaterVideoProcessingTeaserTitle", table: "imageEditing"))
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.diveText)
+                Text(localizationService.localizedString("underwaterVideoProcessingTeaserSubtitle", table: "imageEditing"))
+                    .font(.caption)
+                    .foregroundColor(.diveTextSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.divePrimary.opacity(0.08))
+        .cornerRadius(12)
     }
 
     private var diveEditorSampleBlock: some View {
@@ -215,28 +210,8 @@ struct DiveEditorTabView: View {
             return
         }
 
-        let outURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dive_editor_video_\(UUID().uuidString).mp4")
-        do {
-            try data.write(to: outURL, options: .atomic)
-        } catch {
-            await MainActor.run {
-                errorMessage = LocalizationService.shared.localizedString("unsupportedFileFormat", table: "imageEditing")
-            }
-            return
-        }
-
-        guard await DiveEditorPickMedia.videoWithinDurationLimit(url: outURL) else {
-            try? FileManager.default.removeItem(at: outURL)
-            await MainActor.run {
-                errorMessage = LocalizationService.shared.localizedString("videoMaxLength5Minutes", table: "imageEditing")
-            }
-            return
-        }
-
         await MainActor.run {
-            DiveEditorAnalyticsService.shared.track(.photoSelected, fileType: "photos_picker_video")
-            videoEditorPayload = DiveEditorVideoPayload(url: outURL)
+            errorMessage = LocalizationService.shared.localizedString("unsupportedFileFormat", table: "imageEditing")
         }
     }
 }

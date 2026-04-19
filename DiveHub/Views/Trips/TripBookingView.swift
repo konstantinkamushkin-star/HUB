@@ -139,11 +139,13 @@ struct TripBookingView: View {
     @ViewBuilder
     private var priceSection: some View {
                 Section(localizationService.localizedString("priceSummary", table: "trips")) {
+                    let totalPrice = calculateTotalPrice()
+                    let currency = trip.priceDetails.currency
                     HStack {
                         Text(localizationService.localizedString("total", table: "trips"))
                             .font(.headline)
                         Spacer()
-                Text("ui_trips_value_3".localized)
+                        Text("\(totalPrice, format: .currency(code: currency))")
                             .font(.headline)
                     }
                 }

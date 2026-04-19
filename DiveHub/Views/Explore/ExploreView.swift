@@ -21,6 +21,7 @@ struct ExploreView: View {
     @State private var didCenterExploreMapOnUser = false
     /// Пока `Date() < значения`, баннер «завершите профиль» скрыт (см. `UserDefaults`).
     @State private var completeProfileBannerHiddenUntil: Date?
+    @State private var showSuggestNewDiveSite = false
     
     var body: some View {
         NavigationStack {
@@ -91,6 +92,14 @@ struct ExploreView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     HStack(spacing: 16) {
+                        if authService.isAuthenticated {
+                            Button {
+                                showSuggestNewDiveSite = true
+                            } label: {
+                                Image(systemName: "plus.rectangle.on.folder")
+                            }
+                            .accessibilityLabel(localizationService.localizedString("suggestNewDiveSite", table: "diveSite"))
+                        }
                         sortButton
                         filterButton
                     }
@@ -98,6 +107,9 @@ struct ExploreView: View {
             }
             .sheet(isPresented: $showFilters) {
                 filterSheet
+            }
+            .sheet(isPresented: $showSuggestNewDiveSite) {
+                DiveSiteContributionSheet(mode: .newSite)
             }
             .sheet(item: Binding(
                 get: { selectedItem as? DiveSite },
@@ -135,6 +147,23 @@ struct ExploreView: View {
             .onChange(of: authService.currentUser?.id) { _, _ in
                 refreshCompleteProfileBannerSuppressionState()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .diveHubExploreApplyDiveSitesMap)) { _ in
+                applyDeepLinkExploreDiveSitesMap()
+            }
+        }
+    }
+
+    /// Открыть категорию «Дайв-сайты» и режим карты (из рекомендаций в ленте и т.п.).
+    private func applyDeepLinkExploreDiveSitesMap() {
+        viewModel.selectedCategory = .diveSites
+        viewModel.currentViewMode = .map
+        didCenterExploreMapOnUser = false
+        if let loc = viewModel.userLocation {
+            mapRegion = MapRegion(
+                center: loc.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.35, longitudeDelta: 0.35)
+            )
+            didCenterExploreMapOnUser = true
         }
     }
     
@@ -385,7 +414,7 @@ struct ExploreView: View {
                     .font(.title3)
                 
                 if viewModel.activeFilterCount > 0 {
-                    Text("ui_explore_value_7".localized)
+                    Text("\(viewModel.activeFilterCount)")
                         .font(.caption2)
                         .fontWeight(.bold)
                         .foregroundColor(.white)

@@ -164,6 +164,6 @@ import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
       useClass: ErrorTrackingFilter,
     },
   ],
-  exports: [ErrorStatsService, AuditLogService],
+  exports: [ErrorStatsService, AuditLogService, AdminSupportTicketsService],
 })
 export class AdminModule {}

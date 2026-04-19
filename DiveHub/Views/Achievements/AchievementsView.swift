@@ -10,13 +10,14 @@ import Combine
 
 struct AchievementsView: View {
     @StateObject private var viewModel = AchievementsViewModel()
+    @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
         ScrollView {
                 VStack(spacing: 24) {
                     // Progress Overview
                     VStack(spacing: 16) {
-                        Text("ui_achievements_value_value_achievements".localized)
+                        Text("\(viewModel.unlockedCount) / \(viewModel.totalCount) \(localizationService.localizedString("achievements"))")
                             .font(.title2)
                             .fontWeight(.bold)
                         

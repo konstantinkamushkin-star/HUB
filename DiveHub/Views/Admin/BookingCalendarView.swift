@@ -54,6 +54,7 @@ struct BookingCalendarView: View {
                 }
             }
             .navigationTitle(localizationService.localizedString("bookings", table: "admin"))
+            .diveHubNavigationChrome()
             .sheet(item: $selectedBooking) { booking in
                 BookingDetailView(booking: booking, viewModel: viewModel)
             }
@@ -77,7 +78,7 @@ struct BookingCalendarView: View {
                 Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
                     Text(localizationService.localizedString("all", table: "common")).tag("all")
                     ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
-                        Text(status.rawValue.capitalized).tag(status.rawValue)
+                        Text(localizedStatus(status)).tag(status.rawValue)
                     }
                 }
                 .pickerStyle(.menu)
@@ -111,7 +112,7 @@ struct BookingCalendarView: View {
                 Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
                     Text(localizationService.localizedString("all", table: "common")).tag("all")
                     ForEach([Booking.BookingStatus.pending, .quoted, .confirmed, .completed, .cancelled], id: \.self) { status in
-                        Text(status.rawValue.capitalized).tag(status.rawValue)
+                        Text(localizedStatus(status)).tag(status.rawValue)
                     }
                 }
             }
@@ -127,6 +128,23 @@ struct BookingCalendarView: View {
                     .buttonStyle(.plain)
                 }
             }
+        }
+    }
+
+    private func localizedStatus(_ status: Booking.BookingStatus) -> String {
+        switch status {
+        case .pending:
+            return localizationService.localizedString("bookingStatusPending", table: "admin")
+        case .quoted:
+            return localizationService.localizedString("bookingStatusQuoted", table: "admin")
+        case .confirmed:
+            return localizationService.localizedString("bookingStatusConfirmed", table: "admin")
+        case .completed:
+            return localizationService.localizedString("bookingStatusCompleted", table: "admin")
+        case .cancelled:
+            return localizationService.localizedString("bookingStatusCancelled", table: "admin")
+        case .refunded:
+            return localizationService.localizedString("bookingStatusRefunded", table: "admin")
         }
     }
 }

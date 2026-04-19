@@ -9,6 +9,11 @@ data class InventoryItemLocal(
     val location: String? = null,
     val size: String? = null,
     val notes: String? = null,
+    val issuedToName: String? = null,
+    val dueAt: String? = null,
+    val checkoutNotes: String? = null,
+    val checkoutHandedOffBy: String? = null,
+    val checkoutHandedOffAt: String? = null,
     val createdAt: String,
 )
 
@@ -19,6 +24,19 @@ data class MaintenanceTicketLocal(
     val title: String,
     val status: String,
     val priority: String,
+    val description: String? = null,
+    val checklist: List<String> = emptyList(),
+    val signedBy: String? = null,
+    val signedAt: String? = null,
+    val startedAt: String? = null,
+    val completedAt: String? = null,
+    val events: List<MaintenanceTicketEventLocal> = emptyList(),
     val createdAt: String,
+)
+
+data class MaintenanceTicketEventLocal(
+    val type: String,
+    val at: String,
+    val note: String? = null,
 )
 

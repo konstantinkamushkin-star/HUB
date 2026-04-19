@@ -168,13 +168,13 @@ private struct BookingListRow: View {
                 }
             }
 
-            if booking.manualVerifiedPriceText != nil {
-                Text("ui_profile_final_verified_price_value".localized)
+            if let verifiedPrice = booking.manualVerifiedPriceText {
+                Text("\("ui_booking_detail_final_verified_price".localized): \(verifiedPrice)")
                     .font(.subheadline)
                     .fontWeight(.semibold)
                     .foregroundColor(.primary)
             } else {
-                Text(String(format: "Amount: %.2f %@", booking.payment.amount, booking.payment.currency))
+                Text(String(format: "\("ui_booking_detail_amount".localized): %.2f %@", booking.payment.amount, booking.payment.currency))
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

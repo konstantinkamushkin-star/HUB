@@ -24,29 +24,33 @@ struct GearManagementView: View {
     }
     
     var body: some View {
-        List {
-            // Filter Picker
-            Section {
-                Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
-                    Text(localizationService.localizedString("all", table: "common")).tag("all")
-                    ForEach([GearItem.GearStatus.available, .issued, .maintenance, .scrapped], id: \.self) { status in
-                        Text(status.rawValue.capitalized).tag(status.rawValue)
+        VStack(spacing: 0) {
+            List {
+                // Filter Picker
+                Section {
+                    Picker(localizationService.localizedString("filterByStatus", table: "admin"), selection: $selectedStatus) {
+                        Text(localizationService.localizedString("all", table: "common")).tag("all")
+                        ForEach([GearItem.GearStatus.available, .issued, .maintenance, .scrapped], id: \.self) { status in
+                            Text(status.rawValue.capitalized).tag(status.rawValue)
+                        }
                     }
                 }
-            }
-            
-            // Gear List
-            Section {
-                ForEach(filteredGear) { gear in
-                    GearManagementRow(gear: gear, viewModel: viewModel)
+
+                // Gear List
+                Section {
+                    ForEach(filteredGear) { gear in
+                        GearManagementRow(gear: gear, viewModel: viewModel)
+                    }
                 }
             }
         }
         .navigationTitle(localizationService.localizedString("gear", table: "admin"))
+        .diveHubNavigationChrome()
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(action: { showAddGear = true }) {
-                    Image(systemName: "plus")
+                    Image(systemName: "plus.circle.fill")
+                        .font(.title3)
                 }
             }
         }

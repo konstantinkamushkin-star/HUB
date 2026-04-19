@@ -6,6 +6,8 @@ import com.divehub.app.data.remote.dto.RefreshRequest
 import com.divehub.app.data.remote.dto.RegisterRequest
 import com.divehub.app.data.remote.dto.ChangePasswordBody
 import com.divehub.app.data.remote.dto.ChangePasswordResponse
+import com.divehub.app.data.remote.dto.AppleAuthRequest
+import com.divehub.app.data.remote.dto.GoogleAuthRequest
 import com.divehub.app.data.remote.dto.ForgotPasswordRequest
 import com.divehub.app.data.remote.dto.GenericMessageResponse
 import com.divehub.app.data.remote.dto.ResetPasswordRequest
@@ -20,6 +22,12 @@ import retrofit2.http.POST
 interface AuthApi {
     @POST("auth/login")
     suspend fun login(@Body body: LoginRequest): AuthSessionResponse
+
+    @POST("auth/google")
+    suspend fun google(@Body body: GoogleAuthRequest): AuthSessionResponse
+
+    @POST("auth/apple")
+    suspend fun apple(@Body body: AppleAuthRequest): AuthSessionResponse
 
     @POST("auth/register")
     suspend fun register(@Body body: RegisterRequest): AuthSessionResponse

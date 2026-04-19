@@ -53,6 +53,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -81,6 +82,7 @@ import com.divehub.app.data.ReviewsRepository
 import com.divehub.app.data.remote.dto.ExploreDiveSite
 import com.divehub.app.data.remote.dto.ExploreItemKind
 import com.divehub.app.data.remote.dto.ReviewDto
+import com.divehub.app.ui.components.DiveCenterPromoCard
 import com.divehub.app.ui.components.DiveHubLogoMark
 import com.divehub.app.ui.reviews.AddReviewableDialog
 import com.divehub.app.ui.theme.IosDesign
@@ -119,6 +121,10 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
     var showSortSheet by remember { mutableStateOf(false) }
     var showFilterSheet by remember { mutableStateOf(false) }
     var mapFocusLatLngZoom by remember { mutableStateOf<Triple<Double, Double, Double>?>(null) }
+    var contributionMode by remember { mutableStateOf<DiveSiteContributionMode?>(null) }
+    val loggedIn by produceState(initialValue = false) {
+        graph.tokenStore.accessToken.collect { value = !it.isNullOrBlank() }
+    }
     val context = androidx.compose.ui.platform.LocalContext.current
     var userGeo by remember { mutableStateOf<Pair<Double, Double>?>(null) }
     LaunchedEffect(context) {
@@ -172,6 +178,11 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
                 onSortTap = { showSortSheet = true },
                 onFilterTap = { showFilterSheet = true },
                 onFullscreenMap = { innerNav.navigate(InnerRoutes.MapFullscreen) },
+                onSuggestNewSite = if (loggedIn) {
+                    { contributionMode = DiveSiteContributionMode.NewSite }
+                } else {
+                    null
+                },
             )
             CategoryToggle(state.selectedCategory, onCategory = vm::setCategory)
             SearchBar(state.searchQuery, onChange = vm::setSearch)
@@ -262,6 +273,14 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
                 onReviewSubmitted = { vm.refresh() },
                 innerNav = innerNav,
                 onRequestClose = { selectedSite = null },
+                onReportInaccuracy = if (site.kind == ExploreItemKind.DIVE_SITE) {
+                    {
+                        selectedSite = null
+                        contributionMode = DiveSiteContributionMode.Correction(site)
+                    }
+                } else {
+                    null
+                },
                 onShowOnMap = {
                     val lat = site.latitude
                     val lng = site.longitude
@@ -309,6 +328,16 @@ fun ExploreRoute(graph: AppGraph, innerNav: NavController) {
             )
         }
     }
+
+    if (contributionMode != null) {
+        ModalBottomSheet(onDismissRequest = { contributionMode = null }) {
+            DiveSiteContributionSheetContent(
+                mode = contributionMode!!,
+                graph = graph,
+                onDismiss = { contributionMode = null },
+            )
+        }
+    }
 }
 
 @Composable
@@ -317,6 +346,7 @@ private fun ExploreHeader(
     onSortTap: () -> Unit,
     onFilterTap: () -> Unit,
     onFullscreenMap: () -> Unit,
+    onSuggestNewSite: (() -> Unit)? = null,
 ) {
     Column(
         modifier = Modifier
@@ -331,6 +361,24 @@ private fun ExploreHeader(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (onSuggestNewSite != null) {
+                    Box(
+                        modifier = Modifier
+                            .size(44.dp)
+                            .clip(CircleShape)
+                            .background(IosDesign.Explore.navBarButtonFill),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        IconButton(onClick = onSuggestNewSite, modifier = Modifier.size(44.dp)) {
+                            Icon(
+                                Icons.Default.Add,
+                                contentDescription = stringResource(R.string.dive_site_contribution_suggest_new_cd),
+                                tint = IosDesign.Explore.navBarIconTint,
+                                modifier = Modifier.size(22.dp),
+                            )
+                        }
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .size(44.dp)
@@ -414,12 +462,12 @@ private fun SortSheet(
     onSelect: (ExploreSort) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("Sort", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.explore_sort_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
-        SortOptionRow("Relevance", selectedSort == ExploreSort.RELEVANCE) { onSelect(ExploreSort.RELEVANCE) }
-        SortOptionRow("Top rated", selectedSort == ExploreSort.RATING_DESC) { onSelect(ExploreSort.RATING_DESC) }
-        SortOptionRow("Shallow first", selectedSort == ExploreSort.DEPTH_ASC) { onSelect(ExploreSort.DEPTH_ASC) }
-        SortOptionRow("Name A-Z", selectedSort == ExploreSort.NAME_ASC) { onSelect(ExploreSort.NAME_ASC) }
+        SortOptionRow(stringResource(R.string.explore_sort_relevance), selectedSort == ExploreSort.RELEVANCE) { onSelect(ExploreSort.RELEVANCE) }
+        SortOptionRow(stringResource(R.string.explore_sort_top_rated), selectedSort == ExploreSort.RATING_DESC) { onSelect(ExploreSort.RATING_DESC) }
+        SortOptionRow(stringResource(R.string.explore_sort_shallow_first), selectedSort == ExploreSort.DEPTH_ASC) { onSelect(ExploreSort.DEPTH_ASC) }
+        SortOptionRow(stringResource(R.string.explore_sort_name_az), selectedSort == ExploreSort.NAME_ASC) { onSelect(ExploreSort.NAME_ASC) }
         Spacer(Modifier.height(18.dp))
     }
 }
@@ -456,15 +504,15 @@ private fun FilterSheet(
     val levels = listOf(
         stringResource(R.string.explore_beginner),
         stringResource(R.string.explore_intermediate),
-        "Advanced",
+        stringResource(R.string.explore_advanced),
     )
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)) {
-        Text("Filters", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+        Text(stringResource(R.string.explore_filters_sheet_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
         Spacer(Modifier.height(12.dp))
-        Text("Type", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+        Text(stringResource(R.string.explore_filter_type), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-            IosExplorePill("All Types", selectedDiveType == null) { onSelectDiveType(null) }
+            IosExplorePill(stringResource(R.string.explore_all_types), selectedDiveType == null) { onSelectDiveType(null) }
             types.forEach { type ->
                 IosExplorePill(type, selectedDiveType == type) {
                     onSelectDiveType(if (selectedDiveType == type) null else type)
@@ -472,10 +520,10 @@ private fun FilterSheet(
             }
         }
         Spacer(Modifier.height(12.dp))
-        Text("Level", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
+        Text(stringResource(R.string.explore_filter_level), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium)
         Spacer(Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
-            IosExplorePill("All Levels", selectedDifficulty == null) { onSelectDifficulty(null) }
+            IosExplorePill(stringResource(R.string.explore_all_levels), selectedDifficulty == null) { onSelectDifficulty(null) }
             levels.forEach { level ->
                 IosExplorePill(level, selectedDifficulty == level) {
                     onSelectDifficulty(if (selectedDifficulty == level) null else level)
@@ -488,8 +536,8 @@ private fun FilterSheet(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onResetAll) { Text("Reset") }
-            Button(onClick = onClose) { Text("Done") }
+            TextButton(onClick = onResetAll) { Text(stringResource(R.string.map_filter_reset)) }
+            Button(onClick = onClose) { Text(stringResource(R.string.common_done)) }
         }
         Spacer(Modifier.height(12.dp))
     }
@@ -970,10 +1018,15 @@ private fun SiteCard(site: ExploreDiveSite, userLatLng: Pair<Double, Double>?, o
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.horizontalScroll(rememberScrollState())) {
                 AssistChip(
                     onClick = {},
+                    enabled = false,
                     label = { Text(site.difficulty) },
                     leadingIcon = { DiveHubLogoMark(modifier = Modifier.size(16.dp)) },
                 )
-                AssistChip(onClick = {}, label = { Text(site.country.ifBlank { stringResource(R.string.explore_unknown) }) })
+                AssistChip(
+                    onClick = {},
+                    enabled = false,
+                    label = { Text(site.country.ifBlank { stringResource(R.string.explore_unknown) }) },
+                )
             }
         }
     }
@@ -992,6 +1045,7 @@ private fun DiveSiteDetailSheet(
     onReviewSubmitted: () -> Unit,
     innerNav: NavController,
     onRequestClose: () -> Unit,
+    onReportInaccuracy: (() -> Unit)? = null,
     onShowOnMap: () -> Unit = {},
     onBusinessChat: (() -> Unit)? = null,
 ) {
@@ -1027,23 +1081,23 @@ private fun DiveSiteDetailSheet(
                 TextButton(onClick = onShowOnMap) {
                     Text(stringResource(R.string.explore_show_on_map))
                 }
-                OutlinedButton(
-                    onClick = {
-                        onRequestClose()
-                        val route = when (site.kind) {
-                            ExploreItemKind.DIVE_CENTER ->
-                                InnerRoutes.bookingWizard(centerId = site.id, siteId = null, instructorId = null)
-                            ExploreItemKind.DIVE_SITE ->
-                                InnerRoutes.bookingWizard(centerId = null, siteId = site.id, instructorId = null)
-                            ExploreItemKind.SHOP ->
-                                InnerRoutes.bookingWizard(centerId = null, siteId = null, instructorId = null)
-                        }
-                        innerNav.navigate(route)
-                    },
-                ) {
-                    Text(stringResource(R.string.explore_book))
+                if (site.kind == ExploreItemKind.SHOP) {
+                    OutlinedButton(
+                        onClick = {
+                            onRequestClose()
+                            innerNav.navigate(
+                                InnerRoutes.bookingWizard(centerId = null, siteId = null, instructorId = null),
+                            )
+                        },
+                    ) {
+                        Text(stringResource(R.string.explore_book))
+                    }
                 }
             }
+        }
+        if (site.kind == ExploreItemKind.DIVE_CENTER) {
+            Spacer(Modifier.height(8.dp))
+            DiveCenterPromoCard()
         }
         if (onBusinessChat != null && loggedIn) {
             Spacer(Modifier.height(8.dp))
@@ -1127,6 +1181,15 @@ private fun DiveSiteDetailSheet(
             Text(stringResource(R.string.explore_recent_dives), fontWeight = FontWeight.SemiBold)
             Text(stringResource(R.string.explore_no_recent_dives), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.height(8.dp))
+            if (loggedIn && onReportInaccuracy != null) {
+                OutlinedButton(
+                    onClick = onReportInaccuracy,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(R.string.dive_site_report_inaccuracy))
+                }
+                Spacer(Modifier.height(8.dp))
+            }
         } else {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(stringResource(R.string.explore_difficulty))
@@ -1191,6 +1254,7 @@ private fun DiveSiteDetailSheet(
             },
         )
     }
+
 }
 
 @Composable

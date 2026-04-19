@@ -17,14 +17,16 @@ struct TripsManagementView: View {
     
     var body: some View {
         NavigationView {
-            contentView
-                .navigationTitle(localizationService.localizedString("tripManagement", table: "trips"))
-                .toolbar {
+            VStack(spacing: 0) {
+                contentView
+            }
+            .navigationTitle(localizationService.localizedString("tripManagement", table: "trips"))
+            .diveHubNavigationChrome()
+            .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        showCreateTrip = true
-                    }) {
-                        Image(systemName: "plus")
+                    Button(action: { showCreateTrip = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
                     }
                 }
             }
@@ -148,10 +150,10 @@ struct TripManagementRowView: View {
                 .lineLimit(2)
             
             HStack {
-                Label("ui_admin_value_value_3".localized, systemImage: "calendar")
+                Label("\(trip.startDate.formatted(date: .abbreviated, time: .omitted)) - \(trip.endDate.formatted(date: .abbreviated, time: .omitted))", systemImage: "calendar")
                     .font(.caption)
                 Spacer()
-                Label("ui_admin_value_value".localized, systemImage: "person.2")
+                Label("\(trip.bookedSpots)/\(trip.totalSpots)", systemImage: "person.2")
                     .font(.caption)
                     .foregroundColor(trip.isFullyBooked ? .red : .green)
             }
@@ -447,7 +449,7 @@ struct TripManagementDetailView: View {
                     Text(localizationService.localizedString("booked", table: "trips"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("ui_admin_value_2".localized)
+                    Text("\(currentTrip.bookedSpots)")
                         .font(.title2)
                         .bold()
                 }
@@ -456,7 +458,7 @@ struct TripManagementDetailView: View {
                     Text(localizationService.localizedString("available", table: "trips"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("ui_admin_value_9".localized)
+                    Text("\(currentTrip.availableSpots)")
                         .font(.title2)
                         .bold()
                         .foregroundColor(.green)
@@ -466,7 +468,7 @@ struct TripManagementDetailView: View {
                     Text(localizationService.localizedString("total", table: "trips"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    Text("ui_admin_value_3".localized)
+                    Text("\(currentTrip.totalSpots)")
                         .font(.title2)
                         .bold()
                 }

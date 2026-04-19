@@ -27,6 +27,48 @@ struct DiverEmergencyPayload: Codable, Hashable {
     var insuranceExpiryDate: String?
 }
 
+/// Partner/admin dashboard layout stored under `diver_profile.adminDashboardLayout` (server merge on PATCH).
+/// Keys match Android JSON: `managed`, `kpi`, `bookings`, `inventory`, `trips`, plus iOS-only `quick`, `cal`.
+struct AdminDashboardLayoutPayload: Codable, Hashable {
+    var managed: Bool?
+    var kpi: Bool?
+    var bookings: Bool?
+    var inventory: Bool?
+    var trips: Bool?
+    var quick: Bool?
+    var cal: Bool?
+    /// Порядок блоков на главной админки: `quick`, затем `cal` (или наоборот).
+    var sectionOrder: [String]?
+    /// Видимость быстрых действий внутри блока `quick`.
+    var quickActionInstructors: Bool?
+    var quickActionServices: Bool?
+    /// Порядок карточек быстрых действий: `instructors`, `services`.
+    var quickActionOrder: [String]?
+    /// Ключи вкладок, скрытые из нижней панели партнёра (`dashboard` игнорируется — главная всегда видна).
+    var bottomBarHiddenTabs: [String]?
+    /// Порядок вкладок в нижней панели (подмножество `PartnerShellTab.orderedKeys`); пусто = порядок по умолчанию.
+    var bottomBarOrder: [String]?
+    /// Быстрые действия на главной: ключи вкладок (`dashboard`…`profile`) и/или `instructors` (ярлык на профиль).
+    var quickActionTargets: [String]?
+
+    static let accountDefaults = AdminDashboardLayoutPayload(
+        managed: true,
+        kpi: true,
+        bookings: true,
+        inventory: true,
+        trips: true,
+        quick: true,
+        cal: true,
+        sectionOrder: ["quick", "cal"],
+        quickActionInstructors: true,
+        quickActionServices: true,
+        quickActionOrder: ["instructors", "services"],
+        bottomBarHiddenTabs: [],
+        bottomBarOrder: nil,
+        quickActionTargets: ["instructors", "services"],
+    )
+}
+
 struct DiverProfilePayload: Codable, Hashable {
     var displayName: String?
     var username: String?
@@ -48,6 +90,7 @@ struct DiverProfilePayload: Codable, Hashable {
     var privacy: DiverPrivacyPayload?
     var emergency: DiverEmergencyPayload?
     var onboardingCompleted: Bool?
+    var adminDashboardLayout: AdminDashboardLayoutPayload?
 }
 
 enum DiverProfileCatalog {

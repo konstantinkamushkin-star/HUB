@@ -9,6 +9,7 @@ enum class AppShellKind {
     INSTRUCTOR,
 }
 
+/** Mirrors iOS `MainTabView` partner routing: shop shell when the user owns a shop; center admin vs super-admin share `ADMIN`. */
 fun UserDto?.resolveShellKind(preferDiverShell: Boolean = false): AppShellKind {
     if (this == null) return AppShellKind.DIVER
     val r = role?.trim()?.uppercase().orEmpty()

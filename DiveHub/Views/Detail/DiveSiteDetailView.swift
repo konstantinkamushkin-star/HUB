@@ -10,7 +10,7 @@ import SwiftUI
 struct DiveSiteDetailView: View {
     let site: DiveSite
     var onShowOnMap: (() -> Void)? = nil
-    @State private var showBooking = false
+    @State private var contributionMode: DiveSiteContributionMode?
     @StateObject private var localizationService = LocalizationService.shared
     @State private var recentDivePhotos: [String] = []
     
@@ -147,19 +147,21 @@ struct DiveSiteDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
+                if AuthenticationService.shared.isAuthenticated {
+                    Button(action: { contributionMode = .correction(site) }) {
+                        Image(systemName: "exclamationmark.bubble")
+                    }
+                    .accessibilityLabel(localizationService.localizedString("reportDiveSiteInaccuracy", table: "diveSite"))
+                }
                 if let onShowOnMap = onShowOnMap {
                     Button(action: onShowOnMap) {
                         Image(systemName: "map")
                     }
                 }
-                Button(action: { showBooking = true }) {
-                    Text(LocalizationService.shared.localizedString("book"))
-                        .fontWeight(.semibold)
-                }
             }
         }
-        .sheet(isPresented: $showBooking) {
-            BookingWizardView(diveSiteId: site.id)
+        .sheet(item: $contributionMode) { mode in
+            DiveSiteContributionSheet(mode: mode)
         }
     }
 }

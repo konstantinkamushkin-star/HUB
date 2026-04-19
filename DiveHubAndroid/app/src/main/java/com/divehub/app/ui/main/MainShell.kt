@@ -45,18 +45,25 @@ import com.divehub.app.ui.admin.AdminShopsManagementRoute
 import com.divehub.app.ui.admin.AdminBookingManagementRoute
 import com.divehub.app.ui.admin.AdminBookingCalendarRoute
 import com.divehub.app.ui.admin.AdminAffiliatedSitesRoute
+import com.divehub.app.ui.admin.AdminWebPanelRoute
 import com.divehub.app.ui.inventory.InventoryRoute
+import com.divehub.app.ui.inventory.InventoryItemDetailRoute
+import com.divehub.app.ui.inventory.InventoryTicketDetailRoute
 import com.divehub.app.ui.achievements.AchievementsRoute
 import com.divehub.app.ui.notifications.NotificationsRoute
 import com.divehub.app.ui.profile.CertificationsRoute
+import com.divehub.app.ui.profile.DiveCenterAdminProfileRoute
 import com.divehub.app.ui.profile.EditProfileRoute
 import com.divehub.app.ui.profile.GearProfilesRoute
 import com.divehub.app.ui.profile.HelpRoute
 import com.divehub.app.ui.profile.MeasurementUnitsRoute
+import com.divehub.app.ui.profile.MyBookingsRoute
+import com.divehub.app.ui.profile.MyDiveSiteContributionsRoute
 import com.divehub.app.ui.profile.NotificationSettingsRoute
 import com.divehub.app.ui.profile.PrivacySettingsRoute
 import com.divehub.app.ui.profile.SubscriptionRoute
 import com.divehub.app.ui.profile.SettingsRoute
+import com.divehub.app.ui.profile.InstructorPublicRoute
 import com.divehub.app.ui.profile.UserProfileRoute
 import com.divehub.app.ui.search.GlobalSearchRoute
 import com.divehub.app.ui.statistics.StatisticsRoute
@@ -67,6 +74,8 @@ import com.divehub.app.ui.booking.BookingWizardRoute
 import com.divehub.app.ui.centers.DiveCenterPublicRoute
 import com.divehub.app.ui.shops.ShopPublicRoute
 import com.divehub.app.ui.chat.BusinessChatOpenRoute
+import com.divehub.app.ui.help.AppSupportTopicRoute
+import com.divehub.app.ui.help.SupportTicketFormRoute
 import com.divehub.app.ui.diveeditor.DiveEditorRoute
 import com.divehub.app.ui.explore.MapFullscreenRoute
 import com.divehub.app.ui.trips.CenterManagedTripsRoute
@@ -224,6 +233,27 @@ fun MainShell(
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
             }
         }
+        composable(
+            route = InnerRoutes.InstructorPublic,
+            arguments = listOf(
+                navArgument("userId") { type = NavType.StringType },
+                navArgument("centerId") { type = NavType.StringType },
+            ),
+        ) { entry ->
+            val uid = entry.arguments?.getString("userId").orEmpty()
+            val cid = entry.arguments?.getString("centerId").orEmpty().takeIf { it.isNotBlank() && it != "-" }
+            if (uid.isNotEmpty()) {
+                InstructorPublicRoute(
+                    graph = graph,
+                    userId = uid,
+                    centerId = cid,
+                    innerNav = innerNav,
+                )
+            } else {
+                LaunchedEffect(Unit) { innerNav.popBackStack() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
+            }
+        }
         composable(InnerRoutes.Subscription) {
             SubscriptionRoute(graph = graph, sessionVm = vm, innerNav = innerNav)
         }
@@ -242,11 +272,30 @@ fun MainShell(
         composable(InnerRoutes.MeasurementUnits) {
             MeasurementUnitsRoute(graph = graph, innerNav = innerNav)
         }
+        composable(InnerRoutes.MyDiveSiteContributions) {
+            MyDiveSiteContributionsRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.MyBookings) {
+            MyBookingsRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(InnerRoutes.DiveCenterAdminProfile) {
+            DiveCenterAdminProfileRoute(graph = graph, innerNav = innerNav, sessionVm = vm)
+        }
         composable(InnerRoutes.Help) {
             HelpRoute(
                 innerNav = innerNav,
                 onPartnerApplication = { rootNav.navigate(Routes.PartnerRegistration) },
             )
+        }
+        composable(InnerRoutes.AppSupportNewTopic) {
+            AppSupportTopicRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(
+            route = InnerRoutes.SupportTicketForm,
+            arguments = listOf(navArgument("category") { type = NavType.StringType }),
+        ) { entry ->
+            val category = entry.arguments?.getString("category").orEmpty()
+            SupportTicketFormRoute(graph = graph, innerNav = innerNav, category = category)
         }
         composable(InnerRoutes.Notifications) {
             NotificationsRoute(graph = graph, innerNav = innerNav)
@@ -275,8 +324,25 @@ fun MainShell(
         composable(InnerRoutes.AdminAffiliatedSites) {
             AdminAffiliatedSitesRoute(graph = graph, innerNav = innerNav)
         }
+        composable(InnerRoutes.AdminWebPanel) {
+            AdminWebPanelRoute(graph = graph, innerNav = innerNav, user = user)
+        }
         composable(InnerRoutes.Inventory) {
             InventoryRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(
+            route = InnerRoutes.InventoryItemDetail,
+            arguments = listOf(navArgument("itemId") { type = NavType.StringType }),
+        ) { entry ->
+            val itemId = entry.arguments?.getString("itemId").orEmpty()
+            InventoryItemDetailRoute(graph = graph, innerNav = innerNav, itemId = itemId)
+        }
+        composable(
+            route = InnerRoutes.InventoryTicketDetail,
+            arguments = listOf(navArgument("ticketId") { type = NavType.StringType }),
+        ) { entry ->
+            val ticketId = entry.arguments?.getString("ticketId").orEmpty()
+            InventoryTicketDetailRoute(graph = graph, innerNav = innerNav, ticketId = ticketId)
         }
         composable(InnerRoutes.MapFullscreen) {
             MapFullscreenRoute(graph = graph, innerNav = innerNav)

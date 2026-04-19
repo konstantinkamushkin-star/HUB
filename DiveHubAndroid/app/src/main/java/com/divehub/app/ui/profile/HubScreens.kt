@@ -1,5 +1,6 @@
 package com.divehub.app.ui.profile
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,6 +13,10 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -26,7 +31,10 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -41,6 +49,7 @@ import androidx.core.os.LocaleListCompat
 import com.divehub.app.AppGraph
 import com.divehub.app.BuildConfig
 import com.divehub.app.R
+import com.divehub.app.data.AuthRepository
 import com.divehub.app.ui.main.SessionViewModel
 import com.divehub.app.ui.navigation.InnerRoutes
 import kotlinx.coroutines.launch
@@ -51,6 +60,7 @@ fun HelpRoute(
     innerNav: NavController,
     onPartnerApplication: () -> Unit = {},
 ) {
+    val ctx = LocalContext.current
     Scaffold(
         topBar = {
             TopAppBar(
@@ -72,6 +82,105 @@ fun HelpRoute(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.help_intro), style = MaterialTheme.typography.bodyLarge)
+            Text(
+                stringResource(R.string.help_section_faq_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            HelpFaqItem(
+                question = stringResource(R.string.help_faq_q1),
+                answer = stringResource(R.string.help_faq_a1),
+            )
+            HelpFaqItem(
+                question = stringResource(R.string.help_faq_q2),
+                answer = stringResource(R.string.help_faq_a2),
+            )
+            HelpFaqItem(
+                question = stringResource(R.string.help_faq_q3),
+                answer = stringResource(R.string.help_faq_a3),
+            )
+            HelpFaqItem(
+                question = stringResource(R.string.help_faq_q4),
+                answer = stringResource(R.string.help_faq_a4),
+            )
+            HorizontalDivider()
+            Text(
+                stringResource(R.string.help_section_contact_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            TextButton(
+                onClick = {
+                    runCatching {
+                        ctx.startActivity(
+                            Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${ctx.getString(R.string.help_support_email)}")),
+                        )
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.help_contact_email))
+            }
+            Text(
+                stringResource(R.string.help_support_in_app_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(
+                onClick = { innerNav.navigate(InnerRoutes.AppSupportNewTopic) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.support_open_chat_menu))
+            }
+            TextButton(
+                onClick = { innerNav.navigate(InnerRoutes.supportTicketForm("feedback")) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.support_form_feedback_title))
+            }
+            TextButton(
+                onClick = { innerNav.navigate(InnerRoutes.supportTicketForm("bug")) },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.support_form_bug_title))
+            }
+            HorizontalDivider()
+            Text(
+                stringResource(R.string.help_section_resources_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+            )
+            TextButton(
+                onClick = {
+                    runCatching {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ctx.getString(R.string.help_url_faq))))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.help_link_website_faq))
+            }
+            TextButton(
+                onClick = {
+                    runCatching {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ctx.getString(R.string.help_url_terms))))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.help_link_terms))
+            }
+            TextButton(
+                onClick = {
+                    runCatching {
+                        ctx.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(ctx.getString(R.string.help_url_privacy))))
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.help_link_privacy))
+            }
+            HorizontalDivider()
             HelpSection(
                 title = stringResource(R.string.help_section_explore_title),
                 body = stringResource(R.string.help_section_explore_body),
@@ -103,6 +212,45 @@ fun HelpRoute(
 }
 
 @Composable
+private fun HelpFaqItem(question: String, answer: String) {
+    var expanded by remember(question) { mutableStateOf(false) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { expanded = !expanded },
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
+    ) {
+        Column(Modifier.padding(14.dp)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    question,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.weight(1f),
+                )
+                Icon(
+                    if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                )
+            }
+            if (expanded) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    answer,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun HelpSection(title: String, body: String) {
     Column(Modifier.fillMaxWidth()) {
         Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
@@ -122,6 +270,23 @@ fun SettingsRoute(
     val preferDiverShell by sessionVm.preferDiverShell.collectAsState()
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
+    val authRepo = remember { AuthRepository(graph) }
+
+    fun applyAppLanguage(tag: String?) {
+        scope.launch {
+            graph.tokenStore.setAppLanguageTag(tag)
+            when (tag) {
+                null -> AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
+                "en" -> AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
+                "ru" -> AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ru"))
+                else -> Unit
+            }
+            if (user != null && (tag == "en" || tag == "ru")) {
+                runCatching { authRepo.updateProfile(language = tag) }
+                    .onSuccess { sessionVm.onUserUpdated(it) }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -246,37 +411,46 @@ fun SettingsRoute(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
             TextButton(
-                onClick = {
-                    scope.launch {
-                        graph.tokenStore.setAppLanguageTag(null)
-                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
-                    }
-                },
+                onClick = { applyAppLanguage(null) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.settings_language_system))
             }
             TextButton(
-                onClick = {
-                    scope.launch {
-                        graph.tokenStore.setAppLanguageTag("en")
-                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
-                    }
-                },
+                onClick = { applyAppLanguage("en") },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.settings_language_en))
             }
             TextButton(
-                onClick = {
-                    scope.launch {
-                        graph.tokenStore.setAppLanguageTag("ru")
-                        AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ru"))
-                    }
-                },
+                onClick = { applyAppLanguage("ru") },
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.settings_language_ru))
+            }
+            Text(
+                stringResource(R.string.settings_appearance_section),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+            TextButton(
+                onClick = { scope.launch { graph.tokenStore.setAppTheme("system") } },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_theme_system))
+            }
+            TextButton(
+                onClick = { scope.launch { graph.tokenStore.setAppTheme("light") } },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_theme_light))
+            }
+            TextButton(
+                onClick = { scope.launch { graph.tokenStore.setAppTheme("dark") } },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(stringResource(R.string.settings_theme_dark))
             }
             Text(
                 stringResource(R.string.settings_preferences_section),
@@ -334,7 +508,7 @@ fun SettingsRoute(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
             )
             Text(
-                stringResource(R.string.settings_version_format, BuildConfig.VERSION_NAME),
+                stringResource(R.string.settings_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
             )

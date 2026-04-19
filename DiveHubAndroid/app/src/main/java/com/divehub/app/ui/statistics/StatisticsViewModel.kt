@@ -35,7 +35,10 @@ data class DiveStatisticsUi(
 data class StatisticsUiState(
     val loading: Boolean = true,
     val stats: DiveStatisticsUi? = null,
+    /** Shown full-screen when [stats] is null. */
     val error: String? = null,
+    /** Shown inline when refresh fails but prior [stats] are kept (iOS-style soft reload). */
+    val refreshError: String? = null,
 )
 
 class StatisticsViewModel(
@@ -52,15 +55,38 @@ class StatisticsViewModel(
 
     fun refresh() {
         viewModelScope.launch {
-            _state.value = StatisticsUiState(loading = true)
+            val previous = _state.value.stats
+            _state.value = StatisticsUiState(
+                loading = true,
+                stats = previous,
+                error = null,
+                refreshError = null,
+            )
             val res = getApplication<Application>().resources
             runCatching { repo.list() }
                 .onSuccess { logs ->
-                    _state.value = StatisticsUiState(loading = false, stats = computeStats(res, logs))
+                    _state.value = StatisticsUiState(
+                        loading = false,
+                        stats = computeStats(res, logs),
+                        error = null,
+                        refreshError = null,
+                    )
                 }
                 .onFailure { e ->
-                    _state.value = StatisticsUiState(loading = false, error = e.message ?: "Error")
+                    val msg = e.message ?: res.getString(R.string.common_error)
+                    _state.value = if (previous == null) {
+                        StatisticsUiState(loading = false, stats = null, error = msg, refreshError = null)
+                    } else {
+                        StatisticsUiState(loading = false, stats = previous, error = null, refreshError = msg)
+                    }
                 }
+        }
+    }
+
+    fun dismissRefreshError() {
+        val s = _state.value
+        if (s.refreshError != null) {
+            _state.value = s.copy(refreshError = null)
         }
     }
 

@@ -11,6 +11,8 @@ import Combine
 import CoreLocation
 import SwiftUI
 
+private let mapBoundsReloadDebounceNs: UInt64 = 400_000_000
+
 struct DiveMapAnnotation: Identifiable {
     let id: String
     let coordinate: CLLocationCoordinate2D
@@ -72,6 +74,7 @@ class MapViewModel: ObservableObject {
     private let locationDelegate = LocationManagerDelegate()
     private var cancellables = Set<AnyCancellable>()
     private var didApplyInitialUserRegion = false
+    private var boundsReloadTask: Task<Void, Never>?
     
     init() {
         setupLocationManager()
@@ -113,14 +116,6 @@ class MapViewModel: ObservableObject {
                         span: MKCoordinateSpan(latitudeDelta: 0.45, longitudeDelta: 0.45)
                     )
                 }
-                
-                // Update filters with new location
-                // Only update location if geo search is enabled (maxDistance is not nil)
-                if self.filters.maxDistance != nil {
-                    self.filters.centerLatitude = location.coordinate.latitude
-                    self.filters.centerLongitude = location.coordinate.longitude
-                }
-                // Don't set default maxDistance here - let user control it via filters
                 
                 #if DEBUG
                 print("📍 [MapViewModel] Location updated: \(location.coordinate.latitude), \(location.coordinate.longitude)")
@@ -366,48 +361,6 @@ class MapViewModel: ObservableObject {
                     centerMapOnAnnotations(newAnnotations)
                 }
                 
-                // Load all dive sites (without filters) for filter options if not already loaded
-                if allDiveSites.isEmpty {
-                    var emptyFilters = DiveSiteFilters()
-                    // Use geo search if we have user location
-                    if let userLocation = userLocation {
-                        emptyFilters.centerLatitude = userLocation.coordinate.latitude
-                        emptyFilters.centerLongitude = userLocation.coordinate.longitude
-                        if emptyFilters.shouldUseGeoSearch,
-                           let lat = emptyFilters.centerLatitude,
-                           let lng = emptyFilters.centerLongitude {
-                            // Load all pages using cursor pagination
-                            var allSites: [DiveSite] = []
-                            var cursor: String? = nil
-                            var hasMore = true
-                            
-                            while hasMore {
-                                let result = try await NetworkService.shared.searchDiveSitesByLocation(
-                                    latitude: lat,
-                                    longitude: lng,
-                                    radius: 100000, // 100km
-                                    filters: nil,
-                                    limit: 100, // Max limit per request
-                                    cursor: cursor
-                                )
-                                allSites.append(contentsOf: result.data)
-                                
-                                if let pagination = result.pagination, pagination.hasMore, let nextCursor = pagination.nextCursor {
-                                    cursor = nextCursor
-                                } else {
-                                    hasMore = false
-                                }
-                            }
-                            
-                            allDiveSites = allSites
-                        } else {
-                            allDiveSites = try await NetworkService.shared.getAllDiveSitesLegacy(filters: emptyFilters)
-                        }
-                    } else {
-                            allDiveSites = try await NetworkService.shared.getAllDiveSitesLegacy(filters: emptyFilters)
-                        }
-                }
-                
                 isLoading = false
             } catch {
                 self.error = error
@@ -416,21 +369,20 @@ class MapViewModel: ObservableObject {
         }
     }
     
-    /// Reload dive sites when map region changes (for preloading)
-    func onRegionChanged(_ newRegion: MapRegion) {
-        // Update region
-        region = newRegion
-        
-        // Reload sites for new region (debounced in production)
-        loadDiveSites()
+    /// Call when the user pans/zooms the map; loads markers for the visible bounds (debounced, like Google Maps).
+    func scheduleBoundsReload() {
+        boundsReloadTask?.cancel()
+        boundsReloadTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: mapBoundsReloadDebounceNs)
+            guard !Task.isCancelled else { return }
+            loadDiveSites()
+        }
     }
     
     func loadAllDiveSitesForFilters() async {
-        // Load all dive sites without filters for filter options
         do {
             let emptyFilters = DiveSiteFilters()
-            
-            allDiveSites = try await NetworkService.shared.getAllDiveSitesLegacy(filters: emptyFilters)
+            allDiveSites = try await NetworkService.shared.getDiveSites(filters: emptyFilters, page: 1, limit: 300)
         } catch {
             print("Error loading all dive sites for filters: \(error)")
         }

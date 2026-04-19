@@ -57,8 +57,8 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 8481B3D92F1A841F00642B59 /* Build configuration list for PBXNativeTarget "DiveHub" */;
 			buildPhases = (
-				E7F8A9B32F1A841D00642BAA /* Frameworks */,
 				8481B3CA2F1A841D00642B59 /* Sources */,
+				E7F8A9B32F1A841D00642BAA /* Frameworks */,
 				8481B3CC2F1A841D00642B59 /* Resources */,
 			);
 			buildRules = (
@@ -284,7 +284,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "Dive-Hub.ru";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -327,7 +327,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.0.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "Dive-Hub.ru";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -367,10 +367,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		E7F8A9B02F1A841D00642BAA /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS.git";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 8.0.0;
+				kind = exactVersion;
+				version = 9.1.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

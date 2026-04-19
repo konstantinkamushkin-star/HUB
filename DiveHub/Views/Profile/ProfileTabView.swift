@@ -28,6 +28,15 @@ struct ProfileTabView: View {
         localizationService.localizedString("profileOnboardingDiving", table: "onboarding")
     }
 
+    private func isDiverRole(_ role: UserRole) -> Bool {
+        role == .diverBasic || role == .diverPro
+    }
+
+    private func isDiveCenterProfileRole(_ user: User) -> Bool {
+        (user.role == .diveCenterAdmin || user.role == .instructor || user.role == .superAdmin) &&
+            user.diveCenterId != nil
+    }
+
     private func onboardingCatalogLabel(prefix: String, code: String) -> String {
         let key = "\(prefix)_\(code)"
         let value = localizationService.localizedString(key, table: "onboarding")
@@ -97,7 +106,7 @@ struct ProfileTabView: View {
                     }
 
                     let diverRows = diverProfileRows(for: user)
-                    if !diverRows.isEmpty {
+                    if isDiverRole(user.role) && !diverRows.isEmpty {
                         Section(diverInfoSectionTitle) {
                             ForEach(Array(diverRows.enumerated()), id: \.offset) { _, row in
                                 VStack(alignment: .leading, spacing: 4) {
@@ -112,61 +121,63 @@ struct ProfileTabView: View {
                         }
                     }
                     
-                    // Show different sections based on user role
-                    if user.role == .diveCenterAdmin || user.role == .instructor {
-                        Section(localizationService.localizedString("centerManagement")) {
-                            NavigationLink(destination: DiveCenterAdminView()) {
-                                Label("ui_profile_dive_center_management".localized, systemImage: "building.2")
-                            }
-                        }
-                    }
-                    
                     // Instructor mode toggle
                     if user.role == .instructor {
                         Section(localizationService.localizedString("mode", table: "settings")) {
                             InstructorModeToggleView()
                         }
                     }
-                    
-                    Section(localizationService.localizedString("account")) {
-                        NavigationLink(destination: EditProfileView()) {
-                            Label(localizationService.localizedString("editProfile"), systemImage: "pencil")
-                        }
 
-                        NavigationLink(destination: DiverProfileDetailsView()) {
-                            Label(localizationService.localizedString("profileOnboardingTitle", table: "onboarding"), systemImage: "person.text.rectangle")
-                        }
-                        
-                        if user.role == .diverBasic {
-                            NavigationLink(destination: SubscriptionView()) {
-                                Label(localizationService.localizedString("upgradeToPro"), systemImage: "star.fill")
-                                    .foregroundColor(.diveAccent)
-                            }
-                        } else if user.role == .diverPro {
-                            NavigationLink(destination: SubscriptionView()) {
-                                Label(localizationService.localizedString("proSubscription"), systemImage: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
+                    // Dive center staff: center overview + profile editing on one destination screen.
+                    if isDiveCenterProfileRole(user) {
+                        Section(localizationService.localizedString("centerManagement")) {
+                            NavigationLink(destination: DiveCenterProfileHubView()) {
+                                Label("ui_profile_dive_center_profile".localized, systemImage: "building.2")
                             }
                         }
-                        
-                        NavigationLink(destination: CertificationsView()) {
-                            Label(localizationService.localizedString("certifications"), systemImage: "doc.text")
-                        }
-                        
-                        NavigationLink(destination: GearProfilesView()) {
-                            Label(localizationService.localizedString("gearProfiles"), systemImage: "bag")
-                        }
-                        
-                        NavigationLink(destination: StatisticsView()) {
-                            Label(localizationService.localizedString("statistics"), systemImage: "chart.bar")
-                        }
+                    } else {
+                        Section(localizationService.localizedString("account")) {
+                            NavigationLink(destination: EditProfileView()) {
+                                Label(localizationService.localizedString("editProfile"), systemImage: "pencil")
+                            }
 
-                        NavigationLink(destination: MyBookingsView()) {
-                            Label(localizationService.localizedString("bookings", table: "admin"), systemImage: "calendar.badge.clock")
-                        }
-                        
-                        NavigationLink(destination: AchievementsView()) {
-                            Label(localizationService.localizedString("achievements"), systemImage: "trophy")
+                            if isDiverRole(user.role) {
+                                NavigationLink(destination: DiverProfileDetailsView()) {
+                                    Label(localizationService.localizedString("profileOnboardingTitle", table: "onboarding"), systemImage: "person.text.rectangle")
+                                }
+
+                                if user.role == .diverBasic {
+                                    NavigationLink(destination: SubscriptionView()) {
+                                        Label(localizationService.localizedString("upgradeToPro"), systemImage: "star.fill")
+                                            .foregroundColor(.diveAccent)
+                                    }
+                                } else if user.role == .diverPro {
+                                    NavigationLink(destination: SubscriptionView()) {
+                                        Label(localizationService.localizedString("proSubscription"), systemImage: "checkmark.circle.fill")
+                                            .foregroundColor(.green)
+                                    }
+                                }
+
+                                NavigationLink(destination: CertificationsView()) {
+                                    Label(localizationService.localizedString("certifications"), systemImage: "doc.text")
+                                }
+
+                                NavigationLink(destination: GearProfilesView()) {
+                                    Label(localizationService.localizedString("gearProfiles"), systemImage: "bag")
+                                }
+
+                                NavigationLink(destination: StatisticsView()) {
+                                    Label(localizationService.localizedString("statistics"), systemImage: "chart.bar")
+                                }
+
+                                NavigationLink(destination: MyBookingsView()) {
+                                    Label(localizationService.localizedString("bookings", table: "admin"), systemImage: "calendar.badge.clock")
+                                }
+
+                                NavigationLink(destination: AchievementsView()) {
+                                    Label(localizationService.localizedString("achievements"), systemImage: "trophy")
+                                }
+                            }
                         }
                     }
                     
@@ -227,6 +238,10 @@ struct ProfileTabView: View {
 
 struct ProfileHeaderView: View {
     let user: User
+
+    private var isDiverRole: Bool {
+        user.role == .diverBasic || user.role == .diverPro
+    }
     
     private var avatarURL: URL? {
         guard let avatarURLString = user.avatarURL else { return nil }
@@ -258,7 +273,7 @@ struct ProfileHeaderView: View {
                 Text(user.role.displayName)
                     .font(.subheadline)
                     .foregroundColor(.secondary)
-                if let level = user.certificationLevel {
+                if isDiverRole, let level = user.certificationLevel {
                     Text(level)
                         .font(.caption)
                         .foregroundColor(.divePrimary)

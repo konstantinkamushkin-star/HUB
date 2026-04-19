@@ -9,6 +9,7 @@ import SwiftUI
 
 struct InstructorDetailView: View {
     let instructor: Instructor
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var showBooking = false
     
     var body: some View {
@@ -37,7 +38,7 @@ struct InstructorDetailView: View {
                                 .foregroundColor(.yellow)
                             Text(String(format: "%.1f", instructor.averageRating))
                                 .fontWeight(.semibold)
-                            Text("ui_detail_value_reviews".localized)
+                            Text("(\(instructor.reviewCount) \(localizationService.localizedString("reviews", table: "common")))")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

@@ -40,17 +40,24 @@ struct HelpSupportView: View {
                         }
                     }
                     
-                    Link(destination: URL(string: "tel:+1234567890")!) {
-                        HStack {
-                            Image(systemName: "phone.fill")
-                            Text(localizationService.localizedString("callSupport", table: "help"))
-                        }
-                    }
-                    
-                    NavigationLink(destination: LiveChatView()) {
+                    NavigationLink(destination: NewSupportTopicView()) {
                         HStack {
                             Image(systemName: "message.fill")
                             Text(localizationService.localizedString("liveChat", table: "help"))
+                        }
+                    }
+                    
+                    NavigationLink(destination: SupportTicketFormView(kind: .feedback)) {
+                        HStack {
+                            Image(systemName: "text.bubble.fill")
+                            Text(localizationService.localizedString("supportFormFeedbackTitle", table: "help"))
+                        }
+                    }
+                    
+                    NavigationLink(destination: SupportTicketFormView(kind: .bug)) {
+                        HStack {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                            Text(localizationService.localizedString("supportFormBugTitle", table: "help"))
                         }
                     }
                 }
@@ -104,114 +111,6 @@ struct FAQRow: View {
             }
         }
         .padding(.vertical, 4)
-    }
-}
-
-struct LiveChatView: View {
-    @StateObject private var localizationService = LocalizationService.shared
-    @State private var messageText = ""
-    @State private var subject = ""
-    @State private var isLoading = false
-    @State private var showSuccess = false
-    @State private var errorMessage: String?
-    @Environment(\.dismiss) var dismiss
-    
-    var body: some View {
-        Form {
-            Section {
-                TextField(localizationService.localizedString("subject", table: "help"), text: $subject)
-                TextEditor(text: $messageText)
-                    .frame(height: 200)
-            } header: {
-                Text(localizationService.localizedString("yourMessage", table: "help"))
-            }
-            
-            Section {
-                Button(action: sendMessage) {
-                    if isLoading {
-                        ProgressView()
-                    } else {
-                        Text(localizationService.localizedString("send", table: "common"))
-                    }
-                }
-                .disabled(isLoading || messageText.isEmpty || subject.isEmpty)
-            }
-            
-            if let error = errorMessage {
-                Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                }
-            }
-        }
-        .navigationTitle(localizationService.localizedString("liveChat", table: "help"))
-        .alert(localizationService.localizedString("messageSent", table: "help"), isPresented: $showSuccess) {
-            Button(localizationService.localizedString("ok", table: "common")) {
-                dismiss()
-            }
-        } message: {
-            Text(localizationService.localizedString("messageSentDescription", table: "help"))
-        }
-    }
-    
-    private func sendMessage() {
-        guard !messageText.isEmpty, !subject.isEmpty else {
-            return
-        }
-        
-        isLoading = true
-        errorMessage = nil
-        
-        
-        Task {
-            // Check authentication
-            guard AuthenticationService.shared.isAuthenticated else {
-                await MainActor.run {
-                    errorMessage = localizationService.localizedString("pleaseSignIn", table: "errors")
-                    isLoading = false
-                }
-                return
-            }
-            
-            // Send support message via email (fallback) or API
-            guard AuthenticationService.shared.currentUser?.email != nil else {
-                await MainActor.run {
-                    errorMessage = localizationService.localizedString("pleaseSignIn", table: "errors")
-                    isLoading = false
-                }
-                return
-            }
-            
-            
-            let encodedSubject = subject.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let encodedBody = messageText.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let mailtoURL = "mailto:support@divehub.com?subject=\(encodedSubject)&body=\(encodedBody)"
-            
-            
-            guard let url = URL(string: mailtoURL) else {
-                await MainActor.run {
-                    errorMessage = localizationService.localizedString("failedToSend", table: "errors")
-                    isLoading = false
-                }
-                return
-            }
-            
-            await MainActor.run {
-                
-                UIApplication.shared.open(url, options: [:]) { success in
-                    
-                    Task { @MainActor in
-                        if success {
-                            showSuccess = true
-                            isLoading = false
-                        } else {
-                            errorMessage = localizationService.localizedString("failedToSend", table: "errors")
-                            isLoading = false
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 

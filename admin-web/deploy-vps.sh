@@ -8,6 +8,9 @@ cd "$ROOT"
 echo ">>> cwd: $ROOT"
 echo ">>> git: $(git rev-parse --short HEAD 2>/dev/null || echo '?')"
 
+# Не задавать NODE_ENV=development: `next build` сломается (ошибка <Html> / prerender).
+# Не оставлять NODE_ENV=production до npm ci, иначе не поставятся devDependencies.
+unset NODE_ENV
 npm ci
 rm -rf .next
 npm run build

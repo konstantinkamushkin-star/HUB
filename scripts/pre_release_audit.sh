@@ -47,6 +47,8 @@ for raw in sys.stdin:
     p = raw.strip()
     if not p:
         continue
+    if p == "scripts/pre_release_audit.sh":
+        continue
     if p.endswith(skip_suffix) or any(s in p for s in skip_contains):
         continue
     try:

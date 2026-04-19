@@ -881,12 +881,13 @@ struct GearProfilesView: View {
 
 struct GearProfileRow: View {
     let profile: GearProfile
+    @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(profile.name)
                 .font(.headline)
-            Text("ui_profile_value_items".localized)
+            Text("\(profile.items.count) \(localizationService.localizedString("items", table: "inventory"))")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -909,7 +910,7 @@ struct GearProfileDetailView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(item.category.rawValue.capitalized)
                             .font(.headline)
-                        Text("ui_profile_size_value".localized)
+                        Text("\("ui_label_size".localized): \(item.size)")
                             .font(.subheadline)
                             .foregroundColor(.secondary)
                         if let notes = item.notes, !notes.isEmpty {
@@ -950,7 +951,7 @@ struct AddGearProfileView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             Text(item.category.rawValue.capitalized)
                                 .font(.headline)
-                            Text("ui_profile_size_value".localized)
+                            Text("\("ui_label_size".localized): \(item.size)")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }

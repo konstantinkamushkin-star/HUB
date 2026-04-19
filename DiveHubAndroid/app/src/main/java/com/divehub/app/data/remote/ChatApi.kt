@@ -2,6 +2,7 @@ package com.divehub.app.data.remote
 
 import com.divehub.app.data.remote.dto.ChatConversationDto
 import com.divehub.app.data.remote.dto.ChatMessagesPageDto
+import com.divehub.app.data.remote.dto.OpenAppSupportTopicRequest
 import com.divehub.app.data.remote.dto.OpenConversationRequest
 import com.divehub.app.data.remote.dto.SendMessageRequest
 import retrofit2.http.Body
@@ -16,6 +17,9 @@ interface ChatApi {
 
     @POST("chat/conversations")
     suspend fun openConversation(@Body body: OpenConversationRequest): ChatConversationDto
+
+    @POST("chat/support/topics")
+    suspend fun openAppSupportTopic(@Body body: OpenAppSupportTopicRequest): ChatConversationDto
 
     @GET("chat/{conversationId}/messages")
     suspend fun messages(

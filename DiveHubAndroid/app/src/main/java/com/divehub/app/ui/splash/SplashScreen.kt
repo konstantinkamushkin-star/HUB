@@ -1,49 +1,51 @@
 package com.divehub.app.ui.splash
 
-import androidx.compose.animation.core.*
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavHostController
 import com.divehub.app.AppGraph
+import com.divehub.app.R
 import com.divehub.app.data.remote.dto.needsProfileOnboarding
 import com.divehub.app.ui.Routes
 import kotlinx.coroutines.delay
 
 @Composable
 fun SplashRoute(nav: NavHostController, graph: AppGraph) {
-    val entrance = remember { Animatable(0f) }
-    val pulse = rememberInfiniteTransition(label = "pulse")
-    val logoScale by pulse.animateFloat(
-        initialValue = 0.96f,
-        targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "logoScale",
+    var progress by remember { mutableFloatStateOf(0f) }
+    val entrance by animateFloatAsState(
+        targetValue = progress,
+        animationSpec = tween(durationMillis = 1200, easing = FastOutSlowInEasing),
+        label = "splashEntrance",
     )
 
     LaunchedEffect(Unit) {
-        entrance.animateTo(1f, animationSpec = tween(700, easing = FastOutSlowInEasing))
+        progress = 1f
         delay(2000)
         val token = graph.tokenStore.getAccessToken()
         val user = graph.tokenStore.getUserJson()?.let {
@@ -64,56 +66,43 @@ fun SplashRoute(nav: NavHostController, graph: AppGraph) {
         }
     }
 
+    val logoScale = 0.8f + 0.1f * entrance
+    val logoOpacity = 0.5f + 0.5f * entrance
+    val primary = MaterialTheme.colorScheme.primary
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    listOf(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
-                        MaterialTheme.colorScheme.background,
-                    ),
-                ),
-            ),
+            .background(primary),
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 80.dp, end = 24.dp)
-                .scale(1.1f)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
-                .padding(38.dp),
-        )
-        Box(
-            modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(bottom = 120.dp, start = 22.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.secondary.copy(alpha = 0.08f))
-                .padding(28.dp),
-        )
-
         Column(
             modifier = Modifier
                 .align(Alignment.Center)
-                .alpha(entrance.value)
-                .scale(logoScale),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
+            Image(
+                painter = painterResource(R.mipmap.ic_launcher),
+                contentDescription = stringResource(R.string.splash_logo_accessibility),
+                modifier = Modifier
+                    .size(120.dp)
+                    .scale(logoScale)
+                    .alpha(logoOpacity),
+            )
             Text(
-                text = "DiveHub",
+                text = stringResource(R.string.splash_brand_title),
                 style = MaterialTheme.typography.headlineLarge,
                 fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
+                color = Color.White,
+                modifier = Modifier
+                    .padding(top = 20.dp)
+                    .alpha(logoOpacity),
             )
-            Text(
-                text = "Dive into your next adventure",
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f),
-                modifier = Modifier.padding(top = 8.dp, bottom = 24.dp),
+            CircularProgressIndicator(
+                strokeWidth = 3.dp,
+                color = Color.White.copy(alpha = 0.85f),
+                modifier = Modifier.padding(top = 28.dp),
             )
-            CircularProgressIndicator(strokeWidth = 3.dp)
         }
     }
 }

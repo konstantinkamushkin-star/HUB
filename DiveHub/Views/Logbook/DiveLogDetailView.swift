@@ -218,7 +218,7 @@ struct ShareDiveView: View {
                         HStack {
                             Text(formatDepth(log.maxDepth))
                             Text("ui_explore_a".localized)
-                            Text("ui_logbook_value_min".localized)
+                            Text("\(log.bottomTime) \(localizationService.localizedString("min", table: "logbook"))")
                         }
                         .font(.caption)
                         .foregroundColor(.secondary)
@@ -266,7 +266,10 @@ struct ShareDiveView: View {
     }
     
     private func generateDefaultShareText() -> String {
-        return "Just completed a dive at \(log.location.name)! Max depth: \(formatDepth(log.maxDepth)), Bottom time: \(log.bottomTime) min"
+        let maxDepthLabel = localizationService.localizedString("maxDepth", table: "logbook")
+        let bottomTimeLabel = localizationService.localizedString("bottomTime", table: "logbook")
+        let minutes = localizationService.localizedString("min", table: "logbook")
+        return "\(log.location.name) - \(maxDepthLabel): \(formatDepth(log.maxDepth)), \(bottomTimeLabel): \(log.bottomTime) \(minutes)"
     }
     
     private func shareDive() async {

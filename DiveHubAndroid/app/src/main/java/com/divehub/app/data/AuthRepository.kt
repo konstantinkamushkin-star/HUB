@@ -1,6 +1,8 @@
 package com.divehub.app.data
 
 import com.divehub.app.AppGraph
+import com.divehub.app.data.remote.dto.AppleAuthRequest
+import com.divehub.app.data.remote.dto.GoogleAuthRequest
 import com.divehub.app.data.remote.dto.ChangePasswordBody
 import com.divehub.app.data.remote.dto.DeleteMyAccountRequest
 import com.divehub.app.data.remote.dto.ForgotPasswordRequest
@@ -10,6 +12,7 @@ import com.divehub.app.data.remote.dto.ResetPasswordRequest
 import com.divehub.app.data.remote.dto.UpdateProfileRequest
 import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.data.remote.dto.VerifyResetCodeRequest
+import com.divehub.app.data.local.AdminDashboardLayout
 import com.divehub.app.util.ConsentTexts
 import com.google.gson.JsonParser
 import com.divehub.app.R
@@ -25,6 +28,57 @@ class AuthRepository(private val graph: AppGraph) {
     suspend fun login(email: String, password: String) {
         val api = graph.authApi()
         val res = api.login(LoginRequest(email.trim(), password))
+        val user = res.user.copy(mustChangePassword = res.mustChangePassword ?: res.user.mustChangePassword)
+        graph.tokenStore.saveSession(
+            res.accessToken,
+            res.refreshToken,
+            graph.gson.toJson(user),
+        )
+    }
+
+    suspend fun loginWithApple(
+        idToken: String,
+        email: String?,
+        firstName: String?,
+        lastName: String?,
+    ) {
+        val api = graph.authApi()
+        val res = api.apple(
+            AppleAuthRequest(
+                idToken = idToken,
+                email = email?.trim()?.lowercase()?.takeIf { it.isNotEmpty() },
+                firstName = firstName?.trim()?.takeIf { it.isNotEmpty() },
+                lastName = lastName?.trim()?.takeIf { it.isNotEmpty() },
+                personalDataConsent = true,
+                personalDataConsentText = ConsentTexts.appleOAuthConsentText(),
+            ),
+        )
+        val user = res.user.copy(mustChangePassword = res.mustChangePassword ?: res.user.mustChangePassword)
+        graph.tokenStore.saveSession(
+            res.accessToken,
+            res.refreshToken,
+            graph.gson.toJson(user),
+        )
+    }
+
+    suspend fun loginWithGoogle(
+        idToken: String,
+        email: String?,
+        firstName: String?,
+        lastName: String?,
+    ) {
+        val api = graph.authApi()
+        val res = api.google(
+            GoogleAuthRequest(
+                idToken = idToken,
+                accessToken = null,
+                email = email?.trim()?.lowercase()?.takeIf { it.isNotEmpty() },
+                firstName = firstName?.trim()?.takeIf { it.isNotEmpty() },
+                lastName = lastName?.trim()?.takeIf { it.isNotEmpty() },
+                personalDataConsent = true,
+                personalDataConsentText = ConsentTexts.googleOAuthConsentText(),
+            ),
+        )
         val user = res.user.copy(mustChangePassword = res.mustChangePassword ?: res.user.mustChangePassword)
         graph.tokenStore.saveSession(
             res.accessToken,
@@ -90,6 +144,28 @@ class AuthRepository(private val graph: AppGraph) {
         val user = api.me()
         graph.tokenStore.updateUserJson(graph.gson.toJson(user))
         return user
+    }
+
+    /**
+     * Persists partner admin home layout under `diverProfile.adminDashboardLayout` (server merge).
+     */
+    suspend fun patchAdminDashboardLayout(layout: AdminDashboardLayout): UserDto {
+        val u = cachedUser() ?: throw IllegalStateException("not_signed_in")
+        @Suppress("UNCHECKED_CAST")
+        val inner = u.diverProfile?.get("adminDashboardLayout") as? Map<String, Any?>
+        val merged = layout.mergeIntoExisting(inner)
+        val dp = LinkedHashMap<String, Any?>()
+        u.diverProfile?.let { dp.putAll(it) }
+        dp["adminDashboardLayout"] = merged
+        return updateProfile(diverProfile = dp)
+    }
+
+    suspend fun resetAdminDashboardLayout(): UserDto {
+        val u = cachedUser() ?: throw IllegalStateException("not_signed_in")
+        val dp = LinkedHashMap<String, Any?>()
+        u.diverProfile?.let { dp.putAll(it) }
+        dp["adminDashboardLayout"] = AdminDashboardLayout.defaultServerMapAllPlatforms()
+        return updateProfile(diverProfile = dp)
     }
 
     suspend fun updateProfile(

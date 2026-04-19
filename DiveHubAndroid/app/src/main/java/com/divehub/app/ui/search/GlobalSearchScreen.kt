@@ -146,7 +146,14 @@ fun GlobalSearchRoute(graph: AppGraph, innerNav: NavController) {
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { innerNav.navigate(InnerRoutes.userProfile(u.id)) },
+                                    .clickable {
+                                        val route = if (u.role?.equals("INSTRUCTOR", ignoreCase = true) == true) {
+                                            InnerRoutes.instructorPublic(u.id, null)
+                                        } else {
+                                            InnerRoutes.userProfile(u.id)
+                                        }
+                                        innerNav.navigate(route)
+                                    },
                                 elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                             ) {
                                 Column(Modifier.padding(14.dp)) {

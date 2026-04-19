@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ServicesManagementView: View {
     @EnvironmentObject private var authService: AuthenticationService
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var services: [DiveCenterService] = []
     @State private var isLoading = false
     @State private var errorMessage: String?
@@ -11,51 +12,67 @@ struct ServicesManagementView: View {
     @State private var resolvedDiveCenterId: String?
 
     var body: some View {
-        List {
-            Section {
-                Toggle("ui_admin_show_inactive".localized, isOn: $includeInactive)
-                    .onChange(of: includeInactive) { _, _ in
-                        Task { await loadServices() }
-                    }
-            }
-
-            if let errorMessage, !errorMessage.isEmpty {
+        NavigationStack {
+            List {
                 Section {
-                    Text(errorMessage)
-                        .foregroundColor(.red)
-                }
-            }
-
-            Section {
-                if isLoading {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                } else if services.isEmpty {
-                    Text("ui_admin_no_services_yet_add_your_first_package".localized)
-                        .foregroundColor(.secondary)
-                } else {
-                    ForEach(services) { service in
-                        Button {
-                            selectedService = service
-                        } label: {
-                            AdminServiceRow(service: service)
+                    Toggle("ui_admin_show_inactive".localized, isOn: $includeInactive)
+                        .onChange(of: includeInactive) { _, _ in
+                            Task { await loadServices() }
                         }
-                        .buttonStyle(.plain)
+                }
+
+                if let errorMessage, !errorMessage.isEmpty {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundColor(.red)
                     }
-                    .onDelete(perform: delete)
                 }
-            } header: {
-                Text("ui_admin_services_pricing".localized)
+
+                Section("ui_admin_services_pricing".localized) {
+                    if isLoading && services.isEmpty {
+                        HStack {
+                            Spacer()
+                            ProgressView()
+                            Spacer()
+                        }
+                    } else if services.isEmpty {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Text("ui_admin_no_services_yet_add_your_first_package".localized)
+                                .foregroundColor(.secondary)
+                            Button("ui_admin_new_service".localized) {
+                                showCreate = true
+                            }
+                            .buttonStyle(.borderedProminent)
+                        }
+                        .padding(.vertical, 6)
+                    } else {
+                        ForEach(services) { service in
+                            Button {
+                                selectedService = service
+                            } label: {
+                                AdminServiceRow(service: service)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .onDelete(perform: delete)
+                    }
+                }
             }
-        }
-        .navigationTitle("ui_admin_services".localized)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    showCreate = true
-                } label: {
-                    Image(systemName: "plus")
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle(localizationService.localizedString("services"))
+            .diveHubNavigationChrome()
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showCreate = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
+                    }
                 }
+            }
+            .refreshable {
+                await loadServices()
             }
         }
         .sheet(isPresented: $showCreate) {
@@ -154,7 +171,7 @@ struct ServicesManagementView: View {
             || lowered.contains("cannot delete /api/center-services")
             || lowered.contains("center_services")
             || lowered.contains("relation") && lowered.contains("does not exist") {
-            return "Services backend is not deployed yet. Run migrations and restart API (need migration 029 + latest backend)."
+            return "ui_admin_services_backend_not_deployed".localized
         }
         return raw
     }
@@ -169,7 +186,7 @@ private struct AdminServiceRow: View {
                 Text(service.name)
                     .font(.headline)
                 Spacer()
-                Text(service.isActive ? "Active" : "Inactive")
+                Text(service.isActive ? "ui_status_active".localized : "ui_status_inactive".localized)
                     .font(.caption)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
@@ -186,12 +203,21 @@ private struct AdminServiceRow: View {
                 Text(String(format: "%.0f %@", service.price.amount, service.price.currency))
                     .fontWeight(.semibold)
                 Spacer()
-                Text(service.pricingUnit.replacingOccurrences(of: "_", with: " "))
+                Text(localizedPricingUnit(service.pricingUnit))
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
         }
         .padding(.vertical, 4)
+    }
+
+    private func localizedPricingUnit(_ rawValue: String) -> String {
+        switch rawValue {
+        case "per_person":
+            return "ui_pricing_unit_per_person".localized
+        default:
+            return rawValue.replacingOccurrences(of: "_", with: " ")
+        }
     }
 }
 
@@ -225,14 +251,29 @@ private struct ServiceEditorView: View {
     @State private var isActive = true
     @State private var isSaving = false
     @State private var errorMessage: String?
+    
+    private struct PricingUnitOption: Identifiable, Hashable {
+        let value: String
+        let title: String
+        var id: String { value }
+    }
+    
+    private let pricingUnitOptions: [PricingUnitOption] = [
+        .init(value: "per_person", title: "ui_pricing_unit_per_person".localized),
+        .init(value: "per_group", title: "Per group"),
+        .init(value: "per_day", title: "Per day"),
+        .init(value: "per_session", title: "Per session")
+    ]
+    
+    private let currencyOptions: [String] = ["USD", "EUR", "RUB", "EGP"]
 
     var body: some View {
         NavigationStack {
             Form {
                 Section("ui_basics".localized) {
                     TextField("ui_admin_name".localized, text: $name)
-                    TextEditor(text: $description)
-                        .frame(minHeight: 90)
+                    TextField("ui_admin_description".localized, text: $description, axis: .vertical)
+                        .lineLimit(3...6)
                     Picker("ui_admin_type".localized, selection: $type) {
                         ForEach(DiveCenterService.ServiceType.allCases, id: \.self) { item in
                             Text(item.displayName).tag(item)
@@ -243,9 +284,16 @@ private struct ServiceEditorView: View {
                 Section("ui_price".localized) {
                     TextField("ui_admin_base_price".localized, text: $priceAmount)
                         .keyboardType(.decimalPad)
-                    TextField("ui_admin_currency".localized, text: $currency)
-                        .textInputAutocapitalization(.characters)
-                    TextField("ui_admin_pricing_unit".localized, text: $pricingUnit)
+                    Picker("ui_admin_currency".localized, selection: $currency) {
+                        ForEach(currencyOptions, id: \.self) { item in
+                            Text(item).tag(item)
+                        }
+                    }
+                    Picker("ui_admin_pricing_unit".localized, selection: $pricingUnit) {
+                        ForEach(pricingUnitOptions) { item in
+                            Text(item.title).tag(item.value)
+                        }
+                    }
                 }
 
                 Section("ui_limits".localized) {
@@ -292,7 +340,7 @@ private struct ServiceEditorView: View {
                     }
                 }
             }
-            .navigationTitle(id == nil ? "New service" : "Edit service")
+            .navigationTitle(id == nil ? "ui_admin_new_service".localized : "ui_admin_edit_service".localized)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("ui_cancel".localized) { dismiss() }
@@ -305,6 +353,9 @@ private struct ServiceEditorView: View {
                 }
             }
             .onAppear(perform: bootstrap)
+            .onChange(of: type) { _, newValue in
+                applyTypeDefaultsIfNeeded(for: newValue)
+            }
         }
     }
 
@@ -319,6 +370,8 @@ private struct ServiceEditorView: View {
         case .create(let centerId):
             id = nil
             diveCenterId = centerId
+            pricingUnit = "per_person"
+            currency = "USD"
         case .edit(let service):
             id = service.id
             diveCenterId = service.diveCenterId
@@ -338,6 +391,25 @@ private struct ServiceEditorView: View {
             groupDiscountThreshold = service.groupDiscountThreshold.map { String($0) } ?? ""
             groupDiscountPercent = service.groupDiscountPercent.map { String($0) } ?? ""
             isActive = service.isActive
+        }
+    }
+    
+    private func applyTypeDefaultsIfNeeded(for newType: DiveCenterService.ServiceType) {
+        // Keep this lightweight: only suggest defaults when user hasn't typed custom values yet.
+        let normalizedPricingUnit = pricingUnit.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let hasCustomPricingUnit = !normalizedPricingUnit.isEmpty && normalizedPricingUnit != "per_person"
+        if hasCustomPricingUnit {
+            return
+        }
+        switch newType {
+        case .package:
+            pricingUnit = "per_group"
+        case .equipmentRental:
+            pricingUnit = "per_day"
+        case .poolSession:
+            pricingUnit = "per_session"
+        default:
+            pricingUnit = "per_person"
         }
     }
 

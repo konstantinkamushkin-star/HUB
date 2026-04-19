@@ -38,6 +38,15 @@ export class AdminSupportTicketEntity {
   @Column({ type: 'text', nullable: true, name: 'resolution_note' })
   resolutionNote: string | null;
 
+  @Column({ type: 'varchar', length: 32, default: 'other' })
+  category: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  metadata: Record<string, unknown> | null;
+
+  @Column({ name: 'conversation_id', type: 'uuid', nullable: true })
+  conversationId: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

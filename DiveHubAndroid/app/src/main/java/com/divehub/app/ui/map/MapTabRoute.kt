@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,11 +35,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -53,10 +58,15 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.diveHubApp
 import com.divehub.app.data.ExploreRepository
 import com.divehub.app.data.remote.dto.ExploreDiveSite
+import com.divehub.app.data.remote.dto.ExploreItemKind
+import com.divehub.app.ui.explore.DiveSiteContributionMode
+import com.divehub.app.ui.explore.DiveSiteContributionSheetContent
 import com.divehub.app.ui.explore.ExploreMapActions
 import com.divehub.app.ui.explore.ExploreMapOsm
+import com.divehub.app.ui.components.DiveCenterPromoCard
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.theme.IosDesign
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -104,8 +114,13 @@ fun MapTabRoute(graph: AppGraph, innerNav: NavController) {
     var loading by remember { mutableStateOf(true) }
     var loadError by remember { mutableStateOf<String?>(null) }
     var showFilters by remember { mutableStateOf(false) }
+    var selectedSite by remember { mutableStateOf<ExploreDiveSite?>(null) }
     var mapActions by remember { mutableStateOf<ExploreMapActions?>(null) }
     var pendingCenterOnUser by remember { mutableStateOf(false) }
+    var contributionMode by remember { mutableStateOf<DiveSiteContributionMode?>(null) }
+    val mapLoggedIn by produceState(initialValue = false) {
+        graph.tokenStore.accessToken.collect { value = !it.isNullOrBlank() }
+    }
 
     fun applyCurrentFilters() {
         filteredSites = applyFilters(allSites, selectedDiveType = selectedDiveType, selectedDifficulty = selectedDifficulty)
@@ -177,11 +192,7 @@ fun MapTabRoute(graph: AppGraph, innerNav: NavController) {
             else -> {
                 ExploreMapOsm(
                     sites = filteredSites,
-                    onSiteTap = { site ->
-                        innerNav.navigate(
-                            InnerRoutes.bookingWizard(centerId = null, siteId = site.id, instructorId = null),
-                        )
-                    },
+                    onSiteTap = { site -> selectedSite = site },
                     onActionsReady = { mapActions = it },
                 )
                 MapTabControls(
@@ -203,6 +214,7 @@ fun MapTabRoute(graph: AppGraph, innerNav: NavController) {
                             )
                         }
                     },
+                    onAddDiveLog = { context.diveHubApp().emitDiverTab(3) },
                 )
             }
         }
@@ -223,6 +235,68 @@ fun MapTabRoute(graph: AppGraph, innerNav: NavController) {
             )
         }
     }
+
+    selectedSite?.let { site ->
+        ModalBottomSheet(onDismissRequest = { selectedSite = null }) {
+            MapSiteDetailSheet(
+                site = site,
+                onBook = when (site.kind) {
+                    ExploreItemKind.DIVE_SITE -> null
+                    ExploreItemKind.DIVE_CENTER -> null
+                    ExploreItemKind.SHOP -> {
+                        {
+                            selectedSite = null
+                            innerNav.navigate(
+                                InnerRoutes.bookingWizard(centerId = null, siteId = null, instructorId = null),
+                            )
+                        }
+                    }
+                },
+                onOpenProfile = when (site.kind) {
+                    ExploreItemKind.DIVE_CENTER -> ({
+                        selectedSite = null
+                        innerNav.navigate(InnerRoutes.diveCenterPublic(site.id))
+                    })
+                    ExploreItemKind.SHOP -> ({
+                        selectedSite = null
+                        innerNav.navigate(InnerRoutes.shopPublic(site.id))
+                    })
+                    ExploreItemKind.DIVE_SITE -> null
+                },
+                onMessage = when (site.kind) {
+                    ExploreItemKind.DIVE_CENTER -> ({
+                        selectedSite = null
+                        innerNav.navigate(InnerRoutes.businessChatOpen("dive_center", site.id))
+                    })
+                    ExploreItemKind.SHOP -> ({
+                        selectedSite = null
+                        innerNav.navigate(InnerRoutes.businessChatOpen("shop", site.id))
+                    })
+                    ExploreItemKind.DIVE_SITE -> null
+                },
+                onReportInaccuracy = if (site.kind == ExploreItemKind.DIVE_SITE && mapLoggedIn) {
+                    {
+                        val s = site
+                        selectedSite = null
+                        contributionMode = DiveSiteContributionMode.Correction(s)
+                    }
+                } else {
+                    null
+                },
+                onClose = { selectedSite = null },
+            )
+        }
+    }
+
+    if (contributionMode != null) {
+        ModalBottomSheet(onDismissRequest = { contributionMode = null }) {
+            DiveSiteContributionSheetContent(
+                mode = contributionMode!!,
+                graph = graph,
+                onDismiss = { contributionMode = null },
+            )
+        }
+    }
 }
 
 @Composable
@@ -231,6 +305,7 @@ private fun MapTabControls(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
     onCenterOnUser: () -> Unit,
+    onAddDiveLog: () -> Unit,
 ) {
     Column(
         modifier = Modifier
@@ -283,6 +358,109 @@ private fun MapTabControls(
                     tint = IosDesign.Explore.mapAccent,
                     modifier = Modifier.size(26.dp),
                 )
+            }
+            Box(
+                modifier = Modifier
+                    .padding(top = 10.dp)
+                    .size(52.dp)
+                    .shadow(4.dp, CircleShape)
+                    .clip(CircleShape)
+                    .background(IosDesign.Explore.mapAccent)
+                    .clickable(onClick = onAddDiveLog),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(R.string.map_add_log),
+                    tint = Color.White,
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun MapSiteDetailSheet(
+    site: ExploreDiveSite,
+    onBook: (() -> Unit)?,
+    onOpenProfile: (() -> Unit)?,
+    onMessage: (() -> Unit)?,
+    onReportInaccuracy: (() -> Unit)?,
+    onClose: () -> Unit,
+) {
+    Column(
+        Modifier
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .padding(bottom = 12.dp),
+    ) {
+        Text(site.name, style = MaterialTheme.typography.titleLarge)
+        val location = listOfNotNull(site.region.takeIf { it.isNotBlank() }, site.country.takeIf { it.isNotBlank() })
+            .joinToString(", ")
+        if (location.isNotBlank()) {
+            Spacer(Modifier.size(4.dp))
+            Text(location, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.size(8.dp))
+        Text(site.description.ifBlank { stringResource(R.string.explore_no_description) })
+        Spacer(Modifier.size(10.dp))
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFF3F5F8)) {
+                Text(
+                    text = "${stringResource(R.string.explore_difficulty)}: ${site.difficulty}",
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+            Surface(shape = RoundedCornerShape(999.dp), color = Color(0xFFF3F5F8)) {
+                Text(
+                    text = stringResource(R.string.explore_max_depth, site.depthMax.toInt()),
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                )
+            }
+        }
+        Spacer(Modifier.size(12.dp))
+        if (site.kind == ExploreItemKind.DIVE_CENTER) {
+            DiveCenterPromoCard()
+            Spacer(Modifier.size(10.dp))
+        }
+        if (onReportInaccuracy != null) {
+            OutlinedButton(onClick = onReportInaccuracy, modifier = Modifier.fillMaxWidth()) {
+                Text(stringResource(R.string.dive_site_report_inaccuracy))
+            }
+            Spacer(Modifier.size(8.dp))
+        }
+        if (onOpenProfile != null || onMessage != null) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (onOpenProfile != null) {
+                    TextButton(onClick = onOpenProfile, modifier = Modifier.weight(1f)) {
+                        Text(
+                            when (site.kind) {
+                                ExploreItemKind.DIVE_CENTER -> stringResource(R.string.dive_center_public_open_profile)
+                                ExploreItemKind.SHOP -> stringResource(R.string.shop_public_open_profile)
+                                else -> ""
+                            }
+                        )
+                    }
+                }
+                if (onMessage != null) {
+                    TextButton(onClick = onMessage, modifier = Modifier.weight(1f)) {
+                        Text(
+                            when (site.kind) {
+                                ExploreItemKind.SHOP -> stringResource(R.string.explore_message_shop)
+                                else -> stringResource(R.string.explore_message_center)
+                            }
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.size(6.dp))
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
+            TextButton(onClick = onClose) { Text(stringResource(R.string.common_close)) }
+            if (onBook != null) {
+                Surface(color = IosDesign.Explore.mapAccent, shape = RoundedCornerShape(12.dp), modifier = Modifier.clickable(onClick = onBook)) {
+                    Text(text = stringResource(R.string.explore_book), color = Color.White, modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp))
+                }
             }
         }
     }

@@ -194,7 +194,7 @@ struct GroupTripRow: View {
                 .font(.caption)
                 .foregroundColor(.secondary)
             HStack {
-                Label("ui_social_value".localized, systemImage: "person.2")
+                Label("\(trip.participants.count)", systemImage: "person.2")
                 Spacer()
                 Text(trip.startDate, style: .date)
             }
@@ -224,7 +224,7 @@ struct FriendTrackingView: View {
                         VStack(alignment: .leading) {
                             Text(friend.displayName)
                                 .font(.headline)
-                            Text("\(localizationService.localizedString("lastSeen", table: "social")): 5 min ago")
+                            Text(localizationService.localizedString("lastSeen", table: "social"))
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }

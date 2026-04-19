@@ -79,7 +79,8 @@ struct AdminWebPanelRepresentable: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.isOpaque = true
-        webView.backgroundColor = .systemBackground
+        // Совпадает с admin-web `bg-zinc-950` — иначе при загрузке чанков виден белый фон WKWebView.
+        webView.backgroundColor = UIColor(red: 9 / 255, green: 9 / 255, blue: 11 / 255, alpha: 1)
         #if DEBUG
         if #available(iOS 16.4, *) {
             webView.isInspectable = true

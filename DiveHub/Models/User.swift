@@ -40,13 +40,14 @@ enum UserRole: String, Codable, CaseIterable, Hashable {
     }
     
     var displayName: String {
+        let loc = LocalizationService.shared
         switch self {
-        case .diverBasic: return "Diver (Basic)"
-        case .diverPro: return "Diver (PRO)"
-        case .instructor: return "Instructor"
-        case .diveCenterAdmin: return "Dive Center Admin"
-        case .shopAdmin: return "Shop Admin"
-        case .superAdmin: return "Super Admin"
+        case .diverBasic: return loc.localizedString("roleDiverBasic")
+        case .diverPro: return loc.localizedString("roleDiverPro")
+        case .instructor: return loc.localizedString("roleInstructor")
+        case .diveCenterAdmin: return loc.localizedString("roleDiveCenterAdmin")
+        case .shopAdmin: return loc.localizedString("roleShopAdmin")
+        case .superAdmin: return loc.localizedString("roleSuperAdmin")
         }
     }
 }

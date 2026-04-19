@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import CoreLocation
 
 struct MapTabView: View {
     @StateObject private var viewModel = MapViewModel()
@@ -58,6 +59,15 @@ struct MapTabView: View {
                 selectedSite = annotation.site
             }
         )
+        .onChange(of: viewModel.region.center.latitude) { _, _ in
+            viewModel.scheduleBoundsReload()
+        }
+        .onChange(of: viewModel.region.center.longitude) { _, _ in
+            viewModel.scheduleBoundsReload()
+        }
+        .onChange(of: viewModel.region.zoom) { _, _ in
+            viewModel.scheduleBoundsReload()
+        }
         .ignoresSafeArea()
     }
     

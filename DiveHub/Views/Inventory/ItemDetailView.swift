@@ -10,6 +10,7 @@ import SwiftUI
 struct ItemDetailView: View {
     let item: GearItem
     @ObservedObject var viewModel: InventoryViewModel
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var selectedTab: DetailTab = .overview
     @State private var showEdit = false
     @State private var showCheckout = false
@@ -24,6 +25,29 @@ struct ItemDetailView: View {
         case documents = "Documents"
         case inspections = "Inspections"
         case related = "Related"
+    }
+
+    private func inv(_ key: String) -> String {
+        localizationService.localizedString(key, table: "inventory")
+    }
+
+    private func tabTitle(_ tab: DetailTab) -> String {
+        switch tab {
+        case .overview:
+            return inv("details")
+        case .history:
+            return tab.rawValue
+        case .maintenance:
+            return "ui_inventory_maintenance".localized
+        case .rentals:
+            return inv("rentalDetails")
+        case .documents:
+            return tab.rawValue
+        case .inspections:
+            return "ui_inventory_inspection".localized
+        case .related:
+            return tab.rawValue
+        }
     }
     
     var body: some View {
@@ -139,7 +163,7 @@ struct ItemDetailView: View {
                 ForEach(DetailTab.allCases, id: \.self) { tab in
                     Button(action: { selectedTab = tab }) {
                         VStack(spacing: 4) {
-                            Text(tab.rawValue)
+                            Text(tabTitle(tab))
                                 .font(.subheadline)
                                 .fontWeight(selectedTab == tab ? .semibold : .regular)
                             
@@ -184,16 +208,16 @@ struct ItemDetailView: View {
     private var overviewTab: some View {
         VStack(alignment: .leading, spacing: 20) {
             // Basic Information
-            SectionView(title: "Basic Information") {
-                ItemInfoRow(label: "Category", value: item.category.displayName)
-                ItemInfoRow(label: "Manufacturer", value: item.manufacturer ?? "N/A")
-                ItemInfoRow(label: "Model", value: item.model ?? "N/A")
+            SectionView(title: inv("basicInformation")) {
+                ItemInfoRow(label: inv("category"), value: item.category.displayName)
+                ItemInfoRow(label: inv("manufacturer"), value: item.manufacturer ?? inv("na"))
+                ItemInfoRow(label: inv("model"), value: item.model ?? inv("na"))
                 if let size = item.size {
-                    ItemInfoRow(label: "Size", value: size)
+                    ItemInfoRow(label: inv("size"), value: size)
                 }
-                ItemInfoRow(label: "Serial Number", value: item.serialNumber ?? "N/A")
+                ItemInfoRow(label: inv("serialNumber"), value: item.serialNumber ?? inv("na"))
                 if let barcode = item.barcode {
-                    ItemInfoRow(label: "Barcode", value: barcode)
+                    ItemInfoRow(label: inv("barcode"), value: barcode)
                 }
                 if let qrCode = item.qrCode {
                     ItemInfoRow(label: "QR Code", value: qrCode)
@@ -201,46 +225,46 @@ struct ItemDetailView: View {
             }
             
             // Location & Responsibility
-            SectionView(title: "Location & Responsibility") {
-                ItemInfoRow(label: "Location", value: item.locationName ?? "Not assigned")
-                ItemInfoRow(label: "Responsible", value: item.responsibleUserName ?? "Not assigned")
+            SectionView(title: inv("locationResponsibility")) {
+                ItemInfoRow(label: inv("location"), value: item.locationName ?? inv("notAssigned"))
+                ItemInfoRow(label: inv("recipient"), value: item.responsibleUserName ?? inv("notAssigned"))
             }
             
             // Purchase Information
             if item.purchaseDate != nil || item.supplier != nil {
-                SectionView(title: "Purchase Information") {
+                SectionView(title: inv("purchaseInformation")) {
                     if let purchaseDate = item.purchaseDate {
-                        ItemInfoRow(label: "Purchase Date", value: formatDate(purchaseDate))
+                        ItemInfoRow(label: inv("purchaseDate"), value: formatDate(purchaseDate))
                     }
-                    ItemInfoRow(label: "Supplier", value: item.supplier ?? "N/A")
+                    ItemInfoRow(label: inv("supplier"), value: item.supplier ?? inv("na"))
                     if let price = item.purchasePrice {
-                        ItemInfoRow(label: "Purchase Price", value: String(format: "%.2f", price))
+                        ItemInfoRow(label: inv("purchasePrice"), value: String(format: "%.2f", price))
                     }
                     if let warranty = item.warrantyExpiresAt {
-                        ItemInfoRow(label: "Warranty Expires", value: formatDate(warranty))
+                        ItemInfoRow(label: inv("dueDate"), value: formatDate(warranty))
                     }
                 }
             }
             
             // Technical Details
             if item.productionYear != nil || item.maxPressure != nil || item.material != nil {
-                SectionView(title: "Technical Details") {
+                SectionView(title: inv("technicalDetails")) {
                     if let year = item.productionYear {
-                        ItemInfoRow(label: "Production Year", value: "\(year)")
+                        ItemInfoRow(label: inv("productionYear"), value: "\(year)")
                     }
                     if let pressure = item.maxPressure {
-                        ItemInfoRow(label: "Max Pressure", value: "\(pressure) bar")
+                        ItemInfoRow(label: inv("maxPressureBar"), value: "\(pressure) bar")
                     }
-                    ItemInfoRow(label: "Material", value: item.material ?? "N/A")
+                    ItemInfoRow(label: inv("material"), value: item.material ?? inv("na"))
                 }
             }
             
             // Inspection Schedule
-            SectionView(title: "Inspection Schedule") {
+            SectionView(title: inv("inspectionSchedule")) {
                 if let lastInspection = item.lastInspectionDate {
-                    ItemInfoRow(label: "Last Inspection", value: formatDate(lastInspection))
+                    ItemInfoRow(label: inv("inspection"), value: formatDate(lastInspection))
                 } else {
-                    ItemInfoRow(label: "Last Inspection", value: "Never")
+                    ItemInfoRow(label: inv("inspection"), value: inv("notChecked"))
                 }
                 
                 if let nextInspection = item.nextInspectionDate {
@@ -256,24 +280,24 @@ struct ItemDetailView: View {
                                     .fontWeight(.bold)
                                     .foregroundColor(.red)
                             } else if let days = item.daysUntilInspection {
-                                Text("ui_inventory_value_days".localized)
+                                Text("\(days) \(localizationService.localizedString("days", table: "common"))")
                                     .font(.caption)
                                     .foregroundColor(days <= 30 ? .orange : .secondary)
                             }
                         }
                     }
                 } else {
-                    ItemInfoRow(label: "Next Inspection", value: "Not scheduled")
+                    ItemInfoRow(label: "ui_inventory_next_inspection".localized, value: inv("notAssigned"))
                 }
                 
                 if let interval = item.inspectionIntervalDays {
-                    ItemInfoRow(label: "Inspection Interval", value: "\(interval) days")
+                    ItemInfoRow(label: inv("inspectionIntervalDays"), value: "\(interval) \(localizationService.localizedString("days", table: "common"))")
                 }
             }
             
             // Notes
             if let notes = item.notes, !notes.isEmpty {
-                SectionView(title: "Notes") {
+                SectionView(title: inv("notes")) {
                     Text(notes)
                         .font(.body)
                 }
@@ -281,7 +305,7 @@ struct ItemDetailView: View {
             
             // Tags
             if !item.tags.isEmpty {
-                SectionView(title: "Tags") {
+                SectionView(title: inv("tags")) {
                     FlowLayout(items: item.tags) { tag in
                         Text(tag)
                             .font(.caption)
@@ -606,7 +630,7 @@ struct CheckoutRow: View {
             }
             
             HStack {
-                Text("ui_inventory_due_value".localized)
+                Text("\("ui_label_due".localized): \(formatDate(checkout.dueDate))")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                 
@@ -686,8 +710,8 @@ struct InspectionRow: View {
                     .cornerRadius(8)
             }
             
-            if inspection.performedByName != nil {
-                Text("ui_inventory_by_value".localized)
+            if let performedBy = inspection.performedByName {
+                Text("\("ui_label_by".localized): \(performedBy)")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
             }

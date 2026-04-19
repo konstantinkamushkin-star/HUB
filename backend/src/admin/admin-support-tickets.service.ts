@@ -19,6 +19,7 @@ export class AdminSupportTicketsService {
     status?: string;
     priority?: string;
     assignedAdminId?: string;
+    category?: string;
   }) {
     const limit = Math.min(Math.max(params.limit ?? 50, 1), 200);
     const offset = Math.max(params.offset ?? 0, 0);
@@ -27,6 +28,9 @@ export class AdminSupportTicketsService {
     if (params.priority) qb.andWhere('t.priority = :pr', { pr: params.priority });
     if (params.assignedAdminId) {
       qb.andWhere('t.assignedAdminId = :aid', { aid: params.assignedAdminId });
+    }
+    if (params.category) {
+      qb.andWhere('t.category = :cat', { cat: params.category });
     }
     const [items, total] = await qb.getManyAndCount();
     return { items, total, limit, offset };
@@ -49,6 +53,9 @@ export class AdminSupportTicketsService {
       body: dto.body,
       priority: dto.priority ?? 'normal',
       status: 'open',
+      category: dto.category ?? 'other',
+      conversationId: dto.conversationId ?? null,
+      metadata: dto.metadata ?? null,
     });
     const saved = await this.repo.save(row);
     await this.audit.write({
@@ -87,5 +94,43 @@ export class AdminSupportTicketsService {
       device: actor.userAgent ?? null,
     });
     return saved;
+  }
+
+  /**
+   * Ticket from mobile/web app (authenticated user).
+   */
+  async createFromAppUser(
+    userId: string,
+    email: string | null | undefined,
+    dto: {
+      subject: string;
+      body: string;
+      category?: string;
+      conversationId?: string;
+      metadata?: Record<string, unknown> | null;
+    },
+  ) {
+    const row = this.repo.create({
+      reporterUserId: userId,
+      reporterEmail: email ?? null,
+      subject: dto.subject.trim(),
+      body: dto.body.trim(),
+      category: dto.category ?? 'other',
+      conversationId: dto.conversationId ?? null,
+      metadata: dto.metadata ?? null,
+      priority: 'normal',
+      status: 'open',
+    });
+    const saved = await this.repo.save(row);
+    await this.audit.write({
+      adminId: null,
+      action: 'support_ticket.user_create',
+      targetType: 'support_ticket',
+      targetId: saved.id,
+      after: { subject: saved.subject, category: saved.category },
+      ip: null,
+      device: null,
+    });
+    return { success: true, data: saved };
   }
 }

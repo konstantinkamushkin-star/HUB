@@ -17,31 +17,34 @@ struct CalendarView: View {
     }
     
     var body: some View {
-        VStack {
-            // Calendar Picker
-            DatePicker(
-                localizationService.localizedString("selectDate", table: "admin"),
-                selection: $selectedDate,
-                displayedComponents: .date
-            )
-            .datePickerStyle(.graphical)
-            .padding()
-            
-            // Bookings for selected date
-            List {
-                Section(localizationService.localizedString("bookingsForDate", table: "admin")) {
-                    if bookingsForSelectedDate.isEmpty {
-                        Text(localizationService.localizedString("noBookings", table: "admin"))
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(bookingsForSelectedDate) { booking in
-                            CalendarBookingRow(booking: booking)
+        VStack(spacing: 0) {
+            VStack {
+                // Calendar Picker
+                DatePicker(
+                    localizationService.localizedString("selectDate", table: "admin"),
+                    selection: $selectedDate,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .padding()
+
+                // Bookings for selected date
+                List {
+                    Section(localizationService.localizedString("bookingsForDate", table: "admin")) {
+                        if bookingsForSelectedDate.isEmpty {
+                            Text(localizationService.localizedString("noBookings", table: "admin"))
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(bookingsForSelectedDate) { booking in
+                                CalendarBookingRow(booking: booking)
+                            }
                         }
                     }
                 }
             }
         }
         .navigationTitle(localizationService.localizedString("calendar", table: "admin"))
+        .diveHubNavigationChrome()
         .task {
             await viewModel.loadBookings()
         }
@@ -50,6 +53,7 @@ struct CalendarView: View {
 
 private struct CalendarBookingRow: View {
     let booking: Booking
+    @StateObject private var localizationService = LocalizationService.shared
 
     var body: some View {
         HStack {
@@ -61,7 +65,7 @@ private struct CalendarBookingRow: View {
                     .foregroundColor(.secondary)
             }
             Spacer()
-            Text(booking.status.rawValue.capitalized)
+            Text(localizedStatus(booking.status))
                 .font(.caption)
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
@@ -80,6 +84,23 @@ private struct CalendarBookingRow: View {
         case .completed: return .green
         case .cancelled: return .red
         case .refunded: return .gray
+        }
+    }
+
+    private func localizedStatus(_ status: Booking.BookingStatus) -> String {
+        switch status {
+        case .pending:
+            return localizationService.localizedString("bookingStatusPending", table: "admin")
+        case .quoted:
+            return localizationService.localizedString("bookingStatusQuoted", table: "admin")
+        case .confirmed:
+            return localizationService.localizedString("bookingStatusConfirmed", table: "admin")
+        case .completed:
+            return localizationService.localizedString("bookingStatusCompleted", table: "admin")
+        case .cancelled:
+            return localizationService.localizedString("bookingStatusCancelled", table: "admin")
+        case .refunded:
+            return localizationService.localizedString("bookingStatusRefunded", table: "admin")
         }
     }
 }
