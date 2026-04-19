@@ -15,6 +15,11 @@ export const NAV_ITEMS: NavItem[] = [
   { group: "Дайвинг", href: "/dive-centers", label: "Дайв-центры" },
   { group: "Дайвинг", href: "/shops", label: "Магазины" },
   { group: "Дайвинг", href: "/dive-sites", label: "Дайв-сайты" },
+  {
+    group: "Дайвинг",
+    href: "/dive-site-contributions",
+    label: "Заявки на дайв-сайты",
+  },
   { group: "Дайвинг", href: "/marine-life", label: "Морская жизнь" },
   { group: "Контент", href: "/feed", label: "Лента" },
   { group: "Контент", href: "/comments", label: "Комментарии" },
