@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DiveSitesController } from './dive-sites.controller';
 import { LegacyDiveSitesController } from './legacy-dive-sites.controller';
@@ -16,7 +16,7 @@ import { PushModule } from '../push/push.module';
   imports: [
     TypeOrmModule.forFeature([DiveSiteEntity, DiveSiteContributionEntity]),
     AuthModule,
-    ChatModule,
+    forwardRef(() => ChatModule),
     NotificationsModule,
     PushModule,
   ],

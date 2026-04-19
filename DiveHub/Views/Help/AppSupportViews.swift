@@ -73,7 +73,7 @@ struct NewSupportTopicView: View {
     }
 }
 
-/// Feedback or bug report ticket (`POST /api/chat/support/tickets`).
+/// Feedback or bug report ticket (`POST /api/support/tickets`).
 struct SupportTicketFormView: View {
     enum Kind {
         case feedback

@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PushModule } from '../push/push.module';
@@ -79,7 +79,7 @@ import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
 
 @Module({
   imports: [
-    DiveSitesModule,
+    forwardRef(() => DiveSitesModule),
     PushModule,
     MailModule,
     TypeOrmModule.forFeature([

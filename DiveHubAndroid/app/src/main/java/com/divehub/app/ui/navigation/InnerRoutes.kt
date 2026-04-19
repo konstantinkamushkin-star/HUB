@@ -103,7 +103,7 @@ object InnerRoutes {
     /** New app support topic → opens Messages tab on the new thread. */
     const val AppSupportNewTopic = "help_app_support_new_topic"
 
-    /** Feedback / bug report forms → `POST chat/support/tickets`. Category: `feedback`, `bug`, or `other`. */
+    /** Feedback / bug report forms → `POST support/tickets`. Category: `feedback`, `bug`, or `other`. */
     const val SupportTicketForm = "support_ticket_form/{category}"
 
     fun supportTicketForm(category: String) = "support_ticket_form/$category"

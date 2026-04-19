@@ -15,11 +15,7 @@ import {
   ApiOperation,
   ApiTags,
 } from '@nestjs/swagger';
-import { Throttle } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { AdminSupportTicketsService } from '../admin/admin-support-tickets.service';
-import { PublicCreateSupportTicketDto } from '../support/dto/public-create-support-ticket.dto';
-import { executePublicSupportTicketCreate } from '../support/support-ticket-app.handler';
 import { ChatService } from './chat.service';
 import { OpenChatDto } from './dto/open-chat.dto';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
@@ -31,10 +27,7 @@ import { OpenAppSupportTopicDto } from './dto/open-app-support-topic.dto';
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class ChatController {
-  constructor(
-    private readonly chatService: ChatService,
-    private readonly supportTickets: AdminSupportTicketsService,
-  ) {}
+  constructor(private readonly chatService: ChatService) {}
 
   @Get('conversations')
   @ApiOperation({ summary: 'List conversations for current user' })
@@ -83,18 +76,6 @@ export class ChatController {
       dto.topicId,
       dto.title,
     );
-  }
-
-  /** Same as `POST /api/support/tickets` — under `/api/chat` so older API deploys still route feedback. */
-  @Post('support/tickets')
-  @HttpCode(HttpStatus.CREATED)
-  @Throttle({ default: { ttl: 60000, limit: 10 } })
-  @ApiOperation({ summary: 'Submit feedback / bug report (authenticated app user)' })
-  async createSupportTicketFromApp(
-    @Request() req: { user: { sub: string; email?: string } },
-    @Body() dto: PublicCreateSupportTicketDto,
-  ) {
-    return executePublicSupportTicketCreate(this.supportTickets, req, dto);
   }
 
   @Post('messages')

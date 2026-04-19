@@ -6,6 +6,6 @@ import retrofit2.http.Body
 import retrofit2.http.POST
 
 interface SupportApi {
-    @POST("chat/support/tickets")
+    @POST("support/tickets")
     suspend fun createTicket(@Body body: SupportTicketCreateRequest): SupportTicketCreateResponse
 }

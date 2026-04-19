@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { AdminModule } from '../admin/admin.module';
@@ -15,7 +15,7 @@ import { UsersController } from './users.controller';
   imports: [
     TypeOrmModule.forFeature([User, FeedPost, FeedPostComment, DiveLogEntity, UserPushDevice]),
     AuthModule,
-    AdminModule,
+    forwardRef(() => AdminModule),
     PushModule,
   ],
   controllers: [UsersController],

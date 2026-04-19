@@ -1512,7 +1512,7 @@ extension NetworkService {
         var locale: String?
     }
     
-    /// Feedback / bug report ticket (`POST /api/chat/support/tickets` — тот же модуль, что и чат; работает при старых деплоях без отдельного `SupportModule`).
+    /// Feedback / bug report ticket (`POST /api/support/tickets`).
     func submitSupportTicket(
         subject: String,
         body: String,
@@ -1536,7 +1536,7 @@ extension NetworkService {
         )
         struct SupportTicketCreateResponse: Codable { let success: Bool? }
         let _: SupportTicketCreateResponse = try await request(
-            endpoint: "/api/chat/support/tickets",
+            endpoint: "/api/support/tickets",
             method: .post,
             body: b
         )
