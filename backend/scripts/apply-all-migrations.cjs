@@ -64,6 +64,7 @@ const MIGRATION_FILES = [
   '027_courses_instructor_ids.sql',
   '028_create_bookings.sql',
   '029_create_center_services.sql',
+  '030_dive_site_contributions.sql',
 ];
 
 function pick(envFile, key, fallback) {

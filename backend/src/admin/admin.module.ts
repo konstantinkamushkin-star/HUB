@@ -73,9 +73,13 @@ import { AdminAnalyticsController } from './admin-analytics.controller';
 import { AnalyticsEventEntity } from './entities/analytics-event.entity';
 import { MailModule } from '../mail/mail.module';
 import { PartnerAccountService } from './partner-account.service';
+import { DiveSitesModule } from '../dive-sites/dive-sites.module';
+import { AdminDiveSiteContributionsController } from './admin-dive-site-contributions.controller';
+import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
 
 @Module({
   imports: [
+    DiveSitesModule,
     PushModule,
     MailModule,
     TypeOrmModule.forFeature([
@@ -126,6 +130,7 @@ import { PartnerAccountService } from './partner-account.service';
     AdminIntegrationsController,
     AdminBillingPlansController,
     AdminAnalyticsController,
+    AdminDiveSiteContributionsController,
   ],
   providers: [
     ErrorStatsService,
@@ -153,6 +158,7 @@ import { PartnerAccountService } from './partner-account.service';
     AdminIntegrationsService,
     AdminBillingPlansService,
     AdminAnalyticsService,
+    AdminOrSuperAdminGuard,
     {
       provide: APP_FILTER,
       useClass: ErrorTrackingFilter,
