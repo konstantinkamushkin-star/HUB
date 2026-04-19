@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet, apiRequest, type ApiResult } from "@/lib/api";
+import { getStoredUser } from "@/lib/auth";
 
 type ContributionRow = {
   id: string;
@@ -23,6 +24,15 @@ type SupportChatPayload = {
   conversationId: string | null;
   deepLink: string | null;
   submitterEmail: string | null;
+};
+
+type ThreadMsg = {
+  id: string;
+  senderId: string;
+  senderName?: string;
+  content: string;
+  messageType?: string;
+  createdAt: string;
 };
 
 function typeLabel(t: string): string {
@@ -240,6 +250,37 @@ export function DiveSiteContributionsClient() {
   const [chatInfo, setChatInfo] = useState<SupportChatPayload | null>(null);
   const [chatError, setChatError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [threadMessages, setThreadMessages] = useState<ThreadMsg[]>([]);
+  const [threadMsgLoading, setThreadMsgLoading] = useState(false);
+  const [threadMsgError, setThreadMsgError] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
+  const [sendBusy, setSendBusy] = useState(false);
+  const threadEndRef = useRef<HTMLDivElement>(null);
+
+  const loadThreadMessages = useCallback(async (conversationId: string) => {
+    setThreadMsgLoading(true);
+    setThreadMsgError(null);
+    const res = await apiGet<{ messages?: ThreadMsg[] }>(
+      `/chat/${conversationId}/messages?limit=80`,
+    );
+    setThreadMsgLoading(false);
+    if (!res.ok) {
+      setThreadMsgError(res.errorMessage ?? "Не удалось загрузить сообщения");
+      setThreadMessages([]);
+      return;
+    }
+    const raw = res.data;
+    const list =
+      raw && typeof raw === "object" && Array.isArray(raw.messages)
+        ? raw.messages
+        : [];
+    setThreadMessages(list);
+  }, []);
+
+  useEffect(() => {
+    if (!threadMessages.length) return;
+    threadEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [threadMessages]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -274,6 +315,9 @@ export function DiveSiteContributionsClient() {
     setChatInfo(null);
     setChatError(null);
     setCopied(false);
+    setThreadMessages([]);
+    setThreadMsgError(null);
+    setDraft("");
     setChatLoading(true);
 
     type ChatEnvelope = { success?: boolean; data?: SupportChatPayload };
@@ -313,6 +357,37 @@ export function DiveSiteContributionsClient() {
       return;
     }
     setChatInfo(payload);
+    if (payload.conversationId) {
+      await loadThreadMessages(payload.conversationId);
+    }
+  };
+
+  const sendThreadMessage = async () => {
+    const cid = chatInfo?.conversationId;
+    const text = draft.trim();
+    if (!cid || !text) return;
+    setSendBusy(true);
+    setThreadMsgError(null);
+    const res = await apiRequest<ThreadMsg>("/chat/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        conversationId: cid,
+        content: text,
+        messageType: "text",
+      }),
+    });
+    setSendBusy(false);
+    if (!res.ok) {
+      setThreadMsgError(res.errorMessage ?? "Не удалось отправить");
+      return;
+    }
+    setDraft("");
+    if (res.data && typeof res.data === "object" && "id" in res.data) {
+      setThreadMessages((prev) => [...prev, res.data as ThreadMsg]);
+    } else {
+      await loadThreadMessages(cid);
+    }
   };
 
   const copyDeepLink = async (link: string) => {
@@ -553,82 +628,161 @@ export function DiveSiteContributionsClient() {
 
       {chatRow ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-zinc-600/50 bg-zinc-950 p-6 shadow-2xl">
-            <h2 className="text-lg font-semibold text-white">Чат по заявке</h2>
-            <p className="mt-2 text-sm text-zinc-400">
-              Один тред в приложении DiveHub между автором заявки и служебным
-              аккаунтом поддержки. Веб-интерфейс чата здесь не встроен — откройте
-              ссылку на устройстве с приложением.
-            </p>
-            {chatLoading ? (
-              <p className="mt-4 text-sm text-zinc-500">Подготовка чата…</p>
-            ) : null}
-            {chatError ? (
-              <p className="mt-4 text-sm text-red-400">{chatError}</p>
-            ) : null}
-            {chatInfo && !chatLoading ? (
-              <div className="mt-4 space-y-4">
-                {chatInfo.submitterEmail ? (
-                  <p className="text-sm">
-                    <span className="text-zinc-500">Email автора: </span>
-                    <a
-                      href={`mailto:${encodeURIComponent(chatInfo.submitterEmail)}`}
-                      className="text-sky-400 underline decoration-sky-500/30 underline-offset-2 hover:text-sky-300"
-                    >
-                      {chatInfo.submitterEmail}
-                    </a>
-                  </p>
-                ) : null}
-                {chatInfo.deepLink ? (
-                  <>
-                    <div>
-                      <label className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+          <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl border border-zinc-600/50 bg-zinc-950 shadow-2xl">
+            <div className="shrink-0 border-b border-zinc-800 p-5 pb-3">
+              <h2 className="text-lg font-semibold text-white">Чат по заявке</h2>
+              <p className="mt-1 text-sm text-zinc-400">
+                Тот же тред, что в приложении: автор заявки и поддержка. Ниже можно
+                писать из браузера.
+              </p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+              {chatLoading ? (
+                <p className="text-sm text-zinc-500">Подготовка чата…</p>
+              ) : null}
+              {chatError ? (
+                <p className="text-sm text-red-400">{chatError}</p>
+              ) : null}
+              {chatInfo && !chatLoading ? (
+                <div className="space-y-4">
+                  {chatInfo.submitterEmail ? (
+                    <p className="text-sm">
+                      <span className="text-zinc-500">Email автора: </span>
+                      <a
+                        href={`mailto:${encodeURIComponent(chatInfo.submitterEmail)}`}
+                        className="text-sky-400 underline decoration-sky-500/30 underline-offset-2 hover:text-sky-300"
+                      >
+                        {chatInfo.submitterEmail}
+                      </a>
+                    </p>
+                  ) : null}
+                  {chatInfo.conversationId && chatInfo.deepLink ? (
+                    <details className="rounded-lg border border-zinc-800 bg-zinc-900/40 text-sm">
+                      <summary className="cursor-pointer px-3 py-2 text-zinc-400">
                         Ссылка в приложение
-                      </label>
-                      <div className="mt-1 flex gap-2">
-                        <input
-                          readOnly
-                          className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-2 font-mono text-xs text-zinc-300"
-                          value={chatInfo.deepLink}
+                      </summary>
+                      <div className="border-t border-zinc-800 px-3 py-2">
+                        <div className="flex gap-2">
+                          <input
+                            readOnly
+                            className="min-w-0 flex-1 rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 font-mono text-xs text-zinc-300"
+                            value={chatInfo.deepLink}
+                          />
+                          <button
+                            type="button"
+                            className="shrink-0 rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-200 hover:bg-zinc-700"
+                            onClick={() => void copyDeepLink(chatInfo.deepLink!)}
+                          >
+                            {copied ? "✓" : "Копировать"}
+                          </button>
+                        </div>
+                        <p className="mt-2 text-xs text-zinc-500">
+                          ID беседы:{" "}
+                          <code className="text-zinc-400">{chatInfo.conversationId}</code>
+                        </p>
+                      </div>
+                    </details>
+                  ) : null}
+                  {!chatInfo.conversationId ? (
+                    <p className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200/90">
+                      Чат ещё не создан. На сервере задайте пользователя поддержки:
+                      переменная окружения{" "}
+                      <code className="rounded bg-black/40 px-1 text-xs">
+                        DIVE_SITE_SUPPORT_ADMIN_USER_ID
+                      </code>{" "}
+                      (UUID) или убедитесь, что в базе есть ADMIN / SUPER_ADMIN.
+                    </p>
+                  ) : (
+                    <>
+                      {threadMsgLoading ? (
+                        <p className="text-sm text-zinc-500">Загрузка сообщений…</p>
+                      ) : null}
+                      {threadMsgError ? (
+                        <p className="text-sm text-red-400">{threadMsgError}</p>
+                      ) : null}
+                      <div className="max-h-72 space-y-2 overflow-y-auto rounded-lg border border-zinc-800 bg-zinc-900/50 p-3">
+                        {threadMessages.length === 0 && !threadMsgLoading ? (
+                          <p className="text-center text-sm text-zinc-500">
+                            Пока нет сообщений — напишите первым.
+                          </p>
+                        ) : null}
+                        {threadMessages.map((m) => {
+                          const me = getStoredUser()?.id === m.senderId;
+                          return (
+                            <div
+                              key={m.id}
+                              className={`flex flex-col gap-0.5 rounded-lg px-3 py-2 text-sm ${
+                                me
+                                  ? "ml-8 bg-sky-950/50 text-zinc-100"
+                                  : "mr-8 bg-zinc-800/80 text-zinc-200"
+                              }`}
+                            >
+                              <div className="flex items-baseline justify-between gap-2">
+                                <span className="font-medium text-zinc-300">
+                                  {m.senderName ?? "Участник"}
+                                </span>
+                                <span className="shrink-0 text-[10px] text-zinc-500">
+                                  {new Date(m.createdAt).toLocaleString("ru-RU", {
+                                    day: "2-digit",
+                                    month: "2-digit",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </span>
+                              </div>
+                              <p className="whitespace-pre-wrap break-words leading-relaxed">
+                                {m.content}
+                              </p>
+                            </div>
+                          );
+                        })}
+                        <div ref={threadEndRef} />
+                      </div>
+                      <div className="flex gap-2">
+                        <textarea
+                          className="min-h-[44px] flex-1 resize-none rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600"
+                          placeholder="Сообщение автору…"
+                          rows={2}
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              void sendThreadMessage();
+                            }
+                          }}
                         />
                         <button
                           type="button"
-                          className="shrink-0 rounded-lg bg-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700"
-                          onClick={() => void copyDeepLink(chatInfo.deepLink!)}
+                          disabled={sendBusy || !draft.trim()}
+                          className="shrink-0 self-end rounded-lg bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-50"
+                          onClick={() => void sendThreadMessage()}
                         >
-                          {copied ? "✓" : "Копировать"}
+                          {sendBusy ? "…" : "Отправить"}
                         </button>
                       </div>
-                    </div>
-                    <p className="text-xs text-zinc-500">
-                      ID беседы:{" "}
-                      <code className="text-zinc-400">{chatInfo.conversationId}</code>
-                    </p>
-                  </>
-                ) : (
-                  <p className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200/90">
-                    Чат ещё не создан. На сервере задайте пользователя поддержки:
-                    переменная окружения{" "}
-                    <code className="rounded bg-black/40 px-1 text-xs">
-                      DIVE_SITE_SUPPORT_ADMIN_USER_ID
-                    </code>{" "}
-                    (UUID) или убедитесь, что в базе есть ADMIN / SUPER_ADMIN.
-                  </p>
-                )}
+                    </>
+                  )}
+                </div>
+              ) : null}
+            </div>
+            <div className="shrink-0 border-t border-zinc-800 p-4">
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="rounded-lg px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                  onClick={() => {
+                    setChatRow(null);
+                    setChatInfo(null);
+                    setChatError(null);
+                    setThreadMessages([]);
+                    setThreadMsgError(null);
+                    setDraft("");
+                  }}
+                >
+                  Закрыть
+                </button>
               </div>
-            ) : null}
-            <div className="mt-6 flex justify-end">
-              <button
-                type="button"
-                className="rounded-lg px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
-                onClick={() => {
-                  setChatRow(null);
-                  setChatInfo(null);
-                  setChatError(null);
-                }}
-              >
-                Закрыть
-              </button>
             </div>
           </div>
         </div>

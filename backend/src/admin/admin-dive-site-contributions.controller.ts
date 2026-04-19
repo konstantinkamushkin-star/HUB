@@ -69,12 +69,16 @@ export class AdminDiveSiteContributionsController {
   })
   async supportChatByQuery(
     @Query('contributionId') contributionId: string | undefined,
+    @Req() req: { user: { sub: string } },
   ) {
     const id = contributionId?.trim();
     if (!id) {
       throw new BadRequestException('contributionId query parameter is required');
     }
-    const data = await this.contributionsService.getSupportChatForAdmin(id);
+    const data = await this.contributionsService.getSupportChatForAdmin(
+      id,
+      req.user.sub,
+    );
     return { success: true, data };
   }
 
@@ -85,8 +89,14 @@ export class AdminDiveSiteContributionsController {
     summary:
       'Ensure contribution support chat thread exists; returns conversationId + app deep link',
   })
-  async supportChat(@Param('id') id: string) {
-    const data = await this.contributionsService.getSupportChatForAdmin(id);
+  async supportChat(
+    @Param('id') id: string,
+    @Req() req: { user: { sub: string } },
+  ) {
+    const data = await this.contributionsService.getSupportChatForAdmin(
+      id,
+      req.user.sub,
+    );
     return { success: true, data };
   }
 
@@ -98,8 +108,14 @@ export class AdminDiveSiteContributionsController {
   @ApiOperation({
     summary: 'Legacy: same as GET support-chat/:id',
   })
-  async supportChatLegacy(@Param('id') id: string) {
-    const data = await this.contributionsService.getSupportChatForAdmin(id);
+  async supportChatLegacy(
+    @Param('id') id: string,
+    @Req() req: { user: { sub: string } },
+  ) {
+    const data = await this.contributionsService.getSupportChatForAdmin(
+      id,
+      req.user.sub,
+    );
     return { success: true, data };
   }
 

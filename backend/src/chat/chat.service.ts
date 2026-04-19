@@ -700,6 +700,40 @@ export class ChatService {
   }
 
   /**
+   * Добавляет в тред админа, открывшего панель, чтобы он мог пользоваться GET/POST `/api/chat/...`.
+   * Иначе участники только автор заявки и служебный support user из env.
+   */
+  async ensureContributionSupportPanelAdmin(
+    conversationId: string,
+    panelAdminUserId: string,
+  ): Promise<void> {
+    const conv = await this.convRepository.findOne({
+      where: { id: conversationId },
+    });
+    if (!conv || conv.kind !== 'CONTRIBUTION_SUPPORT') {
+      throw new NotFoundException('Conversation not found');
+    }
+    const existing = await this.participantRepository.findOne({
+      where: {
+        conversationId,
+        participantType: 'user',
+        participantId: panelAdminUserId,
+      },
+    });
+    if (existing) {
+      return;
+    }
+    await this.participantRepository.save(
+      this.participantRepository.create({
+        conversationId,
+        participantType: 'user',
+        participantId: panelAdminUserId,
+        lastReadAt: null,
+      }),
+    );
+  }
+
+  /**
    * Чат пользователь ↔ админ по заявке на дайв-сайт (без «друзей»).
    */
   async openContributionSupportChat(

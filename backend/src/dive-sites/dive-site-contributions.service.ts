@@ -295,7 +295,10 @@ export class DiveSiteContributionsService {
   /**
    * Для админ-панели: создать тред поддержки (если ещё нет) и вернуть id беседы + deep link в приложение.
    */
-  async getSupportChatForAdmin(contributionId: string): Promise<{
+  async getSupportChatForAdmin(
+    contributionId: string,
+    panelAdminUserId: string,
+  ): Promise<{
     conversationId: string | null;
     deepLink: string | null;
     submitterEmail: string | null;
@@ -311,6 +314,12 @@ export class DiveSiteContributionsService {
       c.id,
     );
     const convId = await this.chatService.findContributionConversationId(c.id);
+    if (convId) {
+      await this.chatService.ensureContributionSupportPanelAdmin(
+        convId,
+        panelAdminUserId,
+      );
+    }
     const emails = await this.loadSubmitterEmails([c.submitter_user_id]);
     return {
       conversationId: convId,
