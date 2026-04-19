@@ -109,6 +109,12 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
         </header>
 
         <main className="flex-1 overflow-auto p-6">{children}</main>
+        <footer className="shrink-0 border-t border-zinc-800 px-6 py-2 text-[10px] text-zinc-600">
+          Сборка: {process.env.NEXT_PUBLIC_GIT_SHA ?? "—"} · при проблемах откройте{" "}
+          <a href="/api/deploy-info" className="text-zinc-500 underline">
+            /api/deploy-info
+          </a>
+        </footer>
       </div>
     </div>
   );
