@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -56,13 +57,48 @@ export class AdminDiveSiteContributionsController {
     return { success: true, data };
   }
 
-  @Get(':id/support-chat')
+  /**
+   * Основной способ: query — реже ломается прокси/nginx, чем лишние сегменты пути.
+   * GET /api/admin/dive-site-contributions/support-chat?contributionId=<uuid>
+   */
+  @Get('support-chat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Ensure contribution support chat (query contributionId); returns conversationId + deep link',
+  })
+  async supportChatByQuery(
+    @Query('contributionId') contributionId: string | undefined,
+  ) {
+    const id = contributionId?.trim();
+    if (!id) {
+      throw new BadRequestException('contributionId query parameter is required');
+    }
+    const data = await this.contributionsService.getSupportChatForAdmin(id);
+    return { success: true, data };
+  }
+
+  /** Сегмент `support-chat` до `:id`, чтобы роут не пересекался с другими GET под `:id`. */
+  @Get('support-chat/:id')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary:
       'Ensure contribution support chat thread exists; returns conversationId + app deep link',
   })
   async supportChat(@Param('id') id: string) {
+    const data = await this.contributionsService.getSupportChatForAdmin(id);
+    return { success: true, data };
+  }
+
+  /**
+   * Старый путь (`.../:id/support-chat`) — оставляем для кэша/старых сборок admin-web.
+   */
+  @Get(':id/support-chat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Legacy: same as GET support-chat/:id',
+  })
+  async supportChatLegacy(@Param('id') id: string) {
     const data = await this.contributionsService.getSupportChatForAdmin(id);
     return { success: true, data };
   }
