@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { apiGet, apiRequest } from "@/lib/api";
+import { apiGet, apiRequest, type ApiResult } from "@/lib/api";
 
 type ContributionRow = {
   id: string;
@@ -275,13 +275,32 @@ export function DiveSiteContributionsClient() {
     setChatError(null);
     setCopied(false);
     setChatLoading(true);
-    const res = await apiGet<{
-      success?: boolean;
-      data?: SupportChatPayload;
-    }>(`/admin/dive-site-contributions/${row.id}/support-chat`);
+
+    type ChatEnvelope = { success?: boolean; data?: SupportChatPayload };
+    const candidates = [
+      `/admin/dive-site-contributions/support-chat?contributionId=${encodeURIComponent(row.id)}`,
+      `/admin/dive-site-contributions/support-chat/${row.id}`,
+      `/admin/dive-site-contributions/${row.id}/support-chat`,
+    ];
+
+    let res: ApiResult<ChatEnvelope> | null = null;
+    let lastMessage: string | null = null;
+    for (const path of candidates) {
+      const r = await apiGet<ChatEnvelope>(path);
+      if (r.ok) {
+        res = r;
+        break;
+      }
+      lastMessage = r.errorMessage || `HTTP ${r.status}`;
+      if (r.status !== 404) {
+        res = r;
+        break;
+      }
+    }
+
     setChatLoading(false);
-    if (!res.ok) {
-      setChatError(res.errorMessage || "Не удалось получить чат");
+    if (!res?.ok) {
+      setChatError(lastMessage || "Не удалось получить чат");
       return;
     }
     const body = res.data;
