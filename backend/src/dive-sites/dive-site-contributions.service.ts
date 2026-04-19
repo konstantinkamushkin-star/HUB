@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -12,6 +13,9 @@ import {
   CreateDiveSiteContributionTypeDto,
 } from './dto/create-dive-site-contribution.dto';
 import { DiveSiteStatus } from '../common/statuses';
+import { ChatService } from '../chat/chat.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PushService } from '../push/push.service';
 
 const PATCH_KEYS = new Set([
   'name',
@@ -36,14 +40,39 @@ const PATCH_KEYS = new Set([
   'ai_summary',
 ]);
 
+export type DiveSiteContributionMineStats = {
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  newSite: number;
+  correction: number;
+};
+
+export type DiveSiteContributionSubmitterStatsRow = {
+  userId: string;
+  email: string | null;
+  total: number;
+  pending: number;
+  approved: number;
+  rejected: number;
+  newSite: number;
+  correction: number;
+};
+
 @Injectable()
 export class DiveSiteContributionsService {
+  private readonly logger = new Logger(DiveSiteContributionsService.name);
+
   constructor(
     @InjectRepository(DiveSiteContributionEntity)
     private readonly contributionRepo: Repository<DiveSiteContributionEntity>,
     @InjectRepository(DiveSiteEntity)
     private readonly diveSiteRepo: Repository<DiveSiteEntity>,
     private readonly dataSource: DataSource,
+    private readonly chatService: ChatService,
+    private readonly notificationsService: NotificationsService,
+    private readonly pushService: PushService,
   ) {}
 
   async create(
@@ -80,7 +109,15 @@ export class DiveSiteContributionsService {
       message: dto.message?.trim() ?? null,
       status: 'pending',
     });
-    return this.contributionRepo.save(row);
+    const saved = await this.contributionRepo.save(row);
+    void this.chatService
+      .ensureContributionSupportThread(userId, saved.id)
+      .catch((err: unknown) => {
+        this.logger.warn(
+          `ensureContributionSupportThread on create: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      });
+    return saved;
   }
 
   async listMine(
@@ -174,6 +211,10 @@ export class DiveSiteContributionsService {
       c.rejection_reason = null;
       await manager.save(c);
     });
+    const updated = await this.contributionRepo.findOne({ where: { id } });
+    if (updated) {
+      await this.notifyReviewOutcome(updated, 'approved', adminId);
+    }
     return { success: true };
   }
 
@@ -194,7 +235,145 @@ export class DiveSiteContributionsService {
     c.reviewed_at = new Date();
     c.rejection_reason = reason?.trim() ?? null;
     await this.contributionRepo.save(c);
+    await this.notifyReviewOutcome(c, 'rejected', adminId);
     return { success: true };
+  }
+
+  async getMineStats(userId: string): Promise<DiveSiteContributionMineStats> {
+    const rows: DiveSiteContributionMineStats[] = await this.dataSource.query(
+      `
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE status = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE status = 'approved')::int AS approved,
+        COUNT(*) FILTER (WHERE status = 'rejected')::int AS rejected,
+        COUNT(*) FILTER (WHERE contribution_type = 'new_site')::int AS "newSite",
+        COUNT(*) FILTER (WHERE contribution_type = 'correction')::int AS correction
+      FROM dive_site_contributions
+      WHERE submitter_user_id = $1
+      `,
+      [userId],
+    );
+    const r = rows[0];
+    return (
+      r ?? {
+        total: 0,
+        pending: 0,
+        approved: 0,
+        rejected: 0,
+        newSite: 0,
+        correction: 0,
+      }
+    );
+  }
+
+  async listSubmitterLeaderboard(
+    limit = 50,
+  ): Promise<DiveSiteContributionSubmitterStatsRow[]> {
+    const take = Math.min(Math.max(limit, 1), 200);
+    return this.dataSource.query(
+      `
+      SELECT
+        c.submitter_user_id AS "userId",
+        MAX(u.email) AS email,
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE c.status = 'pending')::int AS pending,
+        COUNT(*) FILTER (WHERE c.status = 'approved')::int AS approved,
+        COUNT(*) FILTER (WHERE c.status = 'rejected')::int AS rejected,
+        COUNT(*) FILTER (WHERE c.contribution_type = 'new_site')::int AS "newSite",
+        COUNT(*) FILTER (WHERE c.contribution_type = 'correction')::int AS correction
+      FROM dive_site_contributions c
+      LEFT JOIN users u ON u.id = c.submitter_user_id
+      GROUP BY c.submitter_user_id
+      ORDER BY total DESC
+      LIMIT $1
+      `,
+      [take],
+    );
+  }
+
+  /**
+   * Для админ-панели: создать тред поддержки (если ещё нет) и вернуть id беседы + deep link в приложение.
+   */
+  async getSupportChatForAdmin(contributionId: string): Promise<{
+    conversationId: string | null;
+    deepLink: string | null;
+    submitterEmail: string | null;
+  }> {
+    const c = await this.contributionRepo.findOne({
+      where: { id: contributionId },
+    });
+    if (!c) {
+      throw new NotFoundException('Contribution not found');
+    }
+    await this.chatService.ensureContributionSupportThread(
+      c.submitter_user_id,
+      c.id,
+    );
+    const convId = await this.chatService.findContributionConversationId(c.id);
+    const emails = await this.loadSubmitterEmails([c.submitter_user_id]);
+    return {
+      conversationId: convId,
+      deepLink: convId ? `divehub://chat?conversationId=${convId}` : null,
+      submitterEmail: emails.get(c.submitter_user_id) ?? null,
+    };
+  }
+
+  private async notifyReviewOutcome(
+    c: DiveSiteContributionEntity,
+    outcome: 'approved' | 'rejected',
+    reviewerId: string,
+  ): Promise<void> {
+    try {
+      await this.chatService.ensureContributionSupportThread(
+        c.submitter_user_id,
+        c.id,
+      );
+      const posted = await this.chatService.postContributionReviewMessage(
+        c.id,
+        reviewerId,
+        outcome,
+        c.rejection_reason,
+      );
+      if (posted) {
+        return;
+      }
+    } catch (err) {
+      this.logger.warn(
+        `notifyReviewOutcome chat: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+    const convId = await this.chatService.findContributionConversationId(c.id);
+    const title =
+      outcome === 'approved' ? 'Заявка по дайв-сайту принята' : 'Заявка отклонена';
+    const body =
+      outcome === 'approved'
+        ? 'Ваше предложение одобрено.'
+        : c.rejection_reason
+          ? `Отклонено: ${c.rejection_reason}`
+          : 'Ваша заявка отклонена.';
+    try {
+      await this.notificationsService.createForUser(c.submitter_user_id, {
+        type: convId ? 'message' : 'system',
+        title,
+        message: body.slice(0, 8000),
+        icon: 'bell',
+        actionUrl: convId
+          ? `divehub://chat?conversationId=${convId}`
+          : null,
+      });
+    } catch (e) {
+      this.logger.warn(
+        `notifyReviewOutcome inbox: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
+    try {
+      await this.pushService.notifyUsers([c.submitter_user_id], title, body);
+    } catch (e) {
+      this.logger.warn(
+        `notifyReviewOutcome push: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
   }
 
   private assertCorrectionHasPayload(

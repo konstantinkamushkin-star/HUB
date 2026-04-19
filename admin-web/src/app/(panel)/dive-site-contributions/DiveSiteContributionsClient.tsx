@@ -19,6 +19,12 @@ type ContributionRow = {
   submitterEmail?: string | null;
 };
 
+type SupportChatPayload = {
+  conversationId: string | null;
+  deepLink: string | null;
+  submitterEmail: string | null;
+};
+
 function typeLabel(t: string): string {
   if (t === "correction") return "Исправление";
   if (t === "new_site") return "Новый сайт";
@@ -32,6 +38,193 @@ function statusLabel(s: string): string {
   return s;
 }
 
+function pickString(data: Record<string, unknown>, key: string): string | null {
+  const v = data[key];
+  if (typeof v === "string" && v.trim()) return v.trim();
+  return null;
+}
+
+function pickNum(data: Record<string, unknown>, ...keys: string[]): number | null {
+  for (const k of keys) {
+    const v = data[k];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim()) {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return null;
+}
+
+function formatList(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return v.map((x) => String(x)).filter(Boolean);
+}
+
+function ProposedDataView({ data }: { data: Record<string, unknown> }) {
+  const name =
+    pickString(data, "name") ?? pickString(data, "localized_name") ?? "—";
+  const country = pickString(data, "country");
+  const region = pickString(data, "region");
+  const address = pickString(data, "address");
+  const description = pickString(data, "description");
+  const lat = pickNum(data, "latitude", "lat");
+  const lng = pickNum(data, "longitude", "lng", "lon");
+  const depthMin = pickNum(data, "depth_min");
+  const depthMax = pickNum(data, "depth_max");
+  const diff = data.difficulty_level;
+  const siteTypes = formatList(data.site_types);
+  const accessTypes = formatList(data.access_type);
+  const marine = formatList(data.marine_life);
+  const photos = formatList(data.photo_urls);
+  const videos = formatList(data.video_urls);
+
+  const mapHref =
+    lat != null && lng != null
+      ? `https://www.openstreetmap.org/?mlat=${lat}&mlon=${lng}#map=14/${lat}/${lng}`
+      : null;
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <h3 className="text-lg font-semibold leading-tight text-white">{name}</h3>
+        {(country || region) && (
+          <p className="mt-1 text-sm text-zinc-400">
+            {[country, region].filter(Boolean).join(" · ")}
+          </p>
+        )}
+      </div>
+
+      <dl className="grid gap-4 sm:grid-cols-2">
+        {address ? (
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Адрес
+            </dt>
+            <dd className="mt-0.5 text-sm text-zinc-200">{address}</dd>
+          </div>
+        ) : null}
+
+        {description ? (
+          <div className="sm:col-span-2">
+            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Описание
+            </dt>
+            <dd className="mt-0.5 whitespace-pre-wrap text-sm leading-relaxed text-zinc-300">
+              {description}
+            </dd>
+          </div>
+        ) : null}
+
+        {lat != null && lng != null ? (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Координаты
+            </dt>
+            <dd className="mt-0.5 font-mono text-sm text-emerald-300/95">
+              {lat.toFixed(6)}, {lng.toFixed(6)}
+              {mapHref ? (
+                <a
+                  href={mapHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 inline-block text-xs font-sans text-sky-400 underline decoration-sky-400/40 underline-offset-2 hover:text-sky-300"
+                >
+                  Карта ↗
+                </a>
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
+
+        {(depthMin != null || depthMax != null) && (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Глубина, м
+            </dt>
+            <dd className="mt-0.5 text-sm text-zinc-200">
+              {depthMin != null ? depthMin : "—"} — {depthMax != null ? depthMax : "—"}
+            </dd>
+          </div>
+        )}
+
+        {diff !== undefined && diff !== null ? (
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+              Сложность
+            </dt>
+            <dd className="mt-0.5 text-sm text-zinc-200">{String(diff)}</dd>
+          </div>
+        ) : null}
+      </dl>
+
+      {siteTypes.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Типы сайта
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {siteTypes.map((t) => (
+              <span
+                key={t}
+                className="rounded-full bg-teal-950/80 px-2.5 py-0.5 text-xs text-teal-200 ring-1 ring-teal-700/50"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {accessTypes.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Доступ
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {accessTypes.map((t) => (
+              <span
+                key={t}
+                className="rounded-full bg-indigo-950/70 px-2.5 py-0.5 text-xs text-indigo-200 ring-1 ring-indigo-700/40"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {marine.length > 0 ? (
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+            Обитатели / интерес
+          </p>
+          <p className="mt-1 text-sm text-zinc-400">{marine.join(" · ")}</p>
+        </div>
+      ) : null}
+
+      {(photos.length > 0 || videos.length > 0) && (
+        <p className="text-xs text-zinc-500">
+          Вложения:{" "}
+          {photos.length > 0 ? `${photos.length} фото` : null}
+          {photos.length > 0 && videos.length > 0 ? ", " : null}
+          {videos.length > 0 ? `${videos.length} видео` : null}
+        </p>
+      )}
+
+      <details className="group rounded-lg border border-zinc-800 bg-black/25">
+        <summary className="cursor-pointer list-none px-3 py-2 text-xs text-zinc-500 transition hover:text-zinc-400">
+          <span className="group-open:hidden">Все поля (JSON) ▾</span>
+          <span className="hidden group-open:inline">Все поля (JSON) ▴</span>
+        </summary>
+        <pre className="max-h-56 overflow-auto border-t border-zinc-800/80 p-3 font-mono text-[11px] leading-relaxed text-zinc-400">
+          {JSON.stringify(data, null, 2)}
+        </pre>
+      </details>
+    </div>
+  );
+}
+
 export function DiveSiteContributionsClient() {
   const [statusFilter, setStatusFilter] = useState<string>("pending");
   const [rows, setRows] = useState<ContributionRow[]>([]);
@@ -41,6 +234,12 @@ export function DiveSiteContributionsClient() {
   const [rejectFor, setRejectFor] = useState<ContributionRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [actionError, setActionError] = useState<string | null>(null);
+
+  const [chatRow, setChatRow] = useState<ContributionRow | null>(null);
+  const [chatLoading, setChatLoading] = useState(false);
+  const [chatInfo, setChatInfo] = useState<SupportChatPayload | null>(null);
+  const [chatError, setChatError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,6 +268,43 @@ export function DiveSiteContributionsClient() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const openSupportChat = async (row: ContributionRow) => {
+    setChatRow(row);
+    setChatInfo(null);
+    setChatError(null);
+    setCopied(false);
+    setChatLoading(true);
+    const res = await apiGet<{
+      success?: boolean;
+      data?: SupportChatPayload;
+    }>(`/admin/dive-site-contributions/${row.id}/support-chat`);
+    setChatLoading(false);
+    if (!res.ok) {
+      setChatError(res.errorMessage || "Не удалось получить чат");
+      return;
+    }
+    const body = res.data;
+    const payload =
+      body && typeof body === "object" && body.data && typeof body.data === "object"
+        ? body.data
+        : null;
+    if (!payload) {
+      setChatError("Пустой ответ сервера");
+      return;
+    }
+    setChatInfo(payload);
+  };
+
+  const copyDeepLink = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setChatError("Не удалось скопировать — выделите ссылку вручную");
+    }
+  };
 
   const approve = async (id: string) => {
     setBusyId(id);
@@ -109,17 +345,31 @@ export function DiveSiteContributionsClient() {
   };
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Заявки на дайв-сайты
-        </h1>
-        <p className="text-sm text-zinc-400">
-          Новые точки и исправления существующих карточек из приложения. Одобряют
-          только <strong>ADMIN</strong> и <strong>SUPER_ADMIN</strong>. Если список
-          пустой — проверьте фильтр «Статус» (по умолчанию только «Ожидают») и что
-          миграция <code className="text-zinc-500">030_dive_site_contributions</code>{" "}
-          применена на сервере.
+    <div className="space-y-8">
+      <header className="space-y-2 border-b border-zinc-800/80 pb-6">
+        <div className="flex flex-wrap items-center gap-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-white">
+            Заявки на дайв-сайты
+          </h1>
+          <span
+            className="rounded-md border border-emerald-700/50 bg-emerald-950/50 px-2 py-0.5 font-mono text-[11px] text-emerald-200/90"
+            title="Если этой метки нет — открыта старая сборка: пересоберите admin-web на сервере и обновите страницу (в приложении — кнопка ⟳)."
+          >
+            UI {process.env.NEXT_PUBLIC_GIT_SHA ?? "—"}
+          </span>
+        </div>
+        <p className="max-w-3xl text-sm leading-relaxed text-zinc-400">
+          Новые точки и правки карточек из приложения. Модераторы:{" "}
+          <strong className="text-zinc-300">ADMIN</strong> и{" "}
+          <strong className="text-zinc-300">SUPER_ADMIN</strong>. Чат с автором
+          ведётся в приложении DiveHub — нажмите «Чат с автором», скопируйте
+          ссылку и откройте на телефоне с установленным приложением.
+        </p>
+        <p className="text-xs text-amber-200/80">
+          Не видите кнопку «Чат с автором» и зелёную метку сборки? Выполните{" "}
+          <code className="rounded bg-zinc-800 px-1">npm run build</code> в{" "}
+          <code className="rounded bg-zinc-800 px-1">admin-web</code>, задеплойте
+          артефакты и в iOS нажмите ⟳ в админ-панели.
         </p>
       </header>
 
@@ -156,64 +406,93 @@ export function DiveSiteContributionsClient() {
       ) : rows.length === 0 ? (
         <p className="text-sm text-zinc-500">Нет записей.</p>
       ) : (
-        <ul className="space-y-4">
+        <ul className="space-y-6">
           {rows.map((row) => (
-            <li
-              key={row.id}
-              className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1 text-sm">
-                  <div className="flex flex-wrap gap-2">
-                    <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-xs">
-                      {typeLabel(row.contribution_type)}
-                    </span>
-                    <span className="rounded-md bg-zinc-800 px-2 py-0.5 text-xs">
-                      {statusLabel(row.status)}
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-500">
-                    {new Date(row.created_at).toLocaleString("ru-RU")} ·{" "}
-                    {row.submitterEmail ?? row.submitter_user_id}
-                  </p>
-                  {row.dive_site_id ? (
-                    <p className="text-xs text-zinc-400">
-                      Дайв-сайт:{" "}
-                      <code className="text-zinc-300">{row.dive_site_id}</code>
+            <li key={row.id}>
+              <article className="overflow-hidden rounded-2xl border border-zinc-700/60 bg-gradient-to-br from-zinc-900/95 via-zinc-950 to-black/90 shadow-xl shadow-black/30 ring-1 ring-white/5">
+                <div className="flex flex-col gap-5 p-5 md:flex-row md:items-stretch md:justify-between md:gap-6">
+                  <div className="min-w-0 flex-1 space-y-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-lg bg-teal-950/90 px-2.5 py-1 text-xs font-medium text-teal-200 ring-1 ring-teal-700/40">
+                        {typeLabel(row.contribution_type)}
+                      </span>
+                      <span
+                        className={`rounded-lg px-2.5 py-1 text-xs font-medium ring-1 ${
+                          row.status === "pending"
+                            ? "bg-amber-950/80 text-amber-200 ring-amber-700/40"
+                            : row.status === "approved"
+                              ? "bg-emerald-950/80 text-emerald-200 ring-emerald-700/40"
+                              : "bg-red-950/70 text-red-200 ring-red-800/40"
+                        }`}
+                      >
+                        {statusLabel(row.status)}
+                      </span>
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      {new Date(row.created_at).toLocaleString("ru-RU")} ·{" "}
+                      <span className="text-zinc-400">
+                        {row.submitterEmail ?? row.submitter_user_id}
+                      </span>
                     </p>
-                  ) : null}
-                  {row.message ? (
-                    <p className="pt-2 text-zinc-200">{row.message}</p>
-                  ) : null}
-                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-black/40 p-3 text-xs text-zinc-300">
-                    {JSON.stringify(row.proposed_data, null, 2)}
-                  </pre>
-                </div>
-                {row.status === "pending" ? (
-                  <div className="flex shrink-0 flex-col gap-2">
-                    <button
-                      type="button"
-                      disabled={busyId === row.id}
-                      className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:opacity-50"
-                      onClick={() => void approve(row.id)}
-                    >
-                      {busyId === row.id ? "…" : "Одобрить"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busyId === row.id}
-                      className="rounded-lg border border-red-500/50 px-3 py-2 text-sm text-red-300 hover:bg-red-950/40 disabled:opacity-50"
-                      onClick={() => {
-                        setRejectFor(row);
-                        setRejectReason("");
-                        setActionError(null);
-                      }}
-                    >
-                      Отклонить
-                    </button>
+                    {row.dive_site_id ? (
+                      <p className="font-mono text-xs text-zinc-500">
+                        ID сайта: {row.dive_site_id}
+                      </p>
+                    ) : null}
+                    {row.message ? (
+                      <div className="rounded-xl border border-zinc-700/50 bg-zinc-900/40 px-4 py-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                          Комментарий автора
+                        </p>
+                        <p className="mt-1 text-sm text-zinc-200">{row.message}</p>
+                      </div>
+                    ) : null}
+                    {row.status !== "pending" && row.rejection_reason ? (
+                      <p className="text-sm text-red-300/90">
+                        Причина отклонения: {row.rejection_reason}
+                      </p>
+                    ) : null}
+                    <div className="rounded-xl border border-zinc-800/80 bg-black/20 p-4">
+                      <ProposedDataView data={row.proposed_data} />
+                    </div>
                   </div>
-                ) : null}
-              </div>
+
+                  <div className="flex shrink-0 flex-col justify-start gap-2 border-t border-zinc-800/60 pt-4 md:w-44 md:border-l md:border-t-0 md:pl-5 md:pt-0">
+                    <button
+                      type="button"
+                      disabled={busyId === row.id}
+                      className="rounded-xl border border-sky-600/50 bg-sky-950/40 px-3 py-2.5 text-sm font-medium text-sky-100 transition hover:bg-sky-900/50 disabled:opacity-50"
+                      onClick={() => void openSupportChat(row)}
+                    >
+                      💬 Чат с автором
+                    </button>
+                    {row.status === "pending" ? (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          className="rounded-xl bg-emerald-600 px-3 py-2.5 text-sm font-medium text-white shadow-lg shadow-emerald-900/20 hover:bg-emerald-500 disabled:opacity-50"
+                          onClick={() => void approve(row.id)}
+                        >
+                          {busyId === row.id ? "…" : "Одобрить"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busyId === row.id}
+                          className="rounded-xl border border-red-500/50 px-3 py-2.5 text-sm text-red-200 hover:bg-red-950/40 disabled:opacity-50"
+                          onClick={() => {
+                            setRejectFor(row);
+                            setRejectReason("");
+                            setActionError(null);
+                          }}
+                        >
+                          Отклонить
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </div>
+              </article>
             </li>
           ))}
         </ul>
@@ -222,7 +501,7 @@ export function DiveSiteContributionsClient() {
       {rejectFor ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-md rounded-xl border border-zinc-700 bg-zinc-950 p-4 shadow-xl">
-            <h2 className="text-lg font-medium">Отклонить заявку</h2>
+            <h2 className="text-lg font-medium text-white">Отклонить заявку</h2>
             <p className="mt-2 text-sm text-zinc-400">
               Укажите причину (необязательно).
             </p>
@@ -247,6 +526,89 @@ export function DiveSiteContributionsClient() {
                 onClick={() => void reject()}
               >
                 Отклонить
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {chatRow ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-lg rounded-2xl border border-zinc-600/50 bg-zinc-950 p-6 shadow-2xl">
+            <h2 className="text-lg font-semibold text-white">Чат по заявке</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Один тред в приложении DiveHub между автором заявки и служебным
+              аккаунтом поддержки. Веб-интерфейс чата здесь не встроен — откройте
+              ссылку на устройстве с приложением.
+            </p>
+            {chatLoading ? (
+              <p className="mt-4 text-sm text-zinc-500">Подготовка чата…</p>
+            ) : null}
+            {chatError ? (
+              <p className="mt-4 text-sm text-red-400">{chatError}</p>
+            ) : null}
+            {chatInfo && !chatLoading ? (
+              <div className="mt-4 space-y-4">
+                {chatInfo.submitterEmail ? (
+                  <p className="text-sm">
+                    <span className="text-zinc-500">Email автора: </span>
+                    <a
+                      href={`mailto:${encodeURIComponent(chatInfo.submitterEmail)}`}
+                      className="text-sky-400 underline decoration-sky-500/30 underline-offset-2 hover:text-sky-300"
+                    >
+                      {chatInfo.submitterEmail}
+                    </a>
+                  </p>
+                ) : null}
+                {chatInfo.deepLink ? (
+                  <>
+                    <div>
+                      <label className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+                        Ссылка в приложение
+                      </label>
+                      <div className="mt-1 flex gap-2">
+                        <input
+                          readOnly
+                          className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-2 font-mono text-xs text-zinc-300"
+                          value={chatInfo.deepLink}
+                        />
+                        <button
+                          type="button"
+                          className="shrink-0 rounded-lg bg-zinc-800 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-700"
+                          onClick={() => void copyDeepLink(chatInfo.deepLink!)}
+                        >
+                          {copied ? "✓" : "Копировать"}
+                        </button>
+                      </div>
+                    </div>
+                    <p className="text-xs text-zinc-500">
+                      ID беседы:{" "}
+                      <code className="text-zinc-400">{chatInfo.conversationId}</code>
+                    </p>
+                  </>
+                ) : (
+                  <p className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-sm text-amber-200/90">
+                    Чат ещё не создан. На сервере задайте пользователя поддержки:
+                    переменная окружения{" "}
+                    <code className="rounded bg-black/40 px-1 text-xs">
+                      DIVE_SITE_SUPPORT_ADMIN_USER_ID
+                    </code>{" "}
+                    (UUID) или убедитесь, что в базе есть ADMIN / SUPER_ADMIN.
+                  </p>
+                )}
+              </div>
+            ) : null}
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                className="rounded-lg px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+                onClick={() => {
+                  setChatRow(null);
+                  setChatInfo(null);
+                  setChatError(null);
+                }}
+              >
+                Закрыть
               </button>
             </div>
           </div>

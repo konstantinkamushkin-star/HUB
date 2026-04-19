@@ -1,0 +1,99 @@
+{
+  "region": "Egypt",
+  "bounds": {
+    "southWestLat": 22,
+    "northEastLat": 31.85,
+    "southWestLng": 24.5,
+    "northEastLng": 37
+  },
+  "grid": {
+    "rows": 4,
+    "cols": 5
+  },
+  "maxPerRequest": 200,
+  "requestsUsed": 20,
+  "tiles": [],
+  "truncatedTiles": [],
+  "errors": [
+    {
+      "tile": "r1c1",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r1c2",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r1c3",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r1c4",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r1c5",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r2c1",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r2c2",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r2c3",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r2c4",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r2c5",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r3c1",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r3c2",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r3c3",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r3c4",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r3c5",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r4c1",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r4c2",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r4c3",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r4c4",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    },
+    {
+      "tile": "r4c5",
+      "message": "HTTP 451: {\"messages\":\"Sorry, we are unable to provide RapidAPI services to your location. RapidAPI is required to comply with US laws that restrict the use of our services in embargoed countries. If you believe you receiving this message in error, please contact support@rapidapi.com.\"}"
+    }
+  ]
+}

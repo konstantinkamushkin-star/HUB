@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BookingsController } from './bookings.controller';
 import { BookingsService } from './bookings.service';
+import { BookingsStripeService } from './bookings-stripe.service';
 import { BookingsAdminController } from './bookings-admin.controller';
 import { BookingsInstructorController } from './bookings-instructor.controller';
 
@@ -10,7 +11,7 @@ import { BookingsInstructorController } from './bookings-instructor.controller';
     BookingsAdminController,
     BookingsInstructorController,
   ],
-  providers: [BookingsService],
+  providers: [BookingsService, BookingsStripeService],
   exports: [BookingsService],
 })
 export class BookingsModule {}

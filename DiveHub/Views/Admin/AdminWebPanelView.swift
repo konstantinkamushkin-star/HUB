@@ -24,30 +24,33 @@ struct AdminWebPanelView: View {
                 )
             } else {
                 NavigationStack {
-                    ZStack(alignment: .bottom) {
-                        AdminWebPanelRepresentable(reloadTick: reloadTick, lastLoadError: $lastLoadError)
-                            .id(reloadTick)
+                    VStack(spacing: 0) {
+                        ZStack(alignment: .bottom) {
+                            AdminWebPanelRepresentable(reloadTick: reloadTick, lastLoadError: $lastLoadError)
+                                .id(reloadTick)
 
-                        if let lastLoadError {
-                            Text(lastLoadError)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal)
-                                .padding(.vertical, 8)
-                                .frame(maxWidth: .infinity)
-                                .background(.ultraThinMaterial)
+                            if let lastLoadError {
+                                Text(lastLoadError)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal)
+                                    .padding(.vertical, 8)
+                                    .frame(maxWidth: .infinity)
+                                    .background(.ultraThinMaterial)
+                            }
                         }
                     }
                     .navigationTitle(localizationService.localizedString("webPanel", table: "admin"))
-                    .navigationBarTitleDisplayMode(.inline)
+                    .diveHubNavigationChrome()
                     .toolbar {
-                        ToolbarItem(placement: .topBarTrailing) {
+                        ToolbarItem(placement: .navigationBarTrailing) {
                             Button {
                                 lastLoadError = nil
                                 reloadTick += 1
                             } label: {
                                 Image(systemName: "arrow.clockwise")
+                                    .font(.title3)
                             }
                             .accessibilityLabel(localizationService.localizedString("webPanelRefresh", table: "admin"))
                         }
@@ -59,6 +62,7 @@ struct AdminWebPanelView: View {
 }
 
 struct AdminWebPanelRepresentable: UIViewRepresentable {
+    /// Увеличивается при ⟳ — пробивает кэш WKWebView для новой сборки admin-web.
     var reloadTick: Int
     @Binding var lastLoadError: String?
 
@@ -88,7 +92,7 @@ struct AdminWebPanelRepresentable: UIViewRepresentable {
         context.coordinator.errorBinding = $lastLoadError
         if context.coordinator.appliedReloadTick != reloadTick {
             context.coordinator.appliedReloadTick = reloadTick
-            context.coordinator.beginLoadCycle(webView: webView)
+            context.coordinator.beginLoadCycle(webView: webView, cacheBust: reloadTick)
         }
     }
 
@@ -98,12 +102,12 @@ struct AdminWebPanelRepresentable: UIViewRepresentable {
 
         /// Сначала локальная страница с `baseURL` = origin админки: в этом origin пишем `localStorage`, затем `location.replace` на дашборд.
         /// Так обходим ограничение WKWebView: `localStorage` с `about:blank` и инъекции «после» первого ответа Next часто не совпадают с веб-логином.
-        func beginLoadCycle(webView: WKWebView) {
+        func beginLoadCycle(webView: WKWebView, cacheBust: Int) {
             errorBinding?.wrappedValue = nil
 
             let baseString = NetworkService.shared.adminWebBaseURL
             guard let baseOrigin = URL(string: baseString),
-                  let dashboardURL = NetworkService.shared.adminPanelDashboardURL(),
+                  let dashboardURL = NetworkService.shared.adminPanelDashboardURL(cacheBust: cacheBust),
                   let payloadB64 = Self.sessionBridgePayloadBase64(dashboardURL: dashboardURL) else {
                 errorBinding?.wrappedValue = LocalizationService.shared.localizedString("webPanelLoadError", table: "admin")
                 print("⚠️ [AdminWebPanel] missing admin URL or session payload (base=\(baseString))")

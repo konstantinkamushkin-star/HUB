@@ -53,4 +53,16 @@ export class DiveSiteContributionsController {
     );
     return { success: true, data };
   }
+
+  @Get('stats/mine')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Aggregate counts for current user dive site contributions',
+  })
+  async statsMine(@Req() req: { user: { sub: string } }) {
+    const data = await this.contributionsService.getMineStats(req.user.sub);
+    return { success: true, data };
+  }
 }

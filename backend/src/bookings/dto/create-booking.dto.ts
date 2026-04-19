@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
@@ -11,7 +12,9 @@ import {
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
+import { PaymentDto } from './payment.dto';
 
 export class CreateBookingDto {
   @IsUUID()
@@ -47,8 +50,9 @@ export class CreateBookingDto {
   @IsArray()
   gearRental?: unknown[];
 
-  @IsObject()
-  payment: Record<string, unknown>;
+  @ValidateNested()
+  @Type(() => PaymentDto)
+  payment: PaymentDto;
 
   @IsOptional()
   @IsIn(['pending', 'quoted', 'confirmed', 'completed', 'cancelled', 'refunded'])

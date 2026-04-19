@@ -12,8 +12,10 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ShopsService } from './shops.service';
+import { ShopCommerceService } from './shop-commerce.service';
 import {
   SearchShopsDto,
   MapSearchShopsDto,
@@ -24,7 +26,10 @@ import { ShopSearchResultDto, ShopListItemDto } from './dto/shop-response.dto';
 
 @Controller('v1/shops')
 export class ShopsController {
-  constructor(private readonly shopsService: ShopsService) {
+  constructor(
+    private readonly shopsService: ShopsService,
+    private readonly shopCommerce: ShopCommerceService,
+  ) {
     console.log('✅ ShopsController initialized');
   }
 
@@ -84,6 +89,78 @@ export class ShopsController {
       console.error('Error in findAll endpoint:', error);
       throw error;
     }
+  }
+
+  @Get(':shopId/products')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Shop owner: list products' })
+  async listShopProducts(
+    @Param('shopId') shopId: string,
+    @Request() req: { user: { sub: string; role?: string } },
+  ) {
+    const data = await this.shopCommerce.listProducts(
+      shopId,
+      req.user.sub,
+      req.user.role,
+    );
+    return { success: true, data };
+  }
+
+  @Post(':shopId/products')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Shop owner: create/update product' })
+  async saveShopProduct(
+    @Param('shopId') shopId: string,
+    @Body() body: Record<string, unknown>,
+    @Request() req: { user: { sub: string; role?: string } },
+  ) {
+    const data = await this.shopCommerce.upsertProduct(
+      shopId,
+      body,
+      req.user.sub,
+      req.user.role,
+    );
+    return { success: true, data };
+  }
+
+  @Get(':shopId/orders')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Shop owner: list orders' })
+  async listShopOrders(
+    @Param('shopId') shopId: string,
+    @Request() req: { user: { sub: string; role?: string } },
+  ) {
+    const data = await this.shopCommerce.listOrders(
+      shopId,
+      req.user.sub,
+      req.user.role,
+    );
+    return { success: true, data };
+  }
+
+  @Post(':shopId/orders')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Shop owner: create/update order' })
+  async saveShopOrder(
+    @Param('shopId') shopId: string,
+    @Body() body: Record<string, unknown>,
+    @Request() req: { user: { sub: string; role?: string } },
+  ) {
+    const data = await this.shopCommerce.upsertOrder(
+      shopId,
+      body,
+      req.user.sub,
+      req.user.role,
+    );
+    return { success: true, data };
   }
 
   @Get(':id')

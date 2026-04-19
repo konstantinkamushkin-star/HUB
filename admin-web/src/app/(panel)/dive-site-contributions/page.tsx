@@ -2,6 +2,10 @@ import { Suspense } from "react";
 
 import { DiveSiteContributionsClient } from "./DiveSiteContributionsClient";
 
+/** Не кэшировать HTML оболочку страницы на CDN — иначе после деплоя WKWebView может долго показывать старый бандл. */
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function ContributionsFallback() {
   return (
     <div className="space-y-4">

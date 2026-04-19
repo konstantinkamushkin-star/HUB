@@ -9,8 +9,8 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { DiveCenterEntity } from '../dive-centers/entities/dive-center.entity';
 import { ShopEntity } from '../shops/entities/shop.entity';
@@ -80,6 +80,8 @@ export class ChatService {
     private readonly eventEmitter: EventEmitter2,
     private readonly pushService: PushService,
     private readonly notificationsService: NotificationsService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   private canonicalKey(
@@ -667,6 +669,211 @@ export class ChatService {
         );
       }
       throw new HttpException(text, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  private async resolveSupportAdminUserId(): Promise<string | null> {
+    const envId = process.env.DIVE_SITE_SUPPORT_ADMIN_USER_ID?.trim();
+    if (envId && /^[0-9a-f-]{36}$/i.test(envId)) {
+      const u = await this.userRepository.findOne({ where: { id: envId } });
+      if (u) return u.id;
+    }
+    const row = await this.userRepository
+      .createQueryBuilder('u')
+      .where('u.role IN (:...roles)', { roles: ['SUPER_ADMIN', 'ADMIN'] })
+      .orderBy('u.role', 'DESC')
+      .take(1)
+      .getOne();
+    return row?.id ?? null;
+  }
+
+  contributionConversationCanonicalKey(contributionId: string): string {
+    return `dsc:${contributionId}`;
+  }
+
+  async findContributionConversationId(
+    contributionId: string,
+  ): Promise<string | null> {
+    const key = this.contributionConversationCanonicalKey(contributionId);
+    const conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+    return conv?.id ?? null;
+  }
+
+  /**
+   * Чат пользователь ↔ админ по заявке на дайв-сайт (без «друзей»).
+   */
+  async openContributionSupportChat(
+    userId: string,
+    contributionId: string,
+  ) {
+    const rows: { submitter_user_id: string }[] = await this.dataSource.query(
+      `SELECT submitter_user_id FROM dive_site_contributions WHERE id = $1`,
+      [contributionId],
+    );
+    if (!rows.length) {
+      throw new NotFoundException('Contribution not found');
+    }
+    if (rows[0].submitter_user_id !== userId) {
+      throw new ForbiddenException('Not your contribution');
+    }
+    const supportId = await this.resolveSupportAdminUserId();
+    if (!supportId) {
+      throw new ServiceUnavailableException(
+        'No support admin user (set DIVE_SITE_SUPPORT_ADMIN_USER_ID or ensure an ADMIN/SUPER_ADMIN exists).',
+      );
+    }
+    await this.ensureContributionSupportThread(userId, contributionId, supportId);
+    const cid = await this.findContributionConversationId(contributionId);
+    if (!cid) {
+      throw new ServiceUnavailableException('Could not open contribution chat.');
+    }
+    return this.serializeConversation(cid, userId);
+  }
+
+  async ensureContributionSupportThread(
+    submitterUserId: string,
+    contributionId: string,
+    supportUserId?: string,
+  ): Promise<string | null> {
+    const supportId = supportUserId ?? (await this.resolveSupportAdminUserId());
+    if (!supportId) {
+      this.logger.warn('ensureContributionSupportThread: no support admin');
+      return null;
+    }
+    const key = this.contributionConversationCanonicalKey(contributionId);
+    let conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+    if (conv) {
+      return conv.id;
+    }
+    try {
+      conv = this.convRepository.create({
+        kind: 'CONTRIBUTION_SUPPORT',
+        canonicalKey: key,
+        diveCenterId: null,
+        shopId: null,
+        bookingId: null,
+      });
+      await this.convRepository.save(conv);
+      await this.participantRepository.save([
+        this.participantRepository.create({
+          conversationId: conv.id,
+          participantType: 'user',
+          participantId: submitterUserId,
+          lastReadAt: new Date(),
+        }),
+        this.participantRepository.create({
+          conversationId: conv.id,
+          participantType: 'user',
+          participantId: supportId,
+          lastReadAt: null,
+        }),
+      ]);
+      const welcome =
+        'Здравствуйте! Этот чат для уточнений по вашей заявке на дайв-сайт. Напишите, если нужна помощь.';
+      const msg = this.messageRepository.create({
+        conversationId: conv.id,
+        senderType: 'user',
+        senderId: supportId,
+        content: welcome,
+        messageType: 'text',
+        attachments: null,
+      });
+      await this.messageRepository.save(msg);
+      await this.deliverChatPushAndInboxForMessage(conv.id, supportId, welcome);
+    } catch (err: unknown) {
+      const { code } = pgDriverMeta(err);
+      if (code === '23505') {
+        conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+        return conv?.id ?? null;
+      }
+      this.logger.warn(
+        `ensureContributionSupportThread failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return null;
+    }
+    return conv!.id;
+  }
+
+  /**
+   * Сообщение от модератора о результате рассмотрения — попадает в ленту чата и в пуш как обычное сообщение.
+   */
+  async postContributionReviewMessage(
+    contributionId: string,
+    reviewerUserId: string,
+    outcome: 'approved' | 'rejected',
+    rejectionReason?: string | null,
+  ): Promise<boolean> {
+    const cid = await this.findContributionConversationId(contributionId);
+    if (!cid) {
+      return false;
+    }
+    await this.assertParticipant(cid, reviewerUserId);
+    const text =
+      outcome === 'approved'
+        ? '✅ Ваша заявка по дайв-сайту одобрена.'
+        : `❌ Заявка отклонена.${rejectionReason ? ` ${rejectionReason}` : ''}`;
+    const row = this.messageRepository.create({
+      conversationId: cid,
+      senderType: 'user',
+      senderId: reviewerUserId,
+      content: text,
+      messageType: 'text',
+      attachments: null,
+    });
+    const saved = await this.messageRepository.save(row);
+    const u = await this.userRepository.findOne({ where: { id: reviewerUserId } });
+    const userCache = new Map<string, User>();
+    if (u) userCache.set(u.id, u);
+    const serialized = this.serializeMessage(
+      saved,
+      userCache,
+      new Map(),
+      new Map(),
+    );
+    try {
+      this.eventEmitter.emit('chat.message', {
+        conversationId: cid,
+        message: serialized,
+      });
+    } catch (emitErr) {
+      this.logger.warn(
+        `chat.message emit failed: ${emitErr instanceof Error ? emitErr.message : String(emitErr)}`,
+      );
+    }
+    await this.deliverChatPushAndInboxForMessage(cid, reviewerUserId, text, serialized.senderName);
+    return true;
+  }
+
+  private async deliverChatPushAndInboxForMessage(
+    conversationId: string,
+    senderUserId: string,
+    preview: string,
+    senderNameOverride?: string,
+  ): Promise<void> {
+    try {
+      const recipients = await this.pushRecipientUserIds(
+        conversationId,
+        senderUserId,
+      );
+      const u = await this.userRepository.findOne({ where: { id: senderUserId } });
+      const title =
+        senderNameOverride ??
+        (u ? `${u.firstName} ${u.lastName}`.trim() || u.email : 'DiveHub');
+      const body = preview.slice(0, 120);
+      await this.pushService.notifyUsers(recipients, title, body);
+      for (const rid of recipients) {
+        await this.notificationsService.createForUser(rid, {
+          type: 'message',
+          title,
+          message: body,
+          icon: 'message',
+          actionUrl: `divehub://chat?conversationId=${conversationId}`,
+        });
+      }
+    } catch (e) {
+      this.logger.warn(
+        `deliverChatPushAndInboxForMessage failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
     }
   }
 }

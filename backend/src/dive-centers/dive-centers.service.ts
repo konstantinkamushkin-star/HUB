@@ -745,4 +745,115 @@ export class DiveCentersService {
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }
+
+  async getAffiliatedSitesForCenterAdmin(
+    centerId: string,
+    actorId: string,
+    actorRole?: string,
+  ): Promise<{ siteIds: string[] }> {
+    await this.assertCanManageCenterForMobileAdmin(actorId, actorRole, centerId);
+    const rows = await this.dataSource.query(
+      `SELECT affiliated_sites FROM dive_centers WHERE id = $1::uuid AND deleted_at IS NULL LIMIT 1`,
+      [centerId],
+    );
+    if (!rows.length) {
+      throw new NotFoundException('Dive center not found');
+    }
+    const raw = rows[0].affiliated_sites;
+    const ids = Array.isArray(raw) ? raw.map((x: unknown) => String(x)) : [];
+    return { siteIds: ids };
+  }
+
+  async setAffiliatedSitesForCenterAdmin(
+    centerId: string,
+    actorId: string,
+    actorRole: string | undefined,
+    siteIds: string[],
+  ): Promise<{ siteIds: string[] }> {
+    await this.assertCanManageCenterForMobileAdmin(actorId, actorRole, centerId);
+    const uniq = [
+      ...new Set(
+        siteIds.map((s) => String(s).trim()).filter((s) => s.length > 0),
+      ),
+    ];
+    if (uniq.length) {
+      const found = await this.dataSource.query(
+        `SELECT id::text AS id FROM dive_sites WHERE id = ANY($1::uuid[]) AND deleted_at IS NULL`,
+        [uniq],
+      );
+      const ok = new Set(
+        found.map((r: { id: string }) => String(r.id).toLowerCase()),
+      );
+      for (const id of uniq) {
+        if (!ok.has(id.toLowerCase())) {
+          throw new BadRequestException(
+            `Unknown or deleted dive site: ${id}`,
+          );
+        }
+      }
+    }
+    await this.dataSource.query(
+      `UPDATE dive_centers SET affiliated_sites = $2::uuid[], updated_at = NOW() WHERE id = $1::uuid AND deleted_at IS NULL`,
+      [centerId, uniq],
+    );
+    return { siteIds: uniq };
+  }
+
+  /** Same rules as TripsWriteService.assertUserCanImportTripsForDiveCenter (mobile JWT). */
+  async assertCanManageCenterForMobileAdmin(
+    actorId: string,
+    actorRole: string | undefined,
+    centerId: string,
+  ): Promise<void> {
+    const roleUpper = (actorRole ?? '').toUpperCase();
+    if (roleUpper === 'SUPER_ADMIN') {
+      const r = await this.dataSource.query(
+        `SELECT id FROM dive_centers WHERE id = $1::uuid AND deleted_at IS NULL LIMIT 1`,
+        [centerId],
+      );
+      if (!r.length) {
+        throw new NotFoundException('Dive center not found');
+      }
+      return;
+    }
+    const r = await this.dataSource.query(
+      `SELECT id, owner_id, email, instructor_ids FROM dive_centers WHERE id = $1::uuid AND deleted_at IS NULL LIMIT 1`,
+      [centerId],
+    );
+    if (!r?.length) {
+      throw new NotFoundException('Dive center not found');
+    }
+    const row = r[0] as {
+      owner_id?: string | null;
+      email?: string | null;
+      instructor_ids?: string[] | null;
+    };
+    if (row.owner_id === actorId) {
+      return;
+    }
+    const instructors = Array.isArray(row.instructor_ids)
+      ? row.instructor_ids
+      : [];
+    if (instructors.includes(actorId)) {
+      return;
+    }
+    if (roleUpper === 'DIVE_CENTER_ADMIN') {
+      const uRows = await this.dataSource.query(
+        `SELECT email FROM users WHERE id = $1 LIMIT 1`,
+        [actorId],
+      );
+      const uEmail = String(uRows[0]?.email ?? '')
+        .toLowerCase()
+        .trim();
+      const cEmail = String(row.email ?? '')
+        .toLowerCase()
+        .trim();
+      if (uEmail && cEmail && uEmail === cEmail) {
+        return;
+      }
+    }
+    throw new ForbiddenException(
+      'No permission to manage affiliated sites for this dive center',
+    );
+  }
 }

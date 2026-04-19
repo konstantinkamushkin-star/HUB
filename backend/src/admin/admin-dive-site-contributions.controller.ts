@@ -42,6 +42,31 @@ export class AdminDiveSiteContributionsController {
     return { success: true, data };
   }
 
+  @Get('stats/submitters')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Per-user contribution counts (leaderboard; SUPER_ADMIN or ADMIN only)',
+  })
+  async submitterStats(@Query('limit') limit?: string) {
+    const parsed = limit ? Number(limit) : 50;
+    const data = await this.contributionsService.listSubmitterLeaderboard(
+      Number.isFinite(parsed) ? parsed : 50,
+    );
+    return { success: true, data };
+  }
+
+  @Get(':id/support-chat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Ensure contribution support chat thread exists; returns conversationId + app deep link',
+  })
+  async supportChat(@Param('id') id: string) {
+    const data = await this.contributionsService.getSupportChatForAdmin(id);
+    return { success: true, data };
+  }
+
   @Post(':id/approve')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

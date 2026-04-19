@@ -7,6 +7,7 @@
 
 import Foundation
 import Combine
+import CoreLocation
 
 struct EmptyResponse: Codable {}
 
@@ -110,8 +111,12 @@ enum NetworkError: LocalizedError {
         if lower.contains("token expired") || lower.contains("invalid token") {
             return L.localizedString("pleaseSignIn", table: "errors")
         }
-        if lower.contains("cannot patch") || lower.contains("cannot get")
-            || lower.contains("cannot post") || lower.contains("cannot put") || lower.contains("cannot delete") {
+        // NestJS 404: "Cannot GET /path" — это сбой загрузки, не сохранения профиля.
+        if lower.contains("cannot get") {
+            return L.localizedString("errorLoadingData", table: "errors")
+        }
+        if lower.contains("cannot patch") || lower.contains("cannot post")
+            || lower.contains("cannot put") || lower.contains("cannot delete") {
             return L.localizedString("editProfileSaveFailed", table: "errors")
         }
         return trimmed.replacingOccurrences(
@@ -200,8 +205,13 @@ class NetworkService {
     }
     
     /// Точка входа панели: `/dashboard` (как после логина в `admin-web`).
-    func adminPanelDashboardURL() -> URL? {
-        URL(string: adminWebBaseURL + "/dashboard")
+    /// `cacheBust` — уникальный query, чтобы WKWebView не отдавал старый кэш после деплоя Next.
+    func adminPanelDashboardURL(cacheBust: Int? = nil) -> URL? {
+        var path = adminWebBaseURL + "/dashboard"
+        if let cb = cacheBust {
+            path += "?_cb=\(cb)"
+        }
+        return URL(string: path)
     }
     
     /// Прод: панель на корневом домене `https://dive-hub.ru` (путь `/dashboard`), не на поддомене `admin.*`.
@@ -597,6 +607,178 @@ extension NetworkService {
         return result
     }
 
+    /// Paginated explore list with filters, sort, and total (`GET /api/dive-sites/explore`).
+    struct DiveSitesExploreEnvelope: Codable {
+        let success: Bool
+        let data: [DiveSite]
+        let total: Int
+        let page: Int
+        let limit: Int
+    }
+
+    func getDiveSitesExplorePage(
+        filters: DiveSiteFilters,
+        searchQuery: String,
+        page: Int,
+        limit: Int,
+        sortOption: ExploreSortOption,
+        userLocation: CLLocation?
+    ) async throws -> (sites: [DiveSite], total: Int) {
+        let language = LocalizationService.shared.currentLanguage.rawValue
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "language", value: language),
+            URLQueryItem(name: "page", value: String(max(1, page))),
+            URLQueryItem(name: "limit", value: String(min(100, max(1, limit)))),
+        ]
+
+        let sortParam: String
+        switch sortOption {
+        case .distance: sortParam = "distance"
+        case .rating: sortParam = "rating"
+        case .name: sortParam = "name"
+        case .reviewCount: sortParam = "reviews"
+        }
+        queryItems.append(URLQueryItem(name: "sort", value: sortParam))
+
+        if sortOption == .distance, let u = userLocation {
+            queryItems.append(URLQueryItem(name: "userLat", value: String(u.coordinate.latitude)))
+            queryItems.append(URLQueryItem(name: "userLng", value: String(u.coordinate.longitude)))
+        }
+
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !q.isEmpty {
+            queryItems.append(URLQueryItem(name: "q", value: q))
+        }
+
+        if let country = filters.country, !country.isEmpty {
+            queryItems.append(URLQueryItem(name: "country", value: country))
+        }
+        if let siteType = filters.siteType {
+            queryItems.append(URLQueryItem(name: "diveTypes", value: siteType.rawValue))
+        }
+        if let difficulty = filters.difficulty {
+            let difficultyValue: Int
+            switch difficulty {
+            case .beginner: difficultyValue = 1
+            case .intermediate: difficultyValue = 2
+            case .advanced: difficultyValue = 3
+            case .expert: difficultyValue = 4
+            }
+            queryItems.append(URLQueryItem(name: "difficultyLevel", value: String(difficultyValue)))
+        }
+        if let minDepth = filters.minDepth, minDepth > 0 {
+            queryItems.append(URLQueryItem(name: "minDepth", value: String(minDepth)))
+        }
+        if let maxDepth = filters.maxDepth, maxDepth > 0 {
+            queryItems.append(URLQueryItem(name: "maxDepth", value: String(maxDepth)))
+        }
+        if let minRating = filters.minRating, minRating > 0 {
+            queryItems.append(URLQueryItem(name: "minRating", value: String(minRating)))
+        }
+
+        var queryParts: [String] = []
+        for item in queryItems {
+            let name = item.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? item.name
+            let value = (item.value ?? "").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+            queryParts.append("\(name)=\(value)")
+        }
+        let queryString = queryParts.joined(separator: "&")
+
+        // v1 — основной путь; legacy `/api/dive-sites/explore` — запасной (старые прокси/сборки).
+        let tryEndpoints = [
+            "/api/v1/dive-sites/explore?\(queryString)",
+            "/api/dive-sites/explore?\(queryString)",
+        ]
+
+        var lastError: Error?
+        for ep in tryEndpoints {
+            do {
+                let envelope: DiveSitesExploreEnvelope = try await request(endpoint: ep)
+                return (envelope.data, envelope.total)
+            } catch {
+                lastError = error
+                if Self.isHttpNotFoundForExploreFallback(error) {
+                    continue
+                }
+                throw error
+            }
+        }
+
+        if let err = lastError, Self.isHttpNotFoundForExploreFallback(err) {
+            return try await exploreFallbackDiveSitesPage(
+                filters: filters,
+                searchQuery: searchQuery,
+                page: page,
+                limit: limit,
+                sortOption: sortOption,
+                userLocation: userLocation
+            )
+        }
+        throw lastError ?? NetworkError.unknown(NSError(domain: "NetworkService", code: -2))
+    }
+
+    /// When production has not deployed `GET /api/dive-sites/explore` yet, use legacy paged list + client sort.
+    private func exploreFallbackDiveSitesPage(
+        filters: DiveSiteFilters,
+        searchQuery: String,
+        page: Int,
+        limit: Int,
+        sortOption: ExploreSortOption,
+        userLocation: CLLocation?
+    ) async throws -> (sites: [DiveSite], total: Int) {
+        let safeLimit = min(100, max(1, limit))
+        let safePage = max(1, page)
+        var batch = try await getDiveSites(filters: filters, page: safePage, limit: safeLimit)
+        let q = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !q.isEmpty {
+            batch = batch.filter { site in
+                site.displayName.localizedCaseInsensitiveContains(q)
+                    || site.description.localizedCaseInsensitiveContains(q)
+            }
+        }
+        let sorted = Self.sortedDiveSitesForExploreFallback(batch, sortOption: sortOption, userLocation: userLocation)
+        let total: Int
+        if sorted.count < safeLimit {
+            total = (safePage - 1) * safeLimit + sorted.count
+        } else {
+            total = safePage * safeLimit + 1
+        }
+        return (sorted, total)
+    }
+
+    private static func isHttpNotFoundForExploreFallback(_ error: Error) -> Bool {
+        guard let ne = error as? NetworkError else { return false }
+        switch ne {
+        case .serverError(let code): return code == 404
+        case .serverErrorWithDetail(let code, _): return code == 404
+        default: return false
+        }
+    }
+
+    private static func sortedDiveSitesForExploreFallback(
+        _ sites: [DiveSite],
+        sortOption: ExploreSortOption,
+        userLocation: CLLocation?
+    ) -> [DiveSite] {
+        switch sortOption {
+        case .distance:
+            guard let u = userLocation else {
+                return sites.sorted { $0.averageRating > $1.averageRating }
+            }
+            return sites.sorted { a, b in
+                let la = CLLocation(latitude: a.location.latitude, longitude: a.location.longitude)
+                let lb = CLLocation(latitude: b.location.latitude, longitude: b.location.longitude)
+                return u.distance(from: la) < u.distance(from: lb)
+            }
+        case .rating:
+            return sites.sorted { $0.averageRating > $1.averageRating }
+        case .name:
+            return sites.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .reviewCount:
+            return sites.sorted { $0.reviewCount > $1.reviewCount }
+        }
+    }
+
     /// Legacy `GET /api/dive-sites` is capped at 500 rows per request on the server; load the full list in pages.
     /// Spreads requests (Nest throttler) and stops if the server ignores `page`/`OFFSET` (duplicate windows).
     func getAllDiveSitesLegacy(filters: DiveSiteFilters? = nil) async throws -> [DiveSite] {
@@ -617,7 +799,6 @@ extension NetworkService {
             if batch.count < pageSize { break }
             page += 1
             if page > 200 { break }
-            try await Task.sleep(nanoseconds: 450_000_000)
         }
         return all
     }
@@ -1328,6 +1509,61 @@ extension NetworkService {
         ) as EmptyResponse
     }
     
+    /// Suggest a dive site fix or a new site (pending admin approval).
+    func submitDiveSiteContribution(
+        type: String,
+        diveSiteId: String?,
+        message: String?,
+        proposedData: [String: Any]
+    ) async throws {
+        var body: [String: Any] = [
+            "type": type,
+            "proposedData": proposedData,
+        ]
+        if let diveSiteId {
+            body["diveSiteId"] = diveSiteId
+        }
+        if let message, !message.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            body["message"] = message
+        }
+        guard let url = URL(string: baseURL + "/api/v1/dive-sites/contributions") else {
+            throw NetworkError.invalidURL
+        }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token = getAuthToken() {
+            req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        }
+        req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        let (data, response) = try await sessionDataWithRateLimitRetry(for: req)
+        guard let http = response as? HTTPURLResponse else {
+            throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
+        }
+        guard (200...299).contains(http.statusCode) else {
+            if http.statusCode == 401, getAuthToken() != nil, KeychainService.shared.getRefreshToken() != nil {
+                do {
+                    let newToken = try await refreshAccessToken()
+                    var retry = URLRequest(url: url)
+                    retry.httpMethod = "POST"
+                    retry.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    retry.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
+                    retry.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+                    let (retryData, retryResp) = try await sessionDataWithRateLimitRetry(for: retry)
+                    guard let retryHttp = retryResp as? HTTPURLResponse,
+                          (200...299).contains(retryHttp.statusCode) else {
+                        throw httpFailureError(data: retryData, statusCode: (retryResp as? HTTPURLResponse)?.statusCode ?? 0)
+                    }
+                    return
+                } catch {
+                    clearAuthTokens()
+                    throw NetworkError.serverError(401)
+                }
+            }
+            throw httpFailureError(data: data, statusCode: http.statusCode)
+        }
+    }
+    
     /// Chat WebSocket path is **not** under `/api`.
     func chatWebSocketURL(accessToken: String) -> URL? {
         var host = baseURL
@@ -1352,29 +1588,8 @@ struct DiveSiteFilters: Codable, Sendable, Equatable {
     var maxDepth: Double?
     var marineLife: [String]?
     var minRating: Double?
-    var maxDistance: Double? // in km (for legacy API)
-    var centerLatitude: Double?
-    var centerLongitude: Double?
-    var country: String? // For geo search
+    var country: String?
     var accessTypes: [String]? // ["shore", "boat"]
-    
-    /// Returns radius in meters for geo search (converts maxDistance from km)
-    nonisolated var radiusMeters: Int {
-        if let maxDistance = maxDistance {
-            return Int(maxDistance * 1000) // Convert km to meters
-        }
-        return 500000 // Default 500km (increased for large regions like Red Sea)
-    }
-    
-    /// Returns true if geo search should be used (has location and not using global search)
-    nonisolated var shouldUseGeoSearch: Bool {
-        // Don't use geo search if maxDistance is explicitly set to nil (global search)
-        if maxDistance == nil && centerLatitude == nil && centerLongitude == nil {
-            return false
-        }
-        // Use geo search if location is available and maxDistance is not nil
-        return centerLatitude != nil && centerLongitude != nil && maxDistance != nil
-    }
 }
 
 struct DiveCenterFilters: Codable, Sendable {

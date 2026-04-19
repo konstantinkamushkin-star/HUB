@@ -8,11 +8,17 @@ import { DiveSiteContributionEntity } from './entities/dive-site-contribution.en
 import { DiveSiteContributionsService } from './dive-site-contributions.service';
 import { DiveSiteContributionsController } from './dive-site-contributions.controller';
 import { AuthModule } from '../auth/auth.module';
+import { ChatModule } from '../chat/chat.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { PushModule } from '../push/push.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([DiveSiteEntity, DiveSiteContributionEntity]),
     AuthModule,
+    ChatModule,
+    NotificationsModule,
+    PushModule,
   ],
   controllers: [
     DiveSitesController,

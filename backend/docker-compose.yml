@@ -4,6 +4,10 @@
 # Затем прогоните миграции (с хоста при DB на localhost:5432 или через exec в api после npm ci в образе — см. docs/PRODUCTION_PREP.md).
 #
 # Обязательно задайте JWT_SECRET и CORS_ORIGINS для реального деплоя; для локального docker подойдут переменные окружения хоста или .env рядом с compose.
+#
+# Опционально: локальный перевод без Google (LibreTranslate). Первый старт скачивает модели — долго и тяжело по RAM.
+#   docker compose --profile translate up -d libretranslate
+# Затем у API: LIBRETRANSLATE_URL=http://libretranslate:5000 (или с хоста: http://127.0.0.1:5000).
 
 services:
   postgres:
@@ -48,6 +52,8 @@ services:
       DB_DATABASE: ${POSTGRES_DB:-divehub}
       REDIS_HOST: redis
       REDIS_PORT: "6379"
+      # Раскомментируйте при `docker compose --profile translate up`:
+      # LIBRETRANSLATE_URL: http://libretranslate:5000
     depends_on:
       postgres:
         condition: service_healthy
@@ -55,6 +61,16 @@ services:
         condition: service_started
     volumes:
       - divehub_uploads:/app/uploads
+
+  libretranslate:
+    profiles: ["translate"]
+    image: libretranslate/libretranslate:latest
+    ports:
+      - "${LIBRETRANSLATE_PUBLISH_PORT:-5000}:5000"
+    environment:
+      # Ограничить языки — меньше памяти и времени первого запуска (подстройте под приложение).
+      LT_LOAD_ONLY: en,ru,de,fr,es,it,pt,uk,pl,tr,zh,ja,ko,ar
+    restart: unless-stopped
 
 volumes:
   divehub_pgdata:

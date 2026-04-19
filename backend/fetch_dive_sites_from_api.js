@@ -2,8 +2,15 @@ const https = require('https');
 const fs = require('fs');
 const { Pool } = require('pg');
 
-const API_KEY = 'fa6fa59858msh2fca808ec049113p1b713fjsnb24a63b4f2d1';
-const API_HOST = 'world-scuba-diving-sites-api.p.rapidapi.com';
+const API_KEY = process.env.RAPIDAPI_KEY || process.env.X_RAPIDAPI_KEY;
+const API_HOST =
+  process.env.RAPIDAPI_HOST || 'world-scuba-diving-sites-api.p.rapidapi.com';
+const GPS_PATH = process.env.RAPIDAPI_GPS_PATH || '/divesites/gs';
+
+if (!API_KEY) {
+  console.error('Set RAPIDAPI_KEY (RapidAPI subscription key) in the environment.');
+  process.exit(1);
+}
 
 // Регионы мира для покрытия максимума дайвсайтов за минимум запросов
 // Каждый регион покрывает большой географический район
@@ -46,11 +53,18 @@ const pool = new Pool({
 
 function makeRequest(region) {
   return new Promise((resolve, reject) => {
-    const url = `https://${API_HOST}/divesites/gps?southWestLat=${region.southWestLat}&northEastLat=${region.northEastLat}&southWestLng=${region.southWestLng}&northEastLng=${region.northEastLng}`;
-    
+    const q = new URLSearchParams({
+      southWestLat: String(region.southWestLat),
+      northEastLat: String(region.northEastLat),
+      southWestLng: String(region.southWestLng),
+      northEastLng: String(region.northEastLng),
+    });
+    const pathWithQuery = `${GPS_PATH.startsWith('/') ? GPS_PATH : `/${GPS_PATH}`}?${q.toString()}`;
+    const url = `https://${API_HOST}${pathWithQuery}`;
+
     const options = {
       hostname: API_HOST,
-      path: `/divesites/gps?southWestLat=${region.southWestLat}&northEastLat=${region.northEastLat}&southWestLng=${region.southWestLng}&northEastLng=${region.northEastLng}`,
+      path: pathWithQuery,
       method: 'GET',
       headers: {
         'x-rapidapi-host': API_HOST,

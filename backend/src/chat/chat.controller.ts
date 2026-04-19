@@ -19,6 +19,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { ChatService } from './chat.service';
 import { OpenChatDto } from './dto/open-chat.dto';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
+import { OpenContributionSupportChatDto } from './dto/open-contribution-support-chat.dto';
 
 @ApiTags('chat')
 @Controller('chat')
@@ -41,6 +42,22 @@ export class ChatController {
     @Body() dto: OpenChatDto,
   ) {
     return this.chatService.openConversation(req.user.sub, dto);
+  }
+
+  @Post('conversations/contribution-support')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Open support chat for a dive-site contribution (submitter only; pairs with admin).',
+  })
+  async openContributionSupport(
+    @Request() req: { user: { sub: string } },
+    @Body() dto: OpenContributionSupportChatDto,
+  ) {
+    return this.chatService.openContributionSupportChat(
+      req.user.sub,
+      dto.contributionId,
+    );
   }
 
   @Post('messages')
