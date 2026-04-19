@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DiveCenterEntity } from '../dive-centers/entities/dive-center.entity';
 import { ShopEntity } from '../shops/entities/shop.entity';
@@ -14,7 +14,7 @@ import { PartnerRegistrationController } from './partner-registration.controller
       ShopEntity,
       AdminVerificationRequestEntity,
     ]),
-    forwardRef(() => AdminModule),
+    AdminModule,
   ],
   controllers: [PartnerRegistrationController],
   providers: [PartnerRegistrationService],

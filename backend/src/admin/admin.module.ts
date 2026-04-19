@@ -1,4 +1,4 @@
-import { Module, forwardRef } from '@nestjs/common';
+import { Module } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { PushModule } from '../push/push.module';
@@ -73,13 +73,10 @@ import { AdminAnalyticsController } from './admin-analytics.controller';
 import { AnalyticsEventEntity } from './entities/analytics-event.entity';
 import { MailModule } from '../mail/mail.module';
 import { PartnerAccountService } from './partner-account.service';
-import { DiveSitesModule } from '../dive-sites/dive-sites.module';
-import { AdminDiveSiteContributionsController } from './admin-dive-site-contributions.controller';
 import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
 
 @Module({
   imports: [
-    forwardRef(() => DiveSitesModule),
     PushModule,
     MailModule,
     TypeOrmModule.forFeature([
@@ -130,7 +127,6 @@ import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
     AdminIntegrationsController,
     AdminBillingPlansController,
     AdminAnalyticsController,
-    AdminDiveSiteContributionsController,
   ],
   providers: [
     ErrorStatsService,
