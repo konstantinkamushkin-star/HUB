@@ -1,8 +1,21 @@
+import { Suspense } from "react";
+
 import { DiveSiteContributionsClient } from "./DiveSiteContributionsClient";
 
-/** Dynamic route so production `next start` reliably serves this URL (static/Turbopack build was 404). */
-export const dynamic = "force-dynamic";
+function ContributionsFallback() {
+  return (
+    <div className="space-y-4">
+      <div className="h-8 w-72 animate-pulse rounded-lg bg-zinc-800" />
+      <div className="h-32 w-full animate-pulse rounded-xl bg-zinc-900" />
+      <p className="text-sm text-zinc-500">Загрузка…</p>
+    </div>
+  );
+}
 
 export default function DiveSiteContributionsPage() {
-  return <DiveSiteContributionsClient />;
+  return (
+    <Suspense fallback={<ContributionsFallback />}>
+      <DiveSiteContributionsClient />
+    </Suspense>
+  );
 }
