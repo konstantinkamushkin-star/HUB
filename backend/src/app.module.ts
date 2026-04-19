@@ -32,6 +32,7 @@ import { TripImportModule } from './trip-import/trip-import.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BookingsModule } from './bookings/bookings.module';
 import { CenterServicesModule } from './center-services/center-services.module';
+import { TranslateModule } from './translate/translate.module';
 
 @Module({
   controllers: [AppController, LegalPagesController, LocalizationController],
@@ -137,6 +138,7 @@ import { CenterServicesModule } from './center-services/center-services.module';
     NotificationsModule,
     BookingsModule,
     CenterServicesModule,
+    TranslateModule,
   ],
   providers: [
     {
