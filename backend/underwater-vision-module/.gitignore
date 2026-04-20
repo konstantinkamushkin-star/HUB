@@ -1,3 +1,5 @@
 # setuptools / pip editable install metadata (генерируется при сборке)
 *.egg-info/
 **/*.egg-info/
+# имя каталога часто с подчёркиванием: underwater_vision_module.egg-info
+**/*egg-info/

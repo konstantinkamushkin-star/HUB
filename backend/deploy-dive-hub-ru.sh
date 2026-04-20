@@ -15,6 +15,13 @@ if [[ ! -f .env ]]; then
   exit 1
 fi
 
+# На VPS после `pip install -e` появляется каталог *egg-info* внутри src — он не должен жить в дереве git и ломает pull/checkout.
+shopt -s nullglob
+for d in "$ROOT/underwater-vision-module/src"/*egg-info "$ROOT/underwater-vision-module"/*egg-info; do
+  [[ -e "$d" ]] && rm -rf "$d"
+done
+shopt -u nullglob
+
 if [[ -d ../.git ]] && [[ "$(basename "$ROOT")" == "backend" ]]; then
   REPO_ROOT="$(cd .. && pwd)"
   if [[ -n "$(cd "$REPO_ROOT" && git status --porcelain)" ]]; then

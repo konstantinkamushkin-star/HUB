@@ -55,6 +55,8 @@ underwater-vision-module/**/*.pt
 underwater-vision-module/**/*.onnx
 underwater-vision-module/**/*.onnx.data
 underwater-vision-module/**/.egg-info/
+# setuptools также кладёт metadata в имя вида package_name.egg-info (не только .egg-info)
+underwater-vision-module/**/*egg-info/
 underwater-vision-module/**/PKG-INFO
 
 # User uploads (runtime)
