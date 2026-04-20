@@ -55,6 +55,27 @@ NODE_ENV=production npm run start
 
 Если видите **`EADDRINUSE :::3001`** — порт уже занят (старый `next start`, pm2 и т.д.). Проверка: `sudo ss -tlnp | grep ':3001'` или `sudo lsof -iTCP:3001 -sTCP:LISTEN` → остановите процесс или используйте другой `PORT`.
 
+#### Персистенция (systemd) и nginx на VPS
+
+Шаблоны в репозитории: **`deploy/divehub-admin-web.service.example`**, **`deploy/nginx-dive-hub-ru-snippet.conf.example`**. На сервере после `git pull`, `npm ci`, `npm run build`:
+
+```bash
+sudo cp /opt/HUB/admin-web/deploy/divehub-admin-web.service.example /etc/systemd/system/divehub-admin-web.service
+# Отредактируйте unit: WorkingDirectory, User, PORT, путь к npm при nvm
+sudo systemctl daemon-reload
+sudo systemctl enable --now divehub-admin-web
+curl -fsSI http://127.0.0.1:3003/staff/divehub-console | head -n 5
+```
+
+В конфиге сайта для **dive-hub.ru** вставьте фрагмент из **`nginx-dive-hub-ru-snippet.conf.example`** (порты **3003** для Next и **3002** для API замените на свои), затем:
+
+```bash
+sudo nginx -t && sudo systemctl reload nginx
+curl -fsSI https://dive-hub.ru/staff/divehub-console | head -n 5
+```
+
+Подробнее про `/privacy` на API и порты: **`backend/docs/SERVER_HANDOFF_TEMPLATE.md`**.
+
 #### Бэкенд в проде — Docker, не `nest start` на хосте
 
 Скрипт **`./deploy-dive-hub-ru.sh`** уже поднимает API в **контейнере** (у вас наружу, например, **3002→3000**). Если после этого запустить в той же машине **`npm run start`** из папки `backend`, Nest попытается занять **:3000** на хосте → **`EADDRINUSE`**. Для продакшена API достаточно Docker; ручной `nest start` — только для отладки и тогда остановите контейнер `api` или смените порт в `.env`.

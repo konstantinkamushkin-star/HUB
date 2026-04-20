@@ -1,0 +1,30 @@
+# Скопируйте на сервер как /etc/systemd/system/divehub-admin-web.service
+# и поправьте пути / пользователя под вашу машину.
+#
+#   sudo cp divehub-admin-web.service.example /etc/systemd/system/divehub-admin-web.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now divehub-admin-web
+#
+# Логи: journalctl -u divehub-admin-web -f
+
+[Unit]
+Description=DiveHub admin-web (Next.js production)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/HUB/admin-web
+Environment=NODE_ENV=production
+Environment=PORT=3003
+# Если Node установлен через nvm — замените на полный путь к npm, например:
+# ExecStart=/home/deploy/.nvm/versions/node/v20.11.0/bin/npm run start
+ExecStart=/usr/bin/npm run start
+Restart=on-failure
+RestartSec=5
+# Раскомментируйте и выставьте владельца каталога admin-web:
+# User=www-data
+# Group=www-data
+
+[Install]
+WantedBy=multi-user.target
