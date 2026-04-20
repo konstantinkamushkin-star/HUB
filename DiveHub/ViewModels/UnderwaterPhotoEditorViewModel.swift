@@ -151,29 +151,12 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
                 await MainActor.run { [weak self] in self?.isProcessing = false }
                 return
             }
+            let profile = await MainActor.run { NetworkService.cardLookProfile }
             do {
-                let imageId = try await NetworkService.shared.uploadImageForProcessing(jpegData: jpeg)
-                let payload = await MainActor.run { [weak self] () -> NetworkService.ImageProcessParamsPayload in
-                    guard let self else {
-                        return NetworkService.ImageProcessParamsPayload(
-                            depth: 30, strength: 70, dehaze: 50, clarity: 40, temperature: 10,
-                            auto_ai: false, pipeline: "default"
-                        )
-                    }
-                    return NetworkService.ImageProcessParamsPayload(
-                        depth: self.diveEditorDepth,
-                        strength: self.diveEditorColorStrength,
-                        dehaze: self.params.dehaze,
-                        clarity: self.params.clarity,
-                        temperature: self.params.temperature,
-                        auto_ai: false,
-                        pipeline: "default"
-                    )
-                }
-                let job = try await NetworkService.shared.createImageProcessJob(imageId: imageId, params: payload)
-                let out = try await NetworkService.shared.waitForImageProcessJob(
-                    jobId: job.job_id,
-                    maxWaitSeconds: 120
+                let out = try await NetworkService.shared.processPhotoUnderwaterVisionModule(
+                    imageJPEG: jpeg,
+                    engine: profile.engine,
+                    mode: profile.mode
                 )
                 guard !Task.isCancelled else { return }
                 guard let ui = UIImage(data: out) else { throw NetworkError.decodingError }
@@ -186,13 +169,55 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
                     self.longWaitTask?.cancel()
                     DiveEditorAnalyticsService.shared.track(
                         .autoAiCompleted,
-                        processingMode: "cloud_job_automatic",
+                        processingMode: "cloud_uvm_bech_automatic",
                         success: true,
                         durationMs: ms
                     )
                 }
             } catch {
-                await runDiveEditorArticleFallback(jpeg: jpeg, startedAt: t0)
+                do {
+                    let imageId = try await NetworkService.shared.uploadImageForProcessing(jpegData: jpeg)
+                    let payload = await MainActor.run { [weak self] () -> NetworkService.ImageProcessParamsPayload in
+                        guard let self else {
+                            return NetworkService.ImageProcessParamsPayload(
+                                depth: 30, strength: 70, dehaze: 50, clarity: 40, temperature: 10,
+                                auto_ai: false, pipeline: "default"
+                            )
+                        }
+                        return NetworkService.ImageProcessParamsPayload(
+                            depth: self.diveEditorDepth,
+                            strength: self.diveEditorColorStrength,
+                            dehaze: self.params.dehaze,
+                            clarity: self.params.clarity,
+                            temperature: self.params.temperature,
+                            auto_ai: false,
+                            pipeline: "default"
+                        )
+                    }
+                    let job = try await NetworkService.shared.createImageProcessJob(imageId: imageId, params: payload)
+                    let out = try await NetworkService.shared.waitForImageProcessJob(
+                        jobId: job.job_id,
+                        maxWaitSeconds: 120
+                    )
+                    guard !Task.isCancelled else { return }
+                    guard let ui = UIImage(data: out) else { throw NetworkError.decodingError }
+                    let ms = Int(Date().timeIntervalSince(t0) * 1000)
+                    await MainActor.run { [weak self] in
+                        guard let self else { return }
+                        self.previewImage = ui
+                        self.isProcessing = false
+                        self.diveEditorLongWaitMessage = nil
+                        self.longWaitTask?.cancel()
+                        DiveEditorAnalyticsService.shared.track(
+                            .autoAiCompleted,
+                            processingMode: "cloud_job_automatic",
+                            success: true,
+                            durationMs: ms
+                        )
+                    }
+                } catch {
+                    await runDiveEditorArticleFallback(jpeg: jpeg, startedAt: t0)
+                }
             }
         }
     }
