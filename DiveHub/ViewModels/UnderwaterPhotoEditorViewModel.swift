@@ -51,17 +51,6 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
     private static let diveEditorManualNeutralClarity: Double = 0
     private static let diveEditorManualNeutralTemperature: Double = 0
 
-    /// Как `ImageProcessingService` (Nest): слайдеры → query `strength` для UVM Nikolaj Bech.
-    private static func diveEditorUvmStrength(
-        colorStrength: Double,
-        dehaze: Double,
-        clarity: Double,
-        temperature: Double
-    ) -> Double {
-        let strengthRaw = (colorStrength + dehaze + clarity) / 300
-        return max(0.25, min(1, strengthRaw + abs(temperature) / 500))
-    }
-
     /// Глубина для `depth_hint_m` (0…60 м), как на бэкенде: `(depthSlider/100)*40`.
     private static func diveEditorDepthHintMeters(depthSlider: Double) -> Double {
         max(0, min(60, (depthSlider / 100) * 40))
@@ -161,7 +150,7 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
                 self.aiStatusMessage = nil
             }
             let jpeg = await Task.detached(priority: .userInitiated) {
-                Self.jpegDataForCloud(from: img, maxSide: 2048)
+                Self.jpegDataForCloud(from: img, maxSide: 8192)
             }.value
             guard let jpeg, !Task.isCancelled else {
                 await MainActor.run { [weak self] in self?.isProcessing = false }
@@ -181,18 +170,13 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
                     temperature: self.params.temperature
                 )
             }
-            let uvmStrength = Self.diveEditorUvmStrength(
-                colorStrength: sliders.color,
-                dehaze: sliders.dehaze,
-                clarity: sliders.clarity,
-                temperature: sliders.temperature
-            )
             let depthHint = Self.diveEditorDepthHintMeters(depthSlider: sliders.depth)
             do {
+                // Nikolaj Bech upstream = полное применение матрицы (без «смешивания» из слайдеров).
                 let out = try await NetworkService.shared.processPhotoUnderwaterVisionModule(
                     imageJPEG: jpeg,
                     engine: "cursor",
-                    strength: uvmStrength,
+                    strength: 1.0,
                     depthHintMeters: depthHint
                 )
                 guard !Task.isCancelled else { return }
@@ -326,19 +310,24 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
     }
 
     nonisolated private static func jpegDataForCloud(from image: UIImage, maxSide: CGFloat) -> Data? {
-        let m = max(image.size.width, image.size.height)
+        let pixelW = image.size.width * image.scale
+        let pixelH = image.size.height * image.scale
+        let m = max(pixelW, pixelH)
         let toDraw: UIImage
         if m > maxSide {
-            let scale = maxSide / m
-            let sz = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-            let renderer = UIGraphicsImageRenderer(size: sz)
+            let down = maxSide / m
+            let nw = max(1, floor(pixelW * down))
+            let nh = max(1, floor(pixelH * down))
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: nw, height: nh), format: format)
             toDraw = renderer.image { _ in
-                image.draw(in: CGRect(origin: .zero, size: sz))
+                image.draw(in: CGRect(origin: .zero, size: CGSize(width: nw, height: nh)))
             }
         } else {
             toDraw = image
         }
-        return toDraw.jpegData(compressionQuality: 0.9)
+        return toDraw.jpegData(compressionQuality: 0.95)
     }
 
     func updateParams(_ block: (inout UnderwaterProcessingParams) -> Void) {

@@ -59,7 +59,7 @@ async def _process_photo_core(
         return JSONResponse({'error': 'processing_failed', 'detail': str(e)}, status_code=500)
 
     try:
-        hex_jpeg = encode_jpeg_hex(out, quality=92)
+        hex_jpeg = encode_jpeg_hex(out)
     except Exception:
         return JSONResponse({'error': 'encode failed'}, status_code=500)
 

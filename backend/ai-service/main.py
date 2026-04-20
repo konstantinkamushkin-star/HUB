@@ -47,7 +47,7 @@ else:
     _upscale_bgr_to_original = None
 
 
-def _encode_jpeg_hex(bgr: np.ndarray, quality: int = 92) -> str:
+def _encode_jpeg_hex(bgr: np.ndarray, quality: int = 95) -> str:
     ok, enc = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not ok:
         raise RuntimeError("jpeg encode failed")
@@ -217,7 +217,7 @@ async def process_photo_uvm_compat(
         report = dict(report)
         report["engine"] = eng
         report["decoder"] = decoder_tag
-        hex_jpeg = _encode_jpeg_hex(out_u8, quality=92)
+        hex_jpeg = _encode_jpeg_hex(out_u8)
     except HTTPException:
         raise
     except Exception as e:
