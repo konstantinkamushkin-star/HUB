@@ -1,3 +1,4 @@
+import { ADMIN_LOGIN_PATH } from "./adminLoginPath";
 import { getApiBaseUrl } from "./config";
 import {
   applyRefreshedTokens,
@@ -226,7 +227,7 @@ export async function apiRequest<T = unknown>(
       return apiRequest<T>(apiPath, init, true);
     }
     clearSession();
-    window.location.assign("/login");
+    window.location.assign(ADMIN_LOGIN_PATH);
     return {
       ok: false,
       status: 401,

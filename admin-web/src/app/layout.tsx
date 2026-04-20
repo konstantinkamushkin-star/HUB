@@ -18,6 +18,22 @@ export const metadata: Metadata = {
   title: "DiveHub",
   description:
     "Платформа для дайверов и дайв-бизнеса. Скачайте приложение и подайте заявку на подключение к каталогу.",
+  icons: {
+    icon: [
+      { url: "/branding/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/branding/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/branding/logo.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [{ url: "/branding/apple-touch-icon.png", sizes: "180x180" }],
+    other: [
+      {
+        rel: "mask-icon",
+        url: "/branding/logo.svg",
+        color: "#0ea5e9",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({

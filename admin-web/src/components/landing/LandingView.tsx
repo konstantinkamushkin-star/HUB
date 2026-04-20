@@ -130,9 +130,10 @@ export function LandingView() {
 
       <header className="relative z-10 border-b border-sky-100/80 bg-white/75 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <a href="#" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2">
+            <BrandLogo variant="mark" className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" maskedMark />
             <BrandLogo variant="wordmark" className="h-9 w-auto max-w-[200px] shrink-0 sm:h-10 sm:max-w-[240px]" />
-          </a>
+          </Link>
           <nav className="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-2 text-xs text-slate-600 sm:gap-6 sm:text-sm">
             <a href="#about" className="transition hover:text-sky-700">
               О приложении
@@ -144,12 +145,6 @@ export function LandingView() {
               Анкета
             </a>
           </nav>
-          <Link
-            href="/login"
-            className="rounded-xl border border-sky-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:border-sky-400 hover:bg-sky-50"
-          >
-            Вход для админа
-          </Link>
         </div>
       </header>
 
@@ -289,9 +284,9 @@ export function LandingView() {
               <PartnerRegistrationForm showIntro appearance="light" />
             </div>
             <p className="mt-6 text-center text-sm text-slate-500">
-              Вход для администраторов или подача заявки на подключение
-              дайв-центра или магазина. После заполнения формы заявка попадает в
-              очередь верификации — её обработает супер-администратор.
+              Подача заявки на подключение дайв-центра или магазина. После заполнения
+              формы заявка попадает в очередь верификации — её обработает
+              супер-администратор.
             </p>
           </div>
         </section>
@@ -299,19 +294,13 @@ export function LandingView() {
 
       <footer className="relative z-10 border-t border-sky-100 bg-white/80 py-10 backdrop-blur-sm">
         <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-6 px-4 text-center text-sm text-slate-600 sm:flex-row sm:text-left sm:px-6">
-          <p className="font-medium text-slate-700">
-            © {new Date().getFullYear()} DiveHub
-          </p>
+          <div className="flex items-center gap-2">
+            <BrandLogo variant="mark" className="h-8 w-8 shrink-0" maskedMark />
+            <p className="font-medium text-slate-700">
+              © {new Date().getFullYear()} DiveHub
+            </p>
+          </div>
           <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link
-              href="/login"
-              className="font-medium text-sky-600 hover:text-sky-700"
-            >
-              Супер-админ: войти в панель
-            </Link>
-            <span className="hidden text-slate-300 sm:inline" aria-hidden>
-              |
-            </span>
             <a href="#registration" className="hover:text-slate-900">
               Анкета партнёра
             </a>
@@ -324,6 +313,9 @@ export function LandingView() {
             >
               Конфиденциальность
             </Link>
+            <span className="hidden text-slate-300 sm:inline" aria-hidden>
+              |
+            </span>
             <Link
               href="/agreement"
               className="hover:text-slate-900"

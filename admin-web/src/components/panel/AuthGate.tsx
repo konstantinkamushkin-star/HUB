@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ADMIN_LOGIN_PATH } from "@/lib/adminLoginPath";
 import { getToken } from "@/lib/auth";
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
@@ -10,7 +11,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!getToken()) {
-      router.replace("/login");
+      router.replace(ADMIN_LOGIN_PATH);
       return;
     }
     setReady(true);

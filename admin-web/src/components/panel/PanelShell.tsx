@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useState } from "react";
 import { BrandLogo } from "@/components/BrandLogo";
+import { ADMIN_LOGIN_PATH } from "@/lib/adminLoginPath";
 import { NAV_ITEMS } from "./nav-items";
 import { clearSession, getStoredUser } from "@/lib/auth";
 
@@ -30,6 +31,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
       <aside className="hidden w-56 shrink-0 flex-col border-r border-zinc-800 bg-zinc-900/80 md:flex">
         <div className="border-b border-zinc-800 px-4 py-4">
           <div className="flex items-center gap-3">
+            <BrandLogo variant="mark" className="h-9 w-9 shrink-0" maskedMark />
             <div className="shrink-0 rounded-lg bg-white px-2 py-1.5">
               <BrandLogo variant="wordmark" className="h-7 w-auto max-w-[160px]" />
             </div>
@@ -99,7 +101,7 @@ export function PanelShell({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => {
                 clearSession();
-                router.replace("/login");
+                router.replace(ADMIN_LOGIN_PATH);
               }}
               className="rounded-md border border-zinc-700 px-3 py-1.5 hover:bg-zinc-800"
             >
