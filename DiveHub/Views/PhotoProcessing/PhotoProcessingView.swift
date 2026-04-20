@@ -21,9 +21,6 @@ struct PhotoProcessingView: View {
     @State private var errorMessage: String?
     @State private var showShare = false
     @State private var shareItems: [Any] = []
-    @State private var strength: Double = NetworkService.cardLookProfile.strength
-    @State private var useDepth = false
-    @State private var depthMeters: Double = 10
     /// Принудительное обновление превью «После» (SwiftUI иногда не перерисовывает Image).
     @State private var processedResultID = UUID()
 
@@ -66,31 +63,6 @@ struct PhotoProcessingView: View {
                     videoComingSoonTeaser
 
                     if sourceImage != nil {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(localizationService.localizedString("strengthProcessing", table: "imageEditing"))
-                                .font(.subheadline.weight(.medium))
-                                .foregroundColor(.diveText)
-                            HStack {
-                                Slider(value: $strength, in: 0.3...1.0, step: 0.05)
-                                Text("\(Int(strength * 100))%")
-                                    .font(.subheadline.weight(.medium).monospacedDigit())
-                                    .foregroundColor(.diveTextSecondary)
-                                    .frame(minWidth: 44, alignment: .trailing)
-                            }
-                        }
-
-                        Toggle(localizationService.localizedString("depthHintUse", table: "imageEditing"), isOn: $useDepth)
-                            .tint(.divePrimary)
-                        if useDepth {
-                            HStack {
-                                Text(localizationService.localizedString("depthHintMetersLabel", table: "imageEditing"))
-                                Spacer()
-                                Stepper(value: $depthMeters, in: 0...60, step: 1) {
-                                    Text("\(Int(depthMeters)) m")
-                                }
-                            }
-                        }
-
                         automaticProcessingButton
 
                         if isProcessing {
@@ -310,8 +282,6 @@ struct PhotoProcessingView: View {
             let out = try await NetworkService.shared.processPhotoUnderwaterVisionModule(
                 imageJPEG: jpeg,
                 engine: NetworkService.cardLookProfile.engine,
-                strength: strength,
-                depthHintMeters: useDepth ? depthMeters : nil,
                 mode: NetworkService.cardLookProfile.mode
             )
             guard let img = UIImage(data: out) else {

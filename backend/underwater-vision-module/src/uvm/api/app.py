@@ -12,7 +12,6 @@ from uvm.api.jpeg_utils import encode_jpeg_hex
 from uvm.api.image_decode import decode_upload_bgr
 from uvm.api.video_tone import (
     downscale_bgr_for_process,
-    post_lift_underwater_video_bgr,
     upscale_bgr_to_original,
 )
 from uvm.pipeline.nikolaj_bech_color_correction import process_bgr_uint8
@@ -22,8 +21,8 @@ app = FastAPI(title='Underwater Vision Module', version='0.2.0')
 _VALID_ENGINES = frozenset({'ai1', 'ai2', 'cursor', 'seathru'})
 
 
-def _run_bech(bgr: np.ndarray, strength: float, eng: str) -> tuple[np.ndarray, dict]:
-    out, rep = process_bgr_uint8(bgr, strength)
+def _run_bech(bgr: np.ndarray, eng: str) -> tuple[np.ndarray, dict]:
+    out, rep = process_bgr_uint8(bgr)
     rep = dict(rep)
     rep['engine'] = eng
     return out, rep
@@ -33,27 +32,23 @@ async def _process_photo_core(
     request: Request,
     eng: str,
     image: UploadFile,
-    strength: float,
-    depth_hint_m: float | None,
-    quality: str,
-    mode: str,
     *,
     route_tag: str,
 ) -> JSONResponse:
-    del request, quality, mode, depth_hint_m
+    del request
     if eng not in _VALID_ENGINES:
         return JSONResponse({'error': 'invalid engine', 'allowed': sorted(_VALID_ENGINES)}, status_code=400)
 
-    print(f'[uvm] {route_tag} engine={eng!r} strength={strength}', flush=True)
+    print(f'[uvm] {route_tag} engine={eng!r}', flush=True)
 
     data = await image.read()
     bgr, decoder_tag = decode_upload_bgr(data)
     if bgr is None:
         return JSONResponse({'error': 'invalid image'}, status_code=400)
 
-    report: dict = {'engine': eng, 'strength': strength, 'decoder': decoder_tag}
+    report: dict = {'engine': eng, 'decoder': decoder_tag}
     try:
-        out, r = _run_bech(bgr, strength, eng)
+        out, r = _run_bech(bgr, eng)
         report.update(r)
     except Exception as e:
         return JSONResponse({'error': 'processing_failed', 'detail': str(e)}, status_code=500)
@@ -71,17 +66,8 @@ async def _process_photo_core(
     )
 
 
-def _process_frame_with_engine(
-    eng: str,
-    bgr: np.ndarray,
-    *,
-    strength: float,
-    depth_hint_m: float | None,
-    quality: str,
-    mode: str,
-) -> tuple[np.ndarray, dict]:
-    del depth_hint_m, quality, mode
-    return _run_bech(bgr, strength, eng)
+def _process_frame_with_engine(eng: str, bgr: np.ndarray) -> tuple[np.ndarray, dict]:
+    return _run_bech(bgr, eng)
 
 
 @app.get('/health')
@@ -99,15 +85,9 @@ async def process_photo_by_path(
     request: Request,
     engine: str,
     image: UploadFile = File(...),
-    strength: float = Query(1.0, ge=0.0, le=1.0),
-    depth_hint_m: float | None = Query(None, description='optional depth in meters (ignored)'),
-    quality: str = Query('auto'),
-    mode: str = Query('default'),
 ):
     eng = (engine or '').strip().lower()
-    return await _process_photo_core(
-        request, eng, image, strength, depth_hint_m, quality, mode, route_tag='process_photo_by_path'
-    )
+    return await _process_photo_core(request, eng, image, route_tag='process_photo_by_path')
 
 
 @app.post('/v1/process/video')
@@ -122,21 +102,11 @@ async def process_video_stub():
 async def process_video_by_path(
     engine: str,
     video: UploadFile = File(...),
-    strength: float = Query(1.0, ge=0.0, le=1.0),
-    depth_hint_m: float | None = Query(None, description='optional depth in meters (ignored)'),
-    quality: str = Query('auto'),
-    mode: str = Query('default'),
-    luma_boost: float = Query(
-        1.0,
-        ge=0.0,
-        le=2.0,
-        description='Пост-осветление экспорта: 0=выкл., 1=по умолчанию',
-    ),
     max_side: int = Query(
         1280,
         ge=480,
         le=3840,
-        description='Длинная сторона кадра для обработки',
+        description='Long edge for per-frame processing (performance)',
     ),
 ):
     eng = (engine or '').strip().lower()
@@ -175,16 +145,7 @@ async def process_video_by_path(
                 if not ok:
                     break
                 work, orig_wh = downscale_bgr_for_process(frame, max_side)
-                out_small, rep = _process_frame_with_engine(
-                    eng,
-                    work,
-                    strength=strength,
-                    depth_hint_m=depth_hint_m,
-                    quality=quality,
-                    mode=mode,
-                )
-                if luma_boost > 0:
-                    out_small = post_lift_underwater_video_bgr(out_small, engine=eng, amount=luma_boost)
+                out_small, rep = _process_frame_with_engine(eng, work)
                 out_frame = upscale_bgr_to_original(out_small, orig_wh)
                 writer.write(out_frame)
                 frames += 1

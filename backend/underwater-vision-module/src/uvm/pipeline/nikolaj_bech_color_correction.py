@@ -1,5 +1,6 @@
 """
-Port of https://github.com/nikolajbech/underwater-image-color-correction (index.js).
+Faithful port of https://github.com/nikolajbech/underwater-image-color-correction/blob/master/index.js
+plus the README per-pixel apply loop (no extra blending — upstream has none).
 
 Pixels are RGBA uint8, row-major, same layout as the JS `pixels` array:
 index = y * (width * 4) + x * 4 + c, c in 0..3 for R,G,B,A.
@@ -172,14 +173,9 @@ def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -
     # alpha unchanged (JS does not touch i+3)
 
 
-def process_bgr_uint8(bgr: np.ndarray, strength: float) -> tuple[np.ndarray, dict[str, Any]]:
+def process_bgr_uint8(bgr: np.ndarray) -> tuple[np.ndarray, dict[str, Any]]:
     """
-    Nikolaj Bech color matrix on RGBA (same as upstream `index.js` + README apply loop), then BGR out.
-
-    Upstream (npm / GitHub) applies the matrix at 100% — there is no “strength” in `index.js`.
-    Here `strength` is an optional **linear blend** toward the original (product extension):
-    ``out = strength * corrected + (1 - strength) * original``, clamped to ``[0, 1]``.
-    Use ``strength=1.0`` for byte-for-byte same correction as applying the README loop to all pixels.
+    BGR uint8 image → same as upstream: build RGBA, `getColorFilterMatrix`, README apply loop → BGR uint8.
     """
     if bgr.ndim != 3 or bgr.shape[2] != 3:
         raise ValueError('bgr must be HxWx3')
@@ -193,17 +189,11 @@ def process_bgr_uint8(bgr: np.ndarray, strength: float) -> tuple[np.ndarray, dic
     work = flat.astype(np.float64)
     apply_color_filter_matrix_rgba_inplace(work, flt)
     corrected_rgb = work[:, :3].reshape(h, w, 3)
-    corrected_bgr = corrected_rgb[..., ::-1].astype(np.float64)
-
-    s = float(min(1.0, max(0.0, strength)))
-    out_f = s * corrected_bgr + (1.0 - s) * orig.astype(np.float64)
-    out = np.clip(np.round(out_f), 0, 255).astype(np.uint8)
+    out = corrected_rgb[..., ::-1].astype(np.uint8)
 
     report: dict[str, Any] = {
         'backend': 'nikolaj_bech_underwater_color_correction',
         'upstream': 'https://github.com/nikolajbech/underwater-image-color-correction',
-        'strength': strength,
-        'blend_strength': s,
         'hue_shift_deg': hue_shift_used,
     }
     return out, report

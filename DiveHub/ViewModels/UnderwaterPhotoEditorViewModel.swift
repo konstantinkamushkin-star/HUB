@@ -51,11 +51,6 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
     private static let diveEditorManualNeutralClarity: Double = 0
     private static let diveEditorManualNeutralTemperature: Double = 0
 
-    /// Глубина для `depth_hint_m` (0…60 м), как на бэкенде: `(depthSlider/100)*40`.
-    private static func diveEditorDepthHintMeters(depthSlider: Double) -> Double {
-        max(0, min(60, (depthSlider / 100) * 40))
-    }
-
     /// Слайдеры активны в реальном времени; отключаем только на время **облачной** автоматической обработки.
     var diveEditorSlidersEnabled: Bool {
         isDiveEditorMode && !isProcessing
@@ -150,34 +145,35 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
                 self.aiStatusMessage = nil
             }
             let jpeg = await Task.detached(priority: .userInitiated) {
-                Self.jpegDataForCloud(from: img, maxSide: 8192)
+                Self.jpegDataForCloud(from: img, maxSide: 2048)
             }.value
             guard let jpeg, !Task.isCancelled else {
                 await MainActor.run { [weak self] in self?.isProcessing = false }
                 return
             }
-            let sliders = await MainActor.run { [weak self] in
-                guard let self else {
-                    return (
-                        depth: 30.0, color: 70.0, dehaze: 50.0, clarity: 40.0, temperature: 10.0
+            do {
+                let imageId = try await NetworkService.shared.uploadImageForProcessing(jpegData: jpeg)
+                let payload = await MainActor.run { [weak self] () -> NetworkService.ImageProcessParamsPayload in
+                    guard let self else {
+                        return NetworkService.ImageProcessParamsPayload(
+                            depth: 30, strength: 70, dehaze: 50, clarity: 40, temperature: 10,
+                            auto_ai: false, pipeline: "default"
+                        )
+                    }
+                    return NetworkService.ImageProcessParamsPayload(
+                        depth: self.diveEditorDepth,
+                        strength: self.diveEditorColorStrength,
+                        dehaze: self.params.dehaze,
+                        clarity: self.params.clarity,
+                        temperature: self.params.temperature,
+                        auto_ai: false,
+                        pipeline: "default"
                     )
                 }
-                return (
-                    depth: self.diveEditorDepth,
-                    color: self.diveEditorColorStrength,
-                    dehaze: self.params.dehaze,
-                    clarity: self.params.clarity,
-                    temperature: self.params.temperature
-                )
-            }
-            let depthHint = Self.diveEditorDepthHintMeters(depthSlider: sliders.depth)
-            do {
-                // Nikolaj Bech upstream = полное применение матрицы (без «смешивания» из слайдеров).
-                let out = try await NetworkService.shared.processPhotoUnderwaterVisionModule(
-                    imageJPEG: jpeg,
-                    engine: "cursor",
-                    strength: 1.0,
-                    depthHintMeters: depthHint
+                let job = try await NetworkService.shared.createImageProcessJob(imageId: imageId, params: payload)
+                let out = try await NetworkService.shared.waitForImageProcessJob(
+                    jobId: job.job_id,
+                    maxWaitSeconds: 120
                 )
                 guard !Task.isCancelled else { return }
                 guard let ui = UIImage(data: out) else { throw NetworkError.decodingError }
@@ -190,47 +186,13 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
                     self.longWaitTask?.cancel()
                     DiveEditorAnalyticsService.shared.track(
                         .autoAiCompleted,
-                        processingMode: "cloud_uvm_bech_automatic",
+                        processingMode: "cloud_job_automatic",
                         success: true,
                         durationMs: ms
                     )
                 }
             } catch {
-                do {
-                    let imageId = try await NetworkService.shared.uploadImageForProcessing(jpegData: jpeg)
-                    let payload = NetworkService.ImageProcessParamsPayload(
-                        depth: sliders.depth,
-                        strength: sliders.color,
-                        dehaze: sliders.dehaze,
-                        clarity: sliders.clarity,
-                        temperature: sliders.temperature,
-                        auto_ai: false,
-                        pipeline: "default"
-                    )
-                    let job = try await NetworkService.shared.createImageProcessJob(imageId: imageId, params: payload)
-                    let out = try await NetworkService.shared.waitForImageProcessJob(
-                        jobId: job.job_id,
-                        maxWaitSeconds: 120
-                    )
-                    guard !Task.isCancelled else { return }
-                    guard let ui = UIImage(data: out) else { throw NetworkError.decodingError }
-                    let ms = Int(Date().timeIntervalSince(t0) * 1000)
-                    await MainActor.run { [weak self] in
-                        guard let self else { return }
-                        self.previewImage = ui
-                        self.isProcessing = false
-                        self.diveEditorLongWaitMessage = nil
-                        self.longWaitTask?.cancel()
-                        DiveEditorAnalyticsService.shared.track(
-                            .autoAiCompleted,
-                            processingMode: "cloud_job_automatic",
-                            success: true,
-                            durationMs: ms
-                        )
-                    }
-                } catch {
-                    await runDiveEditorArticleFallback(jpeg: jpeg, startedAt: t0)
-                }
+                await runDiveEditorArticleFallback(jpeg: jpeg, startedAt: t0)
             }
         }
     }
@@ -310,24 +272,19 @@ final class UnderwaterPhotoEditorViewModel: ObservableObject {
     }
 
     nonisolated private static func jpegDataForCloud(from image: UIImage, maxSide: CGFloat) -> Data? {
-        let pixelW = image.size.width * image.scale
-        let pixelH = image.size.height * image.scale
-        let m = max(pixelW, pixelH)
+        let m = max(image.size.width, image.size.height)
         let toDraw: UIImage
         if m > maxSide {
-            let down = maxSide / m
-            let nw = max(1, floor(pixelW * down))
-            let nh = max(1, floor(pixelH * down))
-            let format = UIGraphicsImageRendererFormat()
-            format.scale = 1
-            let renderer = UIGraphicsImageRenderer(size: CGSize(width: nw, height: nh), format: format)
+            let scale = maxSide / m
+            let sz = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+            let renderer = UIGraphicsImageRenderer(size: sz)
             toDraw = renderer.image { _ in
-                image.draw(in: CGRect(origin: .zero, size: CGSize(width: nw, height: nh)))
+                image.draw(in: CGRect(origin: .zero, size: sz))
             }
         } else {
             toDraw = image
         }
-        return toDraw.jpegData(compressionQuality: 0.95)
+        return toDraw.jpegData(compressionQuality: 0.9)
     }
 
     func updateParams(_ block: (inout UnderwaterProcessingParams) -> Void) {

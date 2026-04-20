@@ -4,7 +4,6 @@ import {
   Controller,
   Param,
   Post,
-  Query,
   Res,
   UploadedFile,
   UseInterceptors,
@@ -15,9 +14,7 @@ import FormData from 'form-data';
 import type { Response } from 'express';
 
 /**
- * Проксирует тот же контракт, что у Python UVM/FastAPI:
- * POST multipart поле `image`, query `strength`, `depth_hint_m`.
- * iOS может указывать базой REST API (https://api/...) без порта 8010.
+ * Проксирует Python UVM: POST multipart поле `image` (Nikolaj Bech — без query, как upstream).
  */
 @Controller('v1/process/photo')
 export class UvmProxyController {
@@ -30,10 +27,6 @@ export class UvmProxyController {
   async forward(
     @Param('engine') engine: string,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Query('strength') strength: string | undefined,
-    @Query('depth_hint_m') depthHintM: string | undefined,
-    @Query('quality') quality: string | undefined,
-    @Query('mode') mode: string | undefined,
     @Res({ passthrough: true }) res: Response,
   ) {
     if (!file?.buffer?.length) {
@@ -42,13 +35,7 @@ export class UvmProxyController {
 
     const uvm = (process.env.UVM_URL || 'http://127.0.0.1:8010').replace(/\/$/, '');
     const eng = encodeURIComponent((engine || '').trim().toLowerCase());
-    const qs = new URLSearchParams();
-    if (strength != null && strength !== '') qs.set('strength', strength);
-    if (depthHintM != null && depthHintM !== '') qs.set('depth_hint_m', depthHintM);
-    if (quality != null && quality !== '') qs.set('quality', quality);
-    if (mode != null && mode !== '') qs.set('mode', mode);
-    const q = qs.toString();
-    const url = `${uvm}/v1/process/photo/${eng}${q ? `?${q}` : ''}`;
+    const url = `${uvm}/v1/process/photo/${eng}`;
 
     const fd = new FormData();
     fd.append('image', file.buffer, {

@@ -34,20 +34,17 @@ if _UVM_SRC.is_dir():
     try:
         from uvm.api.video_tone import (
             downscale_bgr_for_process as _downscale_bgr_for_process,
-            post_lift_underwater_video_bgr as _post_lift_video_bgr,
             upscale_bgr_to_original as _upscale_bgr_to_original,
         )
     except Exception:
-        _post_lift_video_bgr = None
         _downscale_bgr_for_process = None
         _upscale_bgr_to_original = None
 else:
-    _post_lift_video_bgr = None
     _downscale_bgr_for_process = None
     _upscale_bgr_to_original = None
 
 
-def _encode_jpeg_hex(bgr: np.ndarray, quality: int = 95) -> str:
+def _encode_jpeg_hex(bgr: np.ndarray, quality: int = 92) -> str:
     ok, enc = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
     if not ok:
         raise RuntimeError("jpeg encode failed")
@@ -179,16 +176,11 @@ async def process_image(
 async def process_photo_uvm_compat(
     engine: str,
     image: UploadFile = File(...),
-    strength: float = Query(1.0, ge=0.0, le=1.0),
-    depth_hint_m: float | None = Query(None),
-    quality: str = Query("auto"),
-    mode: str = Query("default"),
 ):
     """
     Совместимость с клиентом DiveHub (NetworkService.processPhotoUnderwaterVisionModule).
-    Все движки ai1|ai2|cursor|seathru — один порт Nikolaj Bech (как в full UVM).
+    Все движки ai1|ai2|cursor|seathru — один порт Nikolaj Bech (как в full UVM), без параметров — как upstream index.js.
     """
-    del depth_hint_m, quality, mode
     eng = (engine or "").strip().lower()
     if eng not in ("ai1", "ai2", "cursor", "seathru"):
         raise HTTPException(
@@ -213,7 +205,7 @@ async def process_photo_uvm_compat(
         bgr, decoder_tag = _decode_upload_bgr(raw)
         if bgr is None:
             raise HTTPException(status_code=400, detail="invalid image")
-        out_u8, report = _process_bgr_uint8(bgr, strength)
+        out_u8, report = _process_bgr_uint8(bgr)
         report = dict(report)
         report["engine"] = eng
         report["decoder"] = decoder_tag
@@ -225,17 +217,8 @@ async def process_photo_uvm_compat(
     return JSONResponse({"image_jpeg_base64": hex_jpeg, "report": report})
 
 
-def _process_video_frame_bgr(
-    eng: str,
-    frame_bgr: np.ndarray,
-    *,
-    strength: float,
-    depth_hint_m: float | None,
-    quality: str,
-    mode: str,
-) -> np.ndarray:
+def _process_video_frame_bgr(eng: str, frame_bgr: np.ndarray) -> np.ndarray:
     """Один кадр BGR → BGR (Nikolaj Bech port)."""
-    del depth_hint_m, quality, mode
     if _process_bgr_uint8 is None:
         raise HTTPException(
             status_code=503,
@@ -243,7 +226,7 @@ def _process_video_frame_bgr(
         )
     if eng not in ("ai1", "ai2", "cursor", "seathru"):
         raise HTTPException(status_code=400, detail="invalid engine for video")
-    out_u8, _ = _process_bgr_uint8(frame_bgr, strength)
+    out_u8, _ = _process_bgr_uint8(frame_bgr)
     return out_u8
 
 
@@ -251,11 +234,6 @@ def _process_video_frame_bgr(
 async def process_video_uvm_compat(
     engine: str,
     video: UploadFile = File(...),
-    strength: float = Query(1.0, ge=0.0, le=1.0),
-    depth_hint_m: float | None = Query(None),
-    quality: str = Query("auto"),
-    mode: str = Query("default"),
-    luma_boost: float = Query(1.0, ge=0.0, le=2.0),
     max_side: int = Query(1280, ge=480, le=3840),
 ):
     """
@@ -304,22 +282,13 @@ async def process_video_uvm_compat(
                         work, orig_wh = _downscale_bgr_for_process(frame, max_side)
                     else:
                         work, orig_wh = frame, (frame.shape[1], frame.shape[0])
-                    out_small = _process_video_frame_bgr(
-                        eng,
-                        work,
-                        strength=strength,
-                        depth_hint_m=depth_hint_m,
-                        quality=quality,
-                        mode=mode,
-                    )
+                    out_small = _process_video_frame_bgr(eng, work)
                 except HTTPException:
                     raise
                 except Exception as e:
                     cap.release()
                     writer.release()
                     raise HTTPException(status_code=500, detail=f"video_processing_failed: {e}") from e
-                if luma_boost > 0 and _post_lift_video_bgr is not None:
-                    out_small = _post_lift_video_bgr(out_small, engine=eng, amount=luma_boost)
                 if _upscale_bgr_to_original is not None:
                     out_frame = _upscale_bgr_to_original(out_small, orig_wh)
                 else:

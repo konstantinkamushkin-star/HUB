@@ -99,19 +99,13 @@ export class UnderwaterAiService {
       if (response.status === 404) {
         try {
           const uvmUrl = `${base}/v1/process/photo/ai1`;
-          const q = new URLSearchParams({
-            strength: String(options.strength ?? 1.0),
-          });
-          if (options.depthMeters != null && Number.isFinite(options.depthMeters)) {
-            q.set('depth_hint_m', String(options.depthMeters));
-          }
           const fd = new FormData();
           fd.append('image', imageBuffer, {
             filename: 'image.jpg',
             contentType: 'image/jpeg',
           });
           const uvmResp = await this.client.post<{ image_jpeg_base64: string }>(
-            `${uvmUrl}?${q.toString()}`,
+            uvmUrl,
             fd,
             {
               headers: fd.getHeaders(),

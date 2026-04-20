@@ -25,11 +25,6 @@ export class UvmVideoProxyController {
   async forward(
     @Param('engine') engine: string,
     @UploadedFile() file: Express.Multer.File | undefined,
-    @Query('strength') strength: string | undefined,
-    @Query('depth_hint_m') depthHintM: string | undefined,
-    @Query('quality') quality: string | undefined,
-    @Query('mode') mode: string | undefined,
-    @Query('luma_boost') lumaBoost: string | undefined,
     @Query('max_side') maxSide: string | undefined,
     @Res() res: Response,
   ) {
@@ -40,11 +35,6 @@ export class UvmVideoProxyController {
     const uvm = (process.env.UVM_URL || 'http://127.0.0.1:8010').replace(/\/$/, '');
     const eng = encodeURIComponent((engine || '').trim().toLowerCase());
     const qs = new URLSearchParams();
-    if (strength != null && strength !== '') qs.set('strength', strength);
-    if (depthHintM != null && depthHintM !== '') qs.set('depth_hint_m', depthHintM);
-    if (quality != null && quality !== '') qs.set('quality', quality);
-    if (mode != null && mode !== '') qs.set('mode', mode);
-    if (lumaBoost != null && lumaBoost !== '') qs.set('luma_boost', lumaBoost);
     if (maxSide != null && maxSide !== '') qs.set('max_side', maxSide);
     const q = qs.toString();
     const url = `${uvm}/v1/process/video/${eng}${q ? `?${q}` : ''}`;

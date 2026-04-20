@@ -191,14 +191,12 @@ class NetworkService {
 
     struct UnderwaterPhotoProfile: Sendable {
         let engine: String
-        let strength: Double
         let mode: String?
     }
 
-    /// Production default tuned to the visual style of marketing/reference cards.
+    /// Дефолтный движок для серверной обработки (все алиасы — один алгоритм Nikolaj Bech).
     static let cardLookProfile = UnderwaterPhotoProfile(
         engine: "ai2",
-        strength: 0.90,
         mode: nil
     )
 
@@ -2399,29 +2397,14 @@ extension NetworkService {
         return String(raw.prefix(400))
     }
     
-    /// `POST /v1/process/photo/{engine}` — multipart только `image`; `strength` / `depth_hint_m` в query (engine в path — надёжно с multipart).
+    /// `POST /v1/process/photo/{engine}` — multipart только `image` (алгоритм как в upstream, без query).
     func processPhotoUnderwaterVisionModule(
         imageJPEG: Data,
         engine: String,
-        strength: Double = 1.0,
-        depthHintMeters: Double? = nil,
         mode: String? = nil
     ) async throws -> Data {
         let base = Self.underwaterVisionModuleBaseURLString()
-        var items: [URLQueryItem] = [
-            URLQueryItem(
-                name: "strength",
-                value: String(format: "%.6f", locale: Self.underwaterVisionQueryLocale, strength)
-            )
-        ]
-        if let d = depthHintMeters {
-            items.append(
-                URLQueryItem(
-                    name: "depth_hint_m",
-                    value: String(format: "%.6f", locale: Self.underwaterVisionQueryLocale, d)
-                )
-            )
-        }
+        var items: [URLQueryItem] = []
         if let mode, !mode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             items.append(URLQueryItem(name: "mode", value: mode))
         }
@@ -2434,7 +2417,7 @@ extension NetworkService {
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         var body = Data()
-        // Только файл — engine/strength в query (сервер надёжно различает ai1/ai2/cursor)
+        // Только файл — engine в path
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"image\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
@@ -2493,33 +2476,13 @@ extension NetworkService {
     func processVideoUnderwaterVisionModule(
         videoData: Data,
         engine: String,
-        strength: Double = 1.0,
-        depthHintMeters: Double? = nil,
         sourceVideoDuration: TimeInterval? = nil,
         progress: (@MainActor (VideoUnderwaterProcessingProgress) -> Void)? = nil
     ) async throws -> Data {
         let base = Self.underwaterVisionModuleBaseURLString()
         var items: [URLQueryItem] = [
-            URLQueryItem(
-                name: "strength",
-                value: String(format: "%.6f", locale: Self.underwaterVisionQueryLocale, strength)
-            )
+            URLQueryItem(name: "max_side", value: "1280")
         ]
-        if let d = depthHintMeters {
-            items.append(
-                URLQueryItem(
-                    name: "depth_hint_m",
-                    value: String(format: "%.6f", locale: Self.underwaterVisionQueryLocale, d)
-                )
-            )
-        }
-        items.append(
-            URLQueryItem(
-                name: "luma_boost",
-                value: String(format: "%.4f", locale: Self.underwaterVisionQueryLocale, 1.18)
-            )
-        )
-        items.append(URLQueryItem(name: "max_side", value: "1280"))
         let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
         let normalized = trimmed.hasSuffix("/") ? String(trimmed.dropLast()) : trimmed
         let pathEngine = engine.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? engine

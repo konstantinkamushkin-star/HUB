@@ -7,10 +7,6 @@
 - Реализация: [`src/uvm/pipeline/nikolaj_bech_color_correction.py`](src/uvm/pipeline/nikolaj_bech_color_correction.py) — построчный порт логики из upstream `index.js`.
 - Upstream: <https://github.com/nikolajbech/underwater-image-color-correction> — проверьте лицензию репозитория перед коммерческим использованием.
 
-## Параметр `strength` (расширение API)
-
-В оригинальном JS-пакете силы нет. Расширение API: **`out = strength * corrected + (1 - strength) * original`** с клампом `0…1`. Значение **`strength=1.0`** соответствует upstream (полное применение матрицы, как в README репозитория).
-
 ## Запуск
 
 ```bash
@@ -32,13 +28,13 @@ uvicorn uvm.api.app:app --host 0.0.0.0 --port 8010
 
 - **Тело**: `multipart/form-data`, поле **`image`** (файл).
 - **Путь**: `engine` — один из `ai1` | `ai2` | `cursor` | `seathru` (все ведут себя **одинаково**, это алиасы для совместимости с клиентом).
-- **Query**: `strength` (0…1, по умолчанию **1.0** — как upstream без ослабления); `depth_hint_m`, `quality`, `mode` принимаются и **игнорируются**.
+- **Query**: нет (как в upstream: только матрица по кадру).
 
-**Ответ**: JSON `image_jpeg_base64` (шестнадцатеричная строка JPEG, как раньше) и `report` (в т.ч. `backend`, `hue_shift_deg`, `blend_strength`).
+**Ответ**: JSON `image_jpeg_base64` (hex JPEG) и `report` (`backend`, `hue_shift_deg`, …).
 
 ### `POST /v1/process/video/{engine}`
 
-Тот же `engine`; вход — multipart поле **`video`** (MP4); выход — **сырой MP4** в теле ответа. Каждый кадр обрабатывается тем же алгоритмом, что и фото.
+Тот же `engine`; вход — **`video`** (MP4); опционально **`max_side`** (длинная сторона кадра для скорости). Выход — MP4. На кадр — тот же Bech, что и на фото.
 
 ### `GET /health`
 
