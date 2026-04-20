@@ -61,7 +61,8 @@ NODE_ENV=production npm run start
 
 ```bash
 sudo cp /opt/HUB/admin-web/deploy/divehub-admin-web.service.example /etc/systemd/system/divehub-admin-web.service
-# Отредактируйте unit: WorkingDirectory, User, PORT, путь к npm при nvm
+# При необходимости: `which npm` — подставьте полный путь в ExecStart (часто nvm у root)
+# Отредактируйте unit: WorkingDirectory, User, PORT
 sudo systemctl daemon-reload
 sudo systemctl enable --now divehub-admin-web
 curl -fsSI http://127.0.0.1:3003/staff/divehub-console | head -n 5
