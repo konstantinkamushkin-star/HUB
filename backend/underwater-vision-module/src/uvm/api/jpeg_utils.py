@@ -1,4 +1,4 @@
-"""JPEG helpers without pulling in nn_runtime / torch."""
+"""JPEG helpers for API responses (OpenCV imencode)."""
 
 from __future__ import annotations
 

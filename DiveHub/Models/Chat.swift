@@ -21,9 +21,11 @@ struct ChatConversation: Identifiable, Codable, Hashable {
     var peerDisplayName: String?
     /// Present for `APP_SUPPORT_TOPIC` threads (`POST /api/chat/support/topics`).
     var topicId: String?
+    /// Server: `FRIEND`, `APP_SUPPORT_TOPIC`, `CONTRIBUTION_SUPPORT`, …
+    var kind: String?
     
     enum CodingKeys: String, CodingKey {
-        case id, participants, diveCenterId, shopId, bookingId, lastMessage, unreadCount, createdAt, updatedAt, peerDisplayName, topicId
+        case id, participants, diveCenterId, shopId, bookingId, lastMessage, unreadCount, createdAt, updatedAt, peerDisplayName, topicId, kind
     }
     
     static func == (lhs: ChatConversation, rhs: ChatConversation) -> Bool {

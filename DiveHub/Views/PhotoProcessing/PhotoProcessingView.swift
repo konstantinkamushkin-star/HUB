@@ -21,7 +21,7 @@ struct PhotoProcessingView: View {
     @State private var errorMessage: String?
     @State private var showShare = false
     @State private var shareItems: [Any] = []
-    @State private var strength: Double = 0.7
+    @State private var strength: Double = NetworkService.cardLookProfile.strength
     @State private var useDepth = false
     @State private var depthMeters: Double = 10
     /// Принудительное обновление превью «После» (SwiftUI иногда не перерисовывает Image).
@@ -309,9 +309,10 @@ struct PhotoProcessingView: View {
             }
             let out = try await NetworkService.shared.processPhotoUnderwaterVisionModule(
                 imageJPEG: jpeg,
-                engine: "ai1",
+                engine: NetworkService.cardLookProfile.engine,
                 strength: strength,
-                depthHintMeters: useDepth ? depthMeters : nil
+                depthHintMeters: useDepth ? depthMeters : nil,
+                mode: NetworkService.cardLookProfile.mode
             )
             guard let img = UIImage(data: out) else {
                 throw NetworkError.decodingError

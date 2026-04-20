@@ -8,3 +8,6 @@ DiveHubAndroid/**/build/
 
 # Локальные большие датасеты (при необходимости раскомментируйте)
 # opendivemap_all_sites.geojson
+
+# Локальные сравнения обработки фото — не для репозитория
+tmp-photo-compare/

@@ -12,7 +12,6 @@ import {
   Request,
   UseGuards,
 } from '@nestjs/common';
-import { appendFileSync } from 'fs';
 import { DiveCentersService } from './dive-centers.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { AddDiveCenterInstructorDto } from './dto/add-dive-center-instructor.dto';
@@ -137,42 +136,8 @@ export class DiveCentersController {
         req.user.sub,
         dto,
       );
-      // #region agent log
-      try {
-        appendFileSync(
-          '/Users/admin/Desktop/appp/DivePROD/.cursor/debug-1c36fa.log',
-          JSON.stringify({
-            sessionId: '1c36fa',
-            location: 'dive-centers.controller.ts:patchInstructor',
-            message: 'service_ok',
-            hypothesisId: 'H5',
-            timestamp: Date.now(),
-            data: { diveCenterId: id, userId },
-          }) + '\n',
-        );
-      } catch {
-        /* ignore */
-      }
-      // #endregion
       return { ok: true };
     } catch (e) {
-      // #region agent log
-      try {
-        appendFileSync(
-          '/Users/admin/Desktop/appp/DivePROD/.cursor/debug-1c36fa.log',
-          JSON.stringify({
-            sessionId: '1c36fa',
-            location: 'dive-centers.controller.ts:patchInstructor',
-            message: 'service_error',
-            hypothesisId: 'H5',
-            timestamp: Date.now(),
-            data: { err: String(e) },
-          }) + '\n',
-        );
-      } catch {
-        /* ignore */
-      }
-      // #endregion
       throw e;
     }
   }

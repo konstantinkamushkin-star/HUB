@@ -105,6 +105,15 @@ export class ChatService {
     return SUPPORT_CONVERSATION_KINDS.has(kind);
   }
 
+  /** `app:<userId>:topic:<uuid>` from `ensureAppSupportTopicThread`. */
+  private parseAppSupportTopicIdFromCanonicalKey(canonicalKey: string): string | null {
+    const needle = ':topic:';
+    const i = canonicalKey.indexOf(needle);
+    if (i === -1) return null;
+    const rest = canonicalKey.slice(i + needle.length).trim();
+    return rest.length > 0 ? rest : null;
+  }
+
   /** User IDs that count as “support staff” for depersonalization (env + roles). */
   private async resolveSupportStaffIds(userIds: string[]): Promise<Set<string>> {
     const uniq = [...new Set(userIds)].filter(Boolean);
@@ -525,6 +534,11 @@ export class ChatService {
 
     const unreadCount = await this.unreadCountFor(conversationId, viewerId);
 
+    const topicId =
+      conv.kind === 'APP_SUPPORT_TOPIC'
+        ? this.parseAppSupportTopicIdFromCanonicalKey(conv.canonicalKey)
+        : null;
+
     return {
       id: conv.id,
       participants: peerIds,
@@ -536,6 +550,8 @@ export class ChatService {
       unreadCount,
       createdAt: conv.createdAt,
       updatedAt: conv.updatedAt,
+      kind: conv.kind,
+      topicId,
     };
   }
 

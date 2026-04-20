@@ -73,6 +73,28 @@ for i in $(seq 1 90); do
   fi
 done
 
+echo ">>> Docker: UVM (Python) — образ с нуля, uv sync --frozen из uv.lock (без наслоения старого opencv)"
+docker compose build --no-cache uvm
+docker compose up -d uvm
+
+echo ">>> ждём healthcheck UVM (до 300 с; первый импорт torch/cv2 может быть долгим)…"
+for i in $(seq 1 150); do
+  uvm_id="$(docker compose ps -q uvm 2>/dev/null || true)"
+  if [[ -n "$uvm_id" ]]; then
+    st="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}' "$uvm_id" 2>/dev/null || echo none)"
+    if [[ "$st" == "healthy" ]]; then
+      echo ">>> UVM healthy"
+      break
+    fi
+  fi
+  sleep 2
+  if [[ "$i" -eq 150 ]]; then
+    echo "!!! UVM не стал healthy за 300 с"
+    docker compose logs uvm --tail 120 2>/dev/null || true
+    exit 1
+  fi
+done
+
 echo ">>> Миграции с хоста → 127.0.0.1:${MIGRATE_DB_PORT} (пользователь ${MIGRATE_DB_USER}, БД ${MIGRATE_DB_DATABASE})"
 npm ci --omit=dev
 DB_HOST=127.0.0.1 \
@@ -82,8 +104,8 @@ DB_HOST=127.0.0.1 \
   DB_DATABASE="${MIGRATE_DB_DATABASE}" \
   node scripts/apply-all-migrations.cjs
 
-echo ">>> Сборка и перезапуск контейнера API (хост-порт из .env: ${PUBLISH_PORT} → контейнер :3000)"
-docker compose build api
+echo ">>> Сборка и перезапуск контейнера API (Nest, без кэша слоёв образа; хост-порт из .env: ${PUBLISH_PORT} → контейнер :3000)"
+docker compose build --no-cache api
 set +e
 docker compose up -d api
 compose_api_rc=$?

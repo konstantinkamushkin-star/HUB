@@ -189,6 +189,19 @@ private enum UnderwaterVisionVideoTimeouts: Sendable {
 class NetworkService {
     static let shared = NetworkService()
 
+    struct UnderwaterPhotoProfile: Sendable {
+        let engine: String
+        let strength: Double
+        let mode: String?
+    }
+
+    /// Production default tuned to the visual style of marketing/reference cards.
+    static let cardLookProfile = UnderwaterPhotoProfile(
+        engine: "ai2",
+        strength: 0.90,
+        mode: nil
+    )
+
     /// Production Nest API (TLS). WebSocket: `https` → `wss` в `chatWebSocketURL`.
     private static let productionAPIBaseURL = "https://api.dive-hub.ru"
     
@@ -2391,7 +2404,8 @@ extension NetworkService {
         imageJPEG: Data,
         engine: String,
         strength: Double = 0.7,
-        depthHintMeters: Double? = nil
+        depthHintMeters: Double? = nil,
+        mode: String? = nil
     ) async throws -> Data {
         let base = Self.underwaterVisionModuleBaseURLString()
         var items: [URLQueryItem] = [
@@ -2407,6 +2421,9 @@ extension NetworkService {
                     value: String(format: "%.6f", locale: Self.underwaterVisionQueryLocale, d)
                 )
             )
+        }
+        if let mode, !mode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            items.append(URLQueryItem(name: "mode", value: mode))
         }
         guard let url = Self.underwaterVisionProcessPhotoURL(base: base, engine: engine, queryItems: items) else {
             throw NetworkError.invalidURL
@@ -2440,10 +2457,19 @@ extension NetworkService {
             throw NetworkError.visionModuleHTTPError(statusCode: http.statusCode, message: msg)
         }
         var serverReportEngine: String = ""
+        var reportBackend: String = ""
+        var aiSlotsBackend: String = ""
         if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let rep = obj["report"] as? [String: Any],
-           let re = rep["engine"] as? String {
-            serverReportEngine = re
+           let rep = obj["report"] as? [String: Any] {
+            if let re = rep["engine"] as? String {
+                serverReportEngine = re
+            }
+            if let backend = rep["backend"] as? String {
+                reportBackend = backend
+            }
+            if let slots = rep["ai_slots_backend"] as? String {
+                aiSlotsBackend = slots
+            }
         }
         if !serverReportEngine.isEmpty,
            serverReportEngine.lowercased() != engine.lowercased() {

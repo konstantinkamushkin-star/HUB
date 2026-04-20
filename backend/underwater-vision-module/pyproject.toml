@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "underwater-vision-module"
-version = "0.1.0"
-description = "Depth-aware underwater restoration module for photo/video"
+version = "0.2.0"
+description = "Underwater photo/video color correction (Nikolaj Bech port) via FastAPI"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -13,13 +13,9 @@ dependencies = [
   "python-multipart>=0.0.9",
   "uvicorn>=0.30",
   "pydantic>=2.7",
-  "numpy>=1.24,<2",
-  "scipy>=1.11",
-  "opencv-python-headless>=4.8",
-  "pyyaml>=6.0",
-  "torch>=2.2",
-  "torchvision>=0.17",
-  "tqdm>=4.66",
+  "numpy>=1.26,<2",
+  "opencv-python-headless==4.10.0.84",
+  "pillow>=10.3,<12",
 ]
 
 [tool.setuptools]

@@ -1,0 +1,3 @@
+# setuptools / pip editable install metadata (генерируется при сборке)
+*.egg-info/
+**/*.egg-info/
