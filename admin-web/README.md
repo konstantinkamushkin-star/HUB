@@ -14,7 +14,77 @@ pnpm dev
 bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open **http://localhost:3001** with your browser (`npm run dev` uses port 3001).
+
+### Admin panel login
+
+Вход в админ-панель **не** вынесен в публичное меню. URL по умолчанию: `/staff/divehub-console` (см. `src/lib/adminLoginPath.ts`). При деплое можно переопределить `NEXT_PUBLIC_ADMIN_LOGIN_PATH`. Старый `/login` перенаправляет на главную.
+
+### Деплой (команды)
+
+#### Важно: где лежит `admin-web`
+
+В репозитории **`admin-web`** и **`backend`** — **соседние папки** в корне проекта. На VPS это обычно так:
+
+```text
+/opt/HUB/
+  backend/      ← здесь только Nest + docker-compose, НЕТ папки admin-web внутри
+  admin-web/    ← сайт Next.js — заходить сюда отдельно
+```
+
+Если вы в **`/opt/HUB/backend`**, команда `cd admin-web` **не сработает** — нужно:
+
+```bash
+cd /opt/HUB/admin-web
+# или из backend:
+cd ../admin-web
+```
+
+Из **`backend`** второй раз **`cd backend`** тоже ошибочен — вы уже внутри `backend`.
+
+#### Сайт (Next.js), прод
+
+```bash
+cd /opt/HUB/admin-web   # путь подставьте под свой сервер
+npm ci
+npm run build
+NODE_ENV=production npm run start
+```
+
+`npm run start` запускает **`scripts/next-start.mjs`**: по умолчанию порт **3001**, иначе значение **`PORT`**. Пример: `PORT=3003 NODE_ENV=production npm run start`. За **nginx/Caddy** проксируйте на выбранный порт.
+
+Если видите **`EADDRINUSE :::3001`** — порт уже занят (старый `next start`, pm2 и т.д.). Проверка: `sudo ss -tlnp | grep ':3001'` или `sudo lsof -iTCP:3001 -sTCP:LISTEN` → остановите процесс или используйте другой `PORT`.
+
+#### Бэкенд в проде — Docker, не `nest start` на хосте
+
+Скрипт **`./deploy-dive-hub-ru.sh`** уже поднимает API в **контейнере** (у вас наружу, например, **3002→3000**). Если после этого запустить в той же машине **`npm run start`** из папки `backend`, Nest попытается занять **:3000** на хосте → **`EADDRINUSE`**. Для продакшена API достаточно Docker; ручной `nest start` — только для отладки и тогда остановите контейнер `api` или смените порт в `.env`.
+
+#### Локально в dev (порт **3001** по `package.json`)
+
+```bash
+cd admin-web
+npm install
+npm run dev
+```
+
+Открыть: **http://localhost:3001** (не 3000).
+
+**Vercel** (если проект привязан к Vercel):
+
+```bash
+cd admin-web
+npx vercel --prod
+```
+
+#### Бэкенд (Docker + миграции на VPS)
+
+```bash
+cd /opt/HUB/backend
+chmod +x deploy-dive-hub-ru.sh   # один раз
+./deploy-dive-hub-ru.sh
+```
+
+Перед первым деплоем: `cp .env.production.example .env` и заполните секреты (см. `docker-compose.yml`).
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
