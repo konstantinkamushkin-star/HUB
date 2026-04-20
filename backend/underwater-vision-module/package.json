@@ -1,0 +1,8 @@
+{
+  "name": "uvm-node-reference",
+  "private": true,
+  "description": "Minimal Node deps for scripts/compare_nikolaj_bech_port.py (reference npm package).",
+  "dependencies": {
+    "underwater-image-color-correction": "1.0.3"
+  }
+}

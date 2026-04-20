@@ -130,7 +130,7 @@ async function bootstrap() {
     console.log(`📍 Geo API endpoints available at: http://localhost:${port}/api/v1/dive-sites`);
     console.log(`🔐 Auth endpoints available at: http://localhost:${port}/api/auth`);
     console.log(`🖼️ Underwater AI: POST http://localhost:${port}/api/v1/underwater-ai/process (set AI_UNDERWATER_SERVICE_URL to enable)`);
-    console.log(`🖼️ UVM proxy (photo/video + SeaSplat): POST http://localhost:${port}/api/v1/process/photo/{engine}, /api/v1/process/video/{engine}, /api/v1/seasplat/* → UVM_URL (default http://127.0.0.1:8010)`);
+    console.log(`🖼️ UVM proxy (photo/video): POST http://localhost:${port}/api/v1/process/photo/{engine}, /api/v1/process/video/{engine} → UVM_URL (default http://127.0.0.1:8010)`);
     console.log(`🖼️ Image jobs: POST http://localhost:${port}/api/v1/image/upload → /api/v1/image/process → status/result`);
     console.log(`💬 Chat WebSocket: ws://localhost:${port}/ws/chat?token=<jwt>`);
     console.log(`📷 Media upload: POST http://localhost:${port}/api/media/upload (auth)`);

@@ -100,7 +100,7 @@ export class UnderwaterAiService {
         try {
           const uvmUrl = `${base}/v1/process/photo/ai1`;
           const q = new URLSearchParams({
-            strength: String(options.strength ?? 0.7),
+            strength: String(options.strength ?? 1.0),
           });
           if (options.depthMeters != null && Number.isFinite(options.depthMeters)) {
             q.set('depth_hint_m', String(options.depthMeters));

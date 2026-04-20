@@ -11,3 +11,7 @@ DiveHubAndroid/**/build/
 
 # Локальные сравнения обработки фото — не для репозитория
 tmp-photo-compare/
+
+# npm (локальная установка для scripts/compare_nikolaj_bech_port.py)
+backend/underwater-vision-module/node_modules/
+backend/underwater-vision-module/package-lock.json

@@ -11,10 +11,8 @@ def post_lift_underwater_video_bgr(bgr: np.ndarray, *, engine: str | None = None
     """
     if amount <= 0 or bgr is None or bgr.size == 0:
         return bgr
+    _ = engine  # reserved for per-engine tuning; all engines use the same Bech pipeline now
     amt = float(min(max(amount, 0.0), 1.75))
-    eng = (engine or "").strip().lower()
-    if eng == "seathru":
-        amt *= 0.62
     lab = cv2.cvtColor(bgr, cv2.COLOR_BGR2LAB)
     l_ch, a_ch, b_ch = cv2.split(lab)
     clip = float(1.75 + 0.95 * amt)

@@ -81,6 +81,7 @@
     "rxjs": "^7.8.1",
     "stripe": "^22.0.2",
     "typeorm": "^0.3.17",
+    "underwater-image-color-correction": "^1.0.3",
     "ws": "^8.20.0"
   },
   "devDependencies": {

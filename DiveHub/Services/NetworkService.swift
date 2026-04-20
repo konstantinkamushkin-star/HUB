@@ -2403,7 +2403,7 @@ extension NetworkService {
     func processPhotoUnderwaterVisionModule(
         imageJPEG: Data,
         engine: String,
-        strength: Double = 0.7,
+        strength: Double = 1.0,
         depthHintMeters: Double? = nil,
         mode: String? = nil
     ) async throws -> Data {
@@ -2493,7 +2493,7 @@ extension NetworkService {
     func processVideoUnderwaterVisionModule(
         videoData: Data,
         engine: String,
-        strength: Double = 0.7,
+        strength: Double = 1.0,
         depthHintMeters: Double? = nil,
         sourceVideoDuration: TimeInterval? = nil,
         progress: (@MainActor (VideoUnderwaterProcessingProgress) -> Void)? = nil

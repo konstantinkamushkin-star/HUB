@@ -48,10 +48,7 @@ def _normalizing_interval(norm_array: list[int]) -> tuple[int, int]:
 
 
 def get_color_filter_matrix_rgba(pixels: np.ndarray, width: int, height: int) -> tuple[list[float], int]:
-    """
-    JS getColorFilterMatrix — returns the same 20-number row-major 4x5 matrix
-    (last row is 0,0,0,1,0).
-    """
+    """JS `getColorFilterMatrix`: same 20 coefficients + final hue shift (degrees steps)."""
     pixels = np.asarray(pixels, dtype=np.uint8)
     if pixels.size != width * height * 4:
         raise ValueError('pixels must have length width*height*4')
@@ -177,9 +174,12 @@ def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -
 
 def process_bgr_uint8(bgr: np.ndarray, strength: float) -> tuple[np.ndarray, dict[str, Any]]:
     """
-    Full-image color correction + optional blend with original (strength in (0,1], API default 0.7).
+    Nikolaj Bech color matrix on RGBA (same as upstream `index.js` + README apply loop), then BGR out.
 
-    strength=1.0 => full Bech output; strength<1 => linear blend toward original (extension; not in upstream JS).
+    Upstream (npm / GitHub) applies the matrix at 100% — there is no “strength” in `index.js`.
+    Here `strength` is an optional **linear blend** toward the original (product extension):
+    ``out = strength * corrected + (1 - strength) * original``, clamped to ``[0, 1]``.
+    Use ``strength=1.0`` for byte-for-byte same correction as applying the README loop to all pixels.
     """
     if bgr.ndim != 3 or bgr.shape[2] != 3:
         raise ValueError('bgr must be HxWx3')
@@ -195,7 +195,7 @@ def process_bgr_uint8(bgr: np.ndarray, strength: float) -> tuple[np.ndarray, dic
     corrected_rgb = work[:, :3].reshape(h, w, 3)
     corrected_bgr = corrected_rgb[..., ::-1].astype(np.float64)
 
-    s = float(min(1.0, max(0.05, strength)))
+    s = float(min(1.0, max(0.0, strength)))
     out_f = s * corrected_bgr + (1.0 - s) * orig.astype(np.float64)
     out = np.clip(np.round(out_f), 0, 255).astype(np.uint8)
 

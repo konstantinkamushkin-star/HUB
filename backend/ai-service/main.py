@@ -1,10 +1,8 @@
 """
 Underwater image enhancement AI service.
-POST /process: multipart form with 'image' file, optional 'depth_m', 'strength', 'use_ai'.
-POST /v1/process/photo/{engine}: UVM-совместимый API для iOS
-(engine=cursor — underwater-vision-module; engine=seathru — Sea-Thru CVPR 2019).
-POST /v1/process/video/{engine}: тот же контракт, что у full UVM (iOS шлёт multipart `video`, engine=ai1).
-POST/GET /v1/seasplat/* — тот же контракт, что у full UVM (кнопка «мммммм» / SeaSplat в DiveEditor).
+POST /process: legacy multipart (inference.process).
+POST /v1/process/photo/{engine}: UVM-совместимый API — Nikolaj Bech underwater color correction (same as full UVM).
+POST /v1/process/video/{engine}: покадрово тот же алгоритм.
 """
 import inspect
 import os
@@ -21,20 +19,18 @@ from inference import process
 
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 _UVM_SRC = _BACKEND_ROOT / "underwater-vision-module" / "src"
-_run_cursor_underwater_correct = None
-_seasplat: object | None = None
+_process_bgr_uint8 = None
+_decode_upload_bgr = None
 if _UVM_SRC.is_dir():
     sys.path.insert(0, str(_UVM_SRC))
     try:
-        from uvm.pipeline.cursor_correction import run_cursor_underwater_correct as _run_cursor_underwater_correct
+        from uvm.pipeline.nikolaj_bech_color_correction import process_bgr_uint8 as _process_bgr_uint8
     except Exception:
-        _run_cursor_underwater_correct = None
+        _process_bgr_uint8 = None
     try:
-        from uvm.api.seasplat_runtime import SeaSplatRuntime
-
-        _seasplat = SeaSplatRuntime()
+        from uvm.api.image_decode import decode_upload_bgr as _decode_upload_bgr
     except Exception:
-        _seasplat = None
+        _decode_upload_bgr = None
     try:
         from uvm.api.video_tone import (
             downscale_bgr_for_process as _downscale_bgr_for_process,
@@ -50,11 +46,6 @@ else:
     _downscale_bgr_for_process = None
     _upscale_bgr_to_original = None
 
-try:
-    from sea_thru_cvpr2019 import run_sea_thru_cvpr2019 as _run_sea_thru_cvpr2019
-except Exception:
-    _run_sea_thru_cvpr2019 = None
-
 
 def _encode_jpeg_hex(bgr: np.ndarray, quality: int = 92) -> str:
     ok, enc = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, quality])
@@ -68,13 +59,11 @@ app = FastAPI(title="DiveHub Underwater AI", version="1.0.0")
 
 @app.get("/health")
 def health():
-    out: dict = {"status": "ok", "service": "underwater-ai"}
-    if _seasplat is not None and hasattr(_seasplat, "health"):
-        try:
-            out["seasplat"] = _seasplat.health()  # type: ignore[union-attr]
-        except Exception:
-            out["seasplat"] = {"error": "health_failed"}
-    return out
+    return {
+        "status": "ok",
+        "service": "underwater-ai",
+        "bech_port_available": _process_bgr_uint8 is not None,
+    }
 
 
 def _parse_bool_form(v: object) -> bool:
@@ -190,20 +179,26 @@ async def process_image(
 async def process_photo_uvm_compat(
     engine: str,
     image: UploadFile = File(...),
-    strength: float = Query(0.7, ge=0.05, le=1.0),
+    strength: float = Query(1.0, ge=0.0, le=1.0),
     depth_hint_m: float | None = Query(None),
     quality: str = Query("auto"),
     mode: str = Query("default"),
 ):
     """
     Совместимость с клиентом DiveHub (NetworkService.processPhotoUnderwaterVisionModule).
-    На том же порту, что и Nest AI (8010), чтобы не требовать отдельный UVM только для кнопки Cursor.
+    Все движки ai1|ai2|cursor|seathru — один порт Nikolaj Bech (как в full UVM).
     """
+    del depth_hint_m, quality, mode
     eng = (engine or "").strip().lower()
-    if eng not in ("cursor", "seathru"):
+    if eng not in ("ai1", "ai2", "cursor", "seathru"):
         raise HTTPException(
             status_code=400,
-            detail="ai-service supports engines 'cursor' and 'seathru' here; run full underwater-vision-module for ai1/ai2.",
+            detail="invalid engine (expected ai1, ai2, cursor, seathru)",
+        )
+    if _process_bgr_uint8 is None or _decode_upload_bgr is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Bech color correction unavailable: underwater-vision-module sources not found next to ai-service.",
         )
     ct = (image.content_type or "").lower()
     if ct and not (ct.startswith("image/") or ct == "application/octet-stream"):
@@ -214,35 +209,15 @@ async def process_photo_uvm_compat(
         raise HTTPException(status_code=400, detail=f"Failed to read image: {e}")
     if not raw:
         raise HTTPException(status_code=400, detail="Empty image")
-    arr = np.frombuffer(raw, dtype=np.uint8)
-    bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-    if bgr is None:
-        raise HTTPException(status_code=400, detail="invalid image")
     try:
-        if eng == "cursor":
-            if _run_cursor_underwater_correct is None:
-                raise HTTPException(
-                    status_code=503,
-                    detail="Cursor pipeline unavailable: underwater-vision-module sources not found next to ai-service.",
-                )
-            out_u8, report = _run_cursor_underwater_correct(bgr, strength=strength, depth_hint_m=depth_hint_m)
-            hex_jpeg = _encode_jpeg_hex(out_u8, quality=92)
-            report = dict(report)
-            report.setdefault("backend", "cursor_correction")
-            report.setdefault("engine", "cursor")
-        else:
-            if _run_sea_thru_cvpr2019 is None:
-                raise HTTPException(status_code=503, detail="Sea-Thru module failed to load.")
-            out_u8, report = _run_sea_thru_cvpr2019(
-                bgr,
-                depth_hint_m=depth_hint_m,
-                quality=quality,
-                strength=strength,
-                mode=mode,
-            )
-            hex_jpeg = _encode_jpeg_hex(out_u8, quality=92)
-            report = dict(report)
-            report.setdefault("engine", "seathru")
+        bgr, decoder_tag = _decode_upload_bgr(raw)
+        if bgr is None:
+            raise HTTPException(status_code=400, detail="invalid image")
+        out_u8, report = _process_bgr_uint8(bgr, strength)
+        report = dict(report)
+        report["engine"] = eng
+        report["decoder"] = decoder_tag
+        hex_jpeg = _encode_jpeg_hex(out_u8, quality=92)
     except HTTPException:
         raise
     except Exception as e:
@@ -259,65 +234,24 @@ def _process_video_frame_bgr(
     quality: str,
     mode: str,
 ) -> np.ndarray:
-    """Один кадр BGR → BGR (размер как у входного кадра)."""
-    dm = float(depth_hint_m) if depth_hint_m is not None else 10.0
-    h, w = frame_bgr.shape[:2]
-    if eng in ("ai1", "ai2"):
-        ok, enc = cv2.imencode(".jpg", frame_bgr, [cv2.IMWRITE_JPEG_QUALITY, 92])
-        if not ok:
-            raise ValueError("jpeg encode failed")
-        st = float(strength)
-        if eng == "ai2":
-            st = float(min(1.0, max(0.05, st * 1.1)))
-        out_jpeg = _call_process_compat(
-            enc.tobytes(),
-            depth_m=dm,
-            strength=st,
-            use_ai=True,
-            pipeline="default",
-            gpt_preserve_blues=None,
-            gpt_detail_boost=None,
-            gpt_warmth_bias=None,
-            gpt_dehaze_strength=None,
-            gpt_red_recovery_strength=None,
-            gpt_noise_reduction=None,
+    """Один кадр BGR → BGR (Nikolaj Bech port)."""
+    del depth_hint_m, quality, mode
+    if _process_bgr_uint8 is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Bech color correction unavailable: underwater-vision-module sources not found next to ai-service.",
         )
-        dec = cv2.imdecode(np.frombuffer(out_jpeg, dtype=np.uint8), cv2.IMREAD_COLOR)
-        if dec is None:
-            raise ValueError("jpeg decode failed")
-        if dec.shape[0] != h or dec.shape[1] != w:
-            dec = cv2.resize(dec, (w, h), interpolation=cv2.INTER_LINEAR)
-        return dec
-    if eng == "cursor":
-        if _run_cursor_underwater_correct is None:
-            raise HTTPException(
-                status_code=503,
-                detail="Cursor pipeline unavailable: underwater-vision-module sources not found next to ai-service.",
-            )
-        out_u8, _ = _run_cursor_underwater_correct(frame_bgr, strength=strength, depth_hint_m=depth_hint_m)
-        return out_u8
-    if eng == "seathru":
-        if _run_sea_thru_cvpr2019 is None:
-            raise HTTPException(status_code=503, detail="Sea-Thru module failed to load.")
-        out_u8, _ = _run_sea_thru_cvpr2019(
-            frame_bgr,
-            depth_hint_m=depth_hint_m,
-            quality=quality,
-            strength=strength,
-            mode=mode,
-        )
-        return out_u8
-    raise HTTPException(
-        status_code=400,
-        detail="invalid engine for video (ai-service: ai1, ai2, cursor, seathru)",
-    )
+    if eng not in ("ai1", "ai2", "cursor", "seathru"):
+        raise HTTPException(status_code=400, detail="invalid engine for video")
+    out_u8, _ = _process_bgr_uint8(frame_bgr, strength)
+    return out_u8
 
 
 @app.post("/v1/process/video/{engine}")
 async def process_video_uvm_compat(
     engine: str,
     video: UploadFile = File(...),
-    strength: float = Query(0.7, ge=0.05, le=1.0),
+    strength: float = Query(1.0, ge=0.0, le=1.0),
     depth_hint_m: float | None = Query(None),
     quality: str = Query("auto"),
     mode: str = Query("default"),
@@ -409,86 +343,3 @@ async def process_video_uvm_compat(
             "X-UVM-Backend": "ai-service",
         },
     )
-
-
-# --- SeaSplat (ICRA-style contract): same paths as underwater-vision-module uvm.api.app ---
-
-if _seasplat is not None:
-    _ss = _seasplat  # closure for handlers
-
-    @app.post("/v1/seasplat/scenes")
-    async def seasplat_upload_scene(
-        images: list[UploadFile] = File(...),
-        poses_json: str | None = Query(None, description="optional JSON list of camera poses"),
-    ):
-        frame_names: list[str] = []
-        frame_bgr: list[np.ndarray] = []
-        for i, f in enumerate(images):
-            raw = await f.read()
-            arr = np.frombuffer(raw, dtype=np.uint8)
-            bgr = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-            if bgr is None:
-                return JSONResponse({"error": f"invalid image at index {i}"}, status_code=400)
-            frame_bgr.append(bgr)
-            frame_names.append(f.filename or f"frame_{i:04d}.jpg")
-        if not frame_bgr:
-            return JSONResponse({"error": "at least one image is required"}, status_code=400)
-        try:
-            return _ss.upload_scene(frame_bgr, frame_names, poses_json)  # type: ignore[union-attr]
-        except Exception as e:
-            return JSONResponse({"error": "scene_upload_failed", "detail": str(e)}, status_code=500)
-
-    @app.get("/v1/seasplat/scenes/{scene_id}")
-    def seasplat_scene_status(scene_id: str):
-        s = _ss.get_scene(scene_id)  # type: ignore[union-attr]
-        if s is None:
-            return JSONResponse({"error": "scene_not_found"}, status_code=404)
-        return {
-            "scene_id": scene_id,
-            "status": s["status"],
-            "frame_count": len(s.get("frame_meta", [])),
-            "created_at": s["created_at"],
-        }
-
-    @app.post("/v1/seasplat/jobs")
-    def seasplat_run_job(payload: dict):
-        scene_id = str(payload.get("scene_id") or "").strip()
-        if not scene_id:
-            return JSONResponse({"error": "scene_id is required"}, status_code=400)
-        try:
-            j = _ss.create_job(scene_id)  # type: ignore[union-attr]
-        except KeyError:
-            return JSONResponse({"error": "scene_not_found"}, status_code=404)
-        except Exception as e:
-            return JSONResponse({"error": "job_create_failed", "detail": str(e)}, status_code=500)
-        return {"job_id": j["job_id"], "status": j["status"], "scene_id": scene_id}
-
-    @app.get("/v1/seasplat/jobs/{job_id}")
-    def seasplat_job_status(job_id: str):
-        j = _ss.get_job(job_id)  # type: ignore[union-attr]
-        if j is None:
-            return JSONResponse({"error": "job_not_found"}, status_code=404)
-        return {
-            "job_id": job_id,
-            "scene_id": j["scene_id"],
-            "status": j["status"],
-            "progress": j["progress"],
-            "error": j.get("error"),
-        }
-
-    @app.get("/v1/seasplat/jobs/{job_id}/render")
-    def seasplat_job_render(job_id: str):
-        j = _ss.get_job(job_id)  # type: ignore[union-attr]
-        if j is None:
-            return JSONResponse({"error": "job_not_found"}, status_code=404)
-        if j.get("status") == "failed":
-            return JSONResponse(
-                {"error": "job_failed", "detail": j.get("error") or "unknown"},
-                status_code=500,
-            )
-        if j["status"] != "completed":
-            return JSONResponse({"error": "job_not_ready", "status": j["status"]}, status_code=409)
-        try:
-            return _ss.job_render(job_id)  # type: ignore[union-attr]
-        except Exception as e:
-            return JSONResponse({"error": "render_failed", "detail": str(e)}, status_code=500)
