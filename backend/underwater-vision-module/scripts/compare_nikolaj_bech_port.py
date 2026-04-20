@@ -9,6 +9,12 @@ Usage:
   cd backend/underwater-vision-module
   export PYTHONPATH=src
   python scripts/compare_nikolaj_bech_port.py
+  python scripts/compare_nikolaj_bech_port.py --readme-examples
+
+  ``--readme-examples`` loads upstream ``example1.jpg`` … ``example3.jpg`` from
+  ``node_modules/underwater-image-color-correction/`` (same assets as the GitHub README)
+  and checks that the 20 matrix coefficients match npm for OpenCV-decoded RGBA.
+  Requires ``opencv-python-headless`` (or ``cv2``) in the environment.
 """
 from __future__ import annotations
 
@@ -75,7 +81,66 @@ console.log(JSON.stringify(m));
         return None
 
 
+def _readme_example_paths() -> list[str]:
+    d = os.path.join(ROOT, 'node_modules', 'underwater-image-color-correction')
+    return [os.path.join(d, f'example{i}.jpg') for i in (1, 2, 3)]
+
+
+def _compare_readme_examples(eps: float) -> int:
+    try:
+        import cv2  # type: ignore
+    except ImportError:
+        print(
+            'readme_examples_skipped: install opencv-python-headless (cv2) to run --readme-examples',
+            file=sys.stderr,
+        )
+        return 0
+
+    paths = _readme_example_paths()
+    missing = [p for p in paths if not os.path.isfile(p)]
+    if missing:
+        print(
+            'readme_examples_skipped: missing',
+            ', '.join(missing),
+            '— npm install underwater-image-color-correction in',
+            ROOT,
+            file=sys.stderr,
+        )
+        return 0
+
+    if _node_matrix([0, 0, 0, 255], 1, 1) is None:
+        print('readme_examples_skipped: node/npm package unavailable', file=sys.stderr)
+        return 0
+
+    exit_code = 0
+    for p in paths:
+        bgr = cv2.imread(p)
+        if bgr is None:
+            print('readme_examples_fail: imread', p, file=sys.stderr)
+            exit_code = 1
+            continue
+        h, w = bgr.shape[:2]
+        rgb = bgr[..., ::-1]
+        rgba = np.concatenate([rgb, np.full((h, w, 1), 255, dtype=np.uint8)], axis=-1)
+        flat = rgba.reshape(-1, 4)
+        py_m, hue = get_color_filter_matrix_rgba(flat, w, h)
+        pix_list = flat.reshape(-1).astype(int).tolist()
+        js_m = _node_matrix(pix_list, w, h)
+        assert js_m is not None
+        bad = sum(1 for a, b in zip(py_m, js_m) if abs(float(a) - float(b)) > eps)
+        tag = os.path.basename(p)
+        if bad:
+            print(f'FAIL {tag} {w}x{h} hue={hue}: {bad} coeffs differ (eps={eps})')
+            exit_code = 1
+        else:
+            print(f'OK {tag} {w}x{h} hue={hue}: matrix matches npm')
+    return exit_code
+
+
 def main() -> None:
+    eps = 1e-6
+    readme = '--readme-examples' in sys.argv[1:]
+
     w, h = 4, 3
     flat = _fixed_rgba_flat(w, h)
     py_m, hue = get_color_filter_matrix_rgba(flat, w, h)
@@ -86,8 +151,9 @@ def main() -> None:
     js_m = _node_matrix(pix_list, w, h)
     if js_m is None:
         print('OK (python-only); install node + npm i underwater-image-color-correction to diff.')
+        if readme:
+            sys.exit(_compare_readme_examples(eps))
         return
-    eps = 1e-6
     bad = 0
     for i, (a, b) in enumerate(zip(py_m, js_m)):
         if abs(float(a) - float(b)) > eps:
@@ -98,6 +164,11 @@ def main() -> None:
         print(f'FAIL: {bad} coefficients differ by > {eps}')
         sys.exit(1)
     print('OK: Python matrix matches npm package within', eps)
+
+    if readme:
+        rc = _compare_readme_examples(eps)
+        if rc:
+            sys.exit(rc)
 
 
 if __name__ == '__main__':

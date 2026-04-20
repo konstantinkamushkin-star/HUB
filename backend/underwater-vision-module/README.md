@@ -54,6 +54,8 @@ python scripts/compare_nikolaj_bech_matrix.py
 ```bash
 export PYTHONPATH=src
 python scripts/compare_nikolaj_bech_port.py
+# те же картинки, что в README upstream (example1–3.jpg из npm-пакета):
+python scripts/compare_nikolaj_bech_port.py --readme-examples
 ```
 
 См. также [`NOTICE.md`](NOTICE.md) про upstream и лицензию.
