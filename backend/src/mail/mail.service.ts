@@ -8,20 +8,66 @@ export class MailService {
 
   constructor(private readonly config: ConfigService) {}
 
+  /** True if password reset / welcome emails can be sent (same rules as transporter + From). */
+  isSmtpConfigured(): boolean {
+    const host = this.config.get<string>('SMTP_HOST')?.trim();
+    const user = this.config.get<string>('SMTP_USER')?.trim();
+    const pass = this.config.get<string>('SMTP_PASSWORD')?.trim();
+    const from =
+      this.config.get<string>('SMTP_FROM')?.trim() ||
+      this.config.get<string>('SMTP_USER')?.trim();
+    return !!(host && user && pass && from);
+  }
+
   private transporter(): nodemailer.Transporter | null {
-    const host = this.config.get<string>('SMTP_HOST');
-    const port = this.config.get<number>('SMTP_PORT') ?? 587;
-    const user = this.config.get<string>('SMTP_USER');
-    const pass = this.config.get<string>('SMTP_PASSWORD');
+    const host = this.config.get<string>('SMTP_HOST')?.trim();
+    const user = this.config.get<string>('SMTP_USER')?.trim();
+    const pass = this.config.get<string>('SMTP_PASSWORD')?.trim();
     if (!host || !user || !pass) {
       return null;
     }
+    const portRaw = this.config.get<string | number>('SMTP_PORT');
+    const port =
+      typeof portRaw === 'number'
+        ? portRaw
+        : parseInt(String(portRaw ?? '587'), 10) || 587;
+    const secure = port === 465;
+    const tlsServername =
+      this.config.get<string>('SMTP_TLS_SERVERNAME')?.trim() || host;
     return nodemailer.createTransport({
       host,
       port,
-      secure: port === 465,
+      secure,
+      requireTLS: !secure && port === 587,
       auth: { user, pass },
+      connectionTimeout: 20_000,
+      greetingTimeout: 20_000,
+      socketTimeout: 25_000,
+      tls: { servername: tlsServername },
     });
+  }
+
+  private smtpFailureDetails(e: unknown): string {
+    if (e === null || typeof e !== 'object') {
+      return '';
+    }
+    const o = e as Record<string, unknown>;
+    const parts: string[] = [];
+    if (typeof o.code === 'string') {
+      parts.push(`code=${o.code}`);
+    }
+    if (typeof o.responseCode === 'number') {
+      parts.push(`responseCode=${o.responseCode}`);
+    }
+    if (typeof o.command === 'string') {
+      parts.push(`command=${o.command}`);
+    }
+    if (typeof o.response === 'string' && o.response.length < 600) {
+      parts.push(
+        `response=${o.response.replace(/\r?\n/g, ' ').trim().slice(0, 500)}`,
+      );
+    }
+    return parts.length ? ` ${parts.join(' ')}` : '';
   }
 
   async sendPartnerWelcome(params: {
@@ -81,7 +127,9 @@ export class MailService {
 <p>Действителен <strong>${mins}</strong> минут.</p>
 <p>Если вы не запрашивали восстановление, проигнорируйте это письмо.</p>`;
 
-    const from = this.config.get<string>('SMTP_FROM') ?? this.config.get<string>('SMTP_USER');
+    const from =
+      this.config.get<string>('SMTP_FROM')?.trim() ||
+      this.config.get<string>('SMTP_USER')?.trim();
     const tx = this.transporter();
     if (!tx || !from) {
       this.logger.warn(
@@ -89,15 +137,24 @@ export class MailService {
       );
       return false;
     }
-    await tx.sendMail({
-      from,
-      to: params.to,
-      subject,
-      text,
-      html,
-    });
-    this.logger.log(`Password reset email sent to ${params.to}`);
-    return true;
+    try {
+      await tx.sendMail({
+        from,
+        to: params.to,
+        subject,
+        text,
+        html,
+      });
+      this.logger.log(`Password reset email sent to ${params.to}`);
+      return true;
+    } catch (e) {
+      this.logger.error(
+        `sendMail password reset failed for ${params.to}: ${
+          e instanceof Error ? e.message : String(e)
+        }${this.smtpFailureDetails(e)}`,
+      );
+      throw e;
+    }
   }
 }
 

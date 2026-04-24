@@ -92,6 +92,13 @@ export class User {
   @Column({ name: 'diver_profile', type: 'jsonb', nullable: true })
   diverProfile?: Record<string, unknown> | null;
 
+  /**
+   * Unique public @handle (stored without @, lowercase, [a-z0-9_]{3,30}).
+   * Mirrors `diver_profile.username` when set.
+   */
+  @Column({ type: 'varchar', length: 32, nullable: true, unique: true })
+  username?: string | null;
+
   @Column({ default: 'UTC' })
   timezone: string;
 
