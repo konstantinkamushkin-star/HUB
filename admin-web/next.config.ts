@@ -18,6 +18,13 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_GIT_SHA: gitShortSha(),
   },
+  async rewrites() {
+    return {
+      beforeFiles: [
+        { source: "/presentation", destination: "/presentation-page" },
+      ],
+    };
+  },
 };
 
 export default nextConfig;
