@@ -7,6 +7,12 @@ import { NextResponse } from "next/server";
  * Статика `/_next/static/*` не трогаем.
  */
 export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname === "/presentation") {
+    const nextUrl = request.nextUrl.clone();
+    nextUrl.pathname = "/presentation-page";
+    return NextResponse.rewrite(nextUrl);
+  }
+
   const res = NextResponse.next();
   const p = request.nextUrl.pathname;
   if (request.method !== "GET") return res;
