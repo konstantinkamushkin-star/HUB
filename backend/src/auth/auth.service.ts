@@ -30,6 +30,24 @@ import {
 } from './oauth-id-token.util';
 import { UserAccountStatus } from '../common/statuses';
 
+/** Новые дайверы: PRO на 4 месяца (роль + активная подписка с датой окончания). */
+const NEW_DIVER_PRO_TRIAL_MONTHS = 4;
+
+function newDiverProTrialFields(): Pick<
+  User,
+  'role' | 'subscriptionTier' | 'subscriptionExpiresAt'
+> {
+  const subscriptionExpiresAt = new Date();
+  subscriptionExpiresAt.setMonth(
+    subscriptionExpiresAt.getMonth() + NEW_DIVER_PRO_TRIAL_MONTHS,
+  );
+  return {
+    role: 'DIVER_PRO',
+    subscriptionTier: 'active',
+    subscriptionExpiresAt,
+  };
+}
+
 /** Убирает секретные поля перед отдачей в JSON. */
 export function serializePublicUser(user: User): Omit<User, 'password' | 'adminTotpSecret'> {
   const { password: _p, adminTotpSecret: _t, ...rest } = user;
@@ -65,9 +83,32 @@ function mergeDiverProfile(
   return base;
 }
 
+/** Normalized unique handle: lowercase, no @, 3–30 chars [a-z0-9_]. */
+export function normalizeUsernameHandle(raw: unknown): string | null {
+  if (raw === null || raw === undefined) {
+    return null;
+  }
+  if (typeof raw !== 'string') {
+    return null;
+  }
+  const s = raw.trim().replace(/^@+/g, '').toLowerCase();
+  if (!s) {
+    return null;
+  }
+  if (!/^[a-z0-9_]{3,30}$/.test(s)) {
+    return null;
+  }
+  return s;
+}
+
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  /**
+   * Native iOS bundle id used as Apple id_token audience.
+   * Keeps Apple Sign In functional even before env is configured.
+   */
+  private static readonly defaultAppleClientIds = ['Dive-Hub.ru'];
 
   constructor(
     @InjectRepository(User)
@@ -126,6 +167,30 @@ export class AuthService {
     }
 
     return null;
+  }
+
+  private normalizePasswordResetEmail(raw: string): string {
+    return String(raw ?? '')
+      .trim()
+      .toLowerCase();
+  }
+
+  /** Trim; remove spaces (e.g. paste "123 456" or thin spaces from email). */
+  private normalizePasswordResetCode(raw: string): string {
+    return String(raw ?? '')
+      .replace(/\s/g, '')
+      .trim();
+  }
+
+  private async findUserByPasswordResetEmail(raw: string): Promise<User | null> {
+    const e = this.normalizePasswordResetEmail(raw);
+    if (!e) {
+      return null;
+    }
+    return this.userRepository
+      .createQueryBuilder('u')
+      .where('LOWER(TRIM(u.email)) = :e', { e })
+      .getOne();
   }
 
   private async toPublicUserWithPartners(user: User): Promise<PublicUserWithPartners> {
@@ -201,7 +266,7 @@ export class AuthService {
       firstName,
       lastName,
       phone,
-      role: 'DIVER_BASIC',
+      ...newDiverProTrialFields(),
     });
 
     const savedUser = await this.userRepository.save(user);
@@ -274,6 +339,7 @@ export class AuthService {
 
   async login(loginDto: LoginDto) {
     const user = await this.validateCredentials(loginDto.email, loginDto.password);
+    await this.expireProTrialIfNeededByUserId(user.id);
     await this.touchLastLogin(user.id);
     let tokens: { accessToken: string; refreshToken: string };
     try {
@@ -306,7 +372,34 @@ export class AuthService {
       throw new UnauthorizedException('Account is deleted');
     }
 
-    return this.toPublicUserWithPartnersSafe(user);
+    await this.expireProTrialIfNeededByUserId(userId);
+    const fresh =
+      (await this.userRepository.findOne({ where: { id: userId } })) ?? user;
+    return this.toPublicUserWithPartnersSafe(fresh);
+  }
+
+  /**
+   * По истечении subscriptionExpiresAt снимаем DIVER_PRO → DIVER_BASIC,
+   * чтобы клиент и API снова считали пользователя без активного PRO.
+   */
+  private async expireProTrialIfNeededByUserId(userId: string): Promise<void> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      return;
+    }
+    if (
+      user.role === 'DIVER_PRO' &&
+      user.subscriptionTier === 'active' &&
+      user.subscriptionExpiresAt &&
+      user.subscriptionExpiresAt < new Date()
+    ) {
+      user.role = 'DIVER_BASIC';
+      user.subscriptionTier = 'expired';
+      await this.userRepository.save(user);
+      this.logger.log(
+        `PRO period ended for user ${userId}; role set to DIVER_BASIC, subscriptionTier=expired`,
+      );
+    }
   }
 
   async updateProfile(
@@ -345,18 +438,10 @@ export class AuthService {
     }
 
     if (dto.firstName !== undefined) {
-      const v = dto.firstName.trim();
-      if (!v) {
-        throw new BadRequestException('firstName cannot be empty');
-      }
-      user.firstName = v;
+      user.firstName = dto.firstName.trim();
     }
     if (dto.lastName !== undefined) {
-      const v = dto.lastName.trim();
-      if (!v) {
-        throw new BadRequestException('lastName cannot be empty');
-      }
-      user.lastName = v;
+      user.lastName = dto.lastName.trim();
     }
     if (dto.phone !== undefined) {
       const v = String(dto.phone ?? '').trim();
@@ -384,6 +469,60 @@ export class AuthService {
           ? (user.diverProfile as Record<string, unknown>)
           : {};
       user.diverProfile = mergeDiverProfile(prev, dto.diverProfile);
+    }
+
+    const merged =
+      user.diverProfile && isPlainObject(user.diverProfile)
+        ? (user.diverProfile as Record<string, unknown>)
+        : {};
+    const diverPatch =
+      dto.diverProfile !== undefined && isPlainObject(dto.diverProfile)
+        ? dto.diverProfile
+        : null;
+    const patchTouchedUsername = !!(
+      diverPatch && Object.prototype.hasOwnProperty.call(diverPatch, 'username')
+    );
+
+    const rawUsername = merged['username'];
+    if (
+      patchTouchedUsername &&
+      rawUsername !== null &&
+      rawUsername !== undefined &&
+      typeof rawUsername !== 'string'
+    ) {
+      throw new BadRequestException('Invalid username');
+    }
+    const normalizedFromProfile = normalizeUsernameHandle(rawUsername);
+
+    if (normalizedFromProfile) {
+      const taken = await this.userRepository.findOne({
+        where: { username: normalizedFromProfile },
+      });
+      if (taken && taken.id !== userId) {
+        throw new ConflictException('Username already taken');
+      }
+      user.username = normalizedFromProfile;
+      merged['username'] = normalizedFromProfile;
+      user.diverProfile = merged;
+    } else {
+      const nonEmptyStringAttempt =
+        typeof rawUsername === 'string' && rawUsername.trim().length > 0;
+      if (nonEmptyStringAttempt) {
+        throw new BadRequestException(
+          'Invalid username: use 3-30 lowercase letters, numbers, or underscores',
+        );
+      }
+      if (patchTouchedUsername && user.username) {
+        throw new BadRequestException('Username cannot be removed');
+      }
+      if (user.username && merged['username'] !== user.username) {
+        merged['username'] = user.username;
+        user.diverProfile = merged;
+      }
+    }
+
+    if (merged['onboardingCompleted'] === true && !user.username) {
+      throw new BadRequestException('Username is required');
     }
 
     await this.userRepository.save(user);
@@ -443,10 +582,14 @@ export class AuthService {
   async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
     const { email } = forgotPasswordDto;
 
-    // Find user by email
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
+    const user = await this.findUserByPasswordResetEmail(email);
+    const smtpConfigured = this.mailService.isSmtpConfigured();
+    const nodeEnv = this.configService.get<string>('NODE_ENV') ?? 'undefined';
+    this.logger.log(
+      `forgotPassword: userFound=${Boolean(
+        user,
+      )} smtpConfigured=${smtpConfigured} NODE_ENV=${nodeEnv}`,
+    );
 
     // Always return success message to prevent email enumeration
     // But only generate code if user exists
@@ -461,11 +604,7 @@ export class AuthService {
       user.passwordResetExpires = expiresAt;
       await this.userRepository.save(user);
 
-      const isDevelopment = process.env.NODE_ENV !== 'production';
-      const smtpConfigured =
-        !!process.env.SMTP_HOST?.trim() &&
-        !!process.env.SMTP_USER?.trim() &&
-        !!process.env.SMTP_PASSWORD?.trim();
+      const isDevelopment = this.configService.get<string>('NODE_ENV') !== 'production';
 
       if (isDevelopment && !smtpConfigured) {
         return {
@@ -477,11 +616,16 @@ export class AuthService {
 
       if (smtpConfigured) {
         try {
-          await this.mailService.sendPasswordReset({
+          const sent = await this.mailService.sendPasswordReset({
             to: user.email,
             code: resetCode,
             validMinutes: 15,
           });
+          if (!sent) {
+            this.logger.error(
+              `Password reset: isSmtpConfigured() was true but sendPasswordReset returned false (check SMTP_FROM / MailService) for ${user.email}`,
+            );
+          }
         } catch (err) {
           this.logger.error(
             `sendPasswordReset failed for ${user.email}: ${err instanceof Error ? err.message : err}`,
@@ -489,7 +633,7 @@ export class AuthService {
         }
       } else {
         this.logger.warn(
-          `Password reset requested for ${user.email} but SMTP is not configured (set SMTP_HOST, SMTP_USER, SMTP_PASSWORD). Code stored in DB only.`,
+          `Password reset requested for ${user.email} but SMTP is not fully configured (set SMTP_HOST, SMTP_USER, SMTP_PASSWORD, and SMTP_FROM or rely on SMTP_USER as From). Code stored in DB only.`,
         );
       }
     }
@@ -502,15 +646,14 @@ export class AuthService {
   async verifyResetCode(verifyResetCodeDto: VerifyResetCodeDto) {
     const { email, code } = verifyResetCodeDto;
 
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
+    const user = await this.findUserByPasswordResetEmail(email);
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    if (!user.passwordResetCode || user.passwordResetCode !== code) {
+    const codeNorm = this.normalizePasswordResetCode(code);
+    if (!user.passwordResetCode || user.passwordResetCode !== codeNorm) {
       throw new BadRequestException('Invalid verification code');
     }
 
@@ -527,15 +670,14 @@ export class AuthService {
   async resetPassword(resetPasswordDto: ResetPasswordDto) {
     const { email, code, newPassword } = resetPasswordDto;
 
-    const user = await this.userRepository.findOne({
-      where: { email },
-    });
+    const user = await this.findUserByPasswordResetEmail(email);
 
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    if (!user.passwordResetCode || user.passwordResetCode !== code) {
+    const codeNorm = this.normalizePasswordResetCode(code);
+    if (!user.passwordResetCode || user.passwordResetCode !== codeNorm) {
       throw new BadRequestException('Invalid verification code');
     }
 
@@ -560,13 +702,14 @@ export class AuthService {
   private parseOAuthClientIds(
     multiKey: string,
     singleKey: string,
+    fallback: string[] = [],
   ): string[] {
     const raw =
       this.configService.get<string>(multiKey)?.trim() ||
       this.configService.get<string>(singleKey)?.trim() ||
       '';
     if (!raw) {
-      return [];
+      return fallback;
     }
     return raw
       .split(',')
@@ -653,7 +796,7 @@ export class AuthService {
       password: randomPassword,
       firstName: fn,
       lastName: ln,
-      role: 'DIVER_BASIC',
+      ...newDiverProTrialFields(),
       emailVerified: true,
       mustChangePassword: false,
       ...(provider === 'apple' ? { appleSub: sub } : { googleSub: sub }),
@@ -665,6 +808,7 @@ export class AuthService {
   }
 
   private async oauthLoginResponse(user: User) {
+    await this.expireProTrialIfNeededByUserId(user.id);
     const tokens = await this.issueTokenPair(user.id);
     const fresh = await this.userRepository.findOne({ where: { id: user.id } });
     const u = fresh ?? user;
@@ -679,6 +823,7 @@ export class AuthService {
     const audiences = this.parseOAuthClientIds(
       'APPLE_CLIENT_IDS',
       'APPLE_CLIENT_ID',
+      AuthService.defaultAppleClientIds,
     );
     if (audiences.length === 0) {
       throw new ServiceUnavailableException(

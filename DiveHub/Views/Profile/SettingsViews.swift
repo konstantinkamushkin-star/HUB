@@ -107,274 +107,31 @@ struct AppearanceSettingsView: View {
 struct SubscriptionView: View {
     @StateObject private var authService = AuthenticationService.shared
     @StateObject private var localizationService = LocalizationService.shared
-    @State private var selectedPlan: SubscriptionPlan = .monthly
-    @State private var showPaymentForm = false
-    @State private var showCancellationConfirmation = false
-    @State private var isProcessing = false
-    @State private var errorMessage: String?
-    
-    enum SubscriptionPlan {
-        case monthly
-        case annual
-    }
-    
+
     var body: some View {
         Form {
-            if authService.currentUser?.role == .diverBasic {
-                Section(localizationService.localizedString("upgradeToPro", table: "settings")) {
-                    Picker(localizationService.localizedString("plan", table: "settings"), selection: $selectedPlan) {
-                        Text(localizationService.localizedString("monthly", table: "settings")).tag(SubscriptionPlan.monthly)
-                        Text(localizationService.localizedString("annual", table: "settings")).tag(SubscriptionPlan.annual)
-                    }
-                    
-                    Button(localizationService.localizedString("subscribe", table: "settings")) {
-                        showPaymentForm = true
-                    }
-                    .disabled(isProcessing)
-                }
-                
-                Section {
-                    Text(localizationService.localizedString("proFeatures", table: "settings"))
-                    Text(localizationService.localizedString("noAds", table: "settings"))
-                    Text(localizationService.localizedString("advancedLogbook", table: "settings"))
-                    Text(localizationService.localizedString("sensorIntegration", table: "settings"))
-                    Text(localizationService.localizedString("friendTracking", table: "settings"))
-                    Text(localizationService.localizedString("groupChats", table: "settings"))
-                    Text(localizationService.localizedString("groupBooking", table: "settings"))
-                    Text(localizationService.localizedString("gearProfiles", table: "settings"))
-                    Text(localizationService.localizedString("achievementSystem", table: "settings"))
-                    Text(localizationService.localizedString("prioritySupport", table: "settings"))
-                }
-            } else {
+            Section {
+                Text(localizationService.localizedString("proWelcomeTrial", table: "settings"))
+                    .font(.subheadline)
+            }
+
+            if let expiresAt = authService.currentUser?.subscriptionExpiresAt {
                 Section(localizationService.localizedString("currentSubscription", table: "settings")) {
                     Text(localizationService.localizedString("proSubscriptionActive", table: "settings"))
                         .foregroundColor(.green)
-                    
-                    if let expiresAt = authService.currentUser?.subscriptionExpiresAt {
-                        Text(localizationService.localizedString("expiresOn", table: "settings") + ": \(expiresAt.formatted(date: .abbreviated, time: .omitted))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    
-                    Button(role: .destructive, action: {
-                        showCancellationConfirmation = true
-                    }) {
-                        Text(localizationService.localizedString("cancelSubscription", table: "settings"))
-                    }
-                    .disabled(isProcessing)
+                    Text(localizationService.localizedString("expiresOn", table: "settings") + ": \(expiresAt.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                 }
             }
-            
-            if let error = errorMessage {
-                Section {
-                    Text(error)
-                        .foregroundColor(.red)
-                        .font(.caption)
-                }
+
+            Section(localizationService.localizedString("proFeatures", table: "settings")) {
+                Text(localizationService.localizedString("proSubscriptionDetails", table: "settings"))
+                    .font(.subheadline)
             }
         }
         .navigationTitle(localizationService.localizedString("subscription", table: "settings"))
         .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showPaymentForm) {
-            PaymentFormView(
-                plan: selectedPlan,
-                onComplete: { success in
-                    showPaymentForm = false
-                    if success {
-                        Task {
-                            await handleSubscription()
-                        }
-                    }
-                }
-            )
-        }
-        .sheet(isPresented: $showCancellationConfirmation) {
-            SubscriptionCancellationView(
-                onConfirm: {
-                    showCancellationConfirmation = false
-                    Task {
-                        await handleCancellation()
-                    }
-                },
-                onCancel: {
-                    showCancellationConfirmation = false
-                }
-            )
-        }
-    }
-    
-    private func handleSubscription() async {
-        isProcessing = true
-        errorMessage = nil
-        do {
-            try await authService.upgradeToPro(monthly: selectedPlan == .monthly)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isProcessing = false
-    }
-    
-    private func handleCancellation() async {
-        isProcessing = true
-        errorMessage = nil
-        do {
-            try await authService.cancelSubscription()
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-        isProcessing = false
-    }
-}
-
-struct PaymentFormView: View {
-    let plan: SubscriptionView.SubscriptionPlan
-    let onComplete: (Bool) -> Void
-    @Environment(\.dismiss) var dismiss
-    @StateObject private var localizationService = LocalizationService.shared
-    @State private var selectedPaymentMethod: PaymentMethod = .applePay
-    @State private var cardNumber = ""
-    @State private var cardHolderName = ""
-    @State private var expiryDate = ""
-    @State private var cvv = ""
-    @State private var isProcessing = false
-    
-    enum PaymentMethod: String, CaseIterable {
-        case applePay = "Apple Pay"
-        case creditCard = "Credit Card"
-        
-        var displayName: String {
-            return self.rawValue
-        }
-    }
-    
-    var planPrice: String {
-        switch plan {
-        case .monthly:
-            return "$9.99/month"
-        case .annual:
-            return "$99.99/year"
-        }
-    }
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section(localizationService.localizedString("plan", table: "settings")) {
-                    Text(plan == .monthly ? localizationService.localizedString("monthly", table: "settings") : localizationService.localizedString("annual", table: "settings"))
-                    Text(planPrice)
-                        .font(.headline)
-                        .foregroundColor(.divePrimary)
-                }
-                
-                Section(localizationService.localizedString("paymentMethod", table: "settings")) {
-                    Picker("", selection: $selectedPaymentMethod) {
-                        ForEach(PaymentMethod.allCases, id: \.self) { method in
-                            Text(method.displayName).tag(method)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    
-                    if selectedPaymentMethod == .creditCard {
-                        TextField(localizationService.localizedString("cardNumber", table: "settings"), text: $cardNumber)
-                            .keyboardType(.numberPad)
-                        TextField(localizationService.localizedString("cardHolderName", table: "settings"), text: $cardHolderName)
-                        TextField(localizationService.localizedString("expiryDate", table: "settings"), text: $expiryDate)
-                            .keyboardType(.numberPad)
-                        TextField("ui_profile_cvv".localized, text: $cvv)
-                            .keyboardType(.numberPad)
-                    } else {
-                        Text(localizationService.localizedString("applePayDescription", table: "settings"))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section {
-                    Button(localizationService.localizedString("payNow", table: "settings")) {
-                        isProcessing = true
-                        // Simulate payment processing
-                        Task {
-                            try? await Task.sleep(nanoseconds: 1_500_000_000) // 1.5 seconds
-                            await MainActor.run {
-                                isProcessing = false
-                                onComplete(true)
-                            }
-                        }
-                    }
-                    .disabled(isProcessing || (selectedPaymentMethod == .creditCard && (cardNumber.isEmpty || cardHolderName.isEmpty || expiryDate.isEmpty || cvv.isEmpty)))
-                    
-                    if isProcessing {
-                        ProgressView()
-                            .frame(maxWidth: .infinity, alignment: .center)
-                    }
-                }
-            }
-            .navigationTitle(localizationService.localizedString("payment", table: "booking"))
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(localizationService.localizedString("cancel")) {
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-struct SubscriptionCancellationView: View {
-    let onConfirm: () -> Void
-    let onCancel: () -> Void
-    @StateObject private var localizationService = LocalizationService.shared
-    @State private var cancellationReason = ""
-    @State private var selectedReason: CancellationReason = .tooExpensive
-    
-    enum CancellationReason: String, CaseIterable {
-        case tooExpensive = "Too Expensive"
-        case notUsingFeatures = "Not Using Features"
-        case foundAlternative = "Found Alternative"
-        case other = "Other"
-        
-        var displayName: String {
-            return self.rawValue
-        }
-    }
-    
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section(localizationService.localizedString("cancelSubscription", table: "settings")) {
-                    Text(localizationService.localizedString("cancellationWarning", table: "settings"))
-                        .font(.caption)
-                        .foregroundColor(.orange)
-                }
-                
-                Section(localizationService.localizedString("reasonForCancellation", table: "settings")) {
-                    Picker("", selection: $selectedReason) {
-                        ForEach(CancellationReason.allCases, id: \.self) { reason in
-                            Text(reason.displayName).tag(reason)
-                        }
-                    }
-                    
-                    if selectedReason == .other {
-                        TextEditor(text: $cancellationReason)
-                            .frame(height: 100)
-                    }
-                }
-                
-                Section {
-                    Button(role: .destructive, action: onConfirm) {
-                        Text(localizationService.localizedString("confirmCancellation", table: "settings"))
-                    }
-                    
-                    Button(action: onCancel) {
-                        Text(localizationService.localizedString("keepSubscription", table: "settings"))
-                    }
-                }
-            }
-            .navigationTitle(localizationService.localizedString("cancelSubscription", table: "settings"))
-            .navigationBarTitleDisplayMode(.inline)
-        }
     }
 }
 
@@ -839,7 +596,14 @@ struct GearProfilesView: View {
                         .font(.caption)
                 } else {
                     ForEach(gearProfiles) { profile in
-                        NavigationLink(destination: GearProfileDetailView(profile: profile)) {
+                        NavigationLink(
+                            destination: GearProfileDetailView(profile: profile) { updated in
+                                if let i = gearProfiles.firstIndex(where: { $0.id == updated.id }) {
+                                    gearProfiles[i] = updated
+                                    saveProfiles()
+                                }
+                            }
+                        ) {
                             GearProfileRow(profile: profile)
                         }
                     }
@@ -887,7 +651,7 @@ struct GearProfileRow: View {
         VStack(alignment: .leading, spacing: 4) {
             Text(profile.name)
                 .font(.headline)
-            Text("\(profile.items.count) \(localizationService.localizedString("items", table: "inventory"))")
+            Text("\(profile.items.count) \(localizationService.localizedString("ui_gear_profile_items_suffix", table: "ui"))")
                 .font(.caption)
                 .foregroundColor(.secondary)
         }
@@ -895,35 +659,76 @@ struct GearProfileRow: View {
 }
 
 struct GearProfileDetailView: View {
-    let profile: GearProfile
+    @State private var draft: GearProfile
+    let onSave: (GearProfile) -> Void
     @StateObject private var localizationService = LocalizationService.shared
-    @Environment(\.dismiss) var dismiss
+    @State private var showAddItem = false
+    
+    init(profile: GearProfile, onSave: @escaping (GearProfile) -> Void) {
+        _draft = State(initialValue: profile)
+        self.onSave = onSave
+    }
     
     var body: some View {
-        List {
+        Form {
             Section("ui_profile_name".localized) {
-                Text(profile.name)
+                TextField("ui_profile_enter_profile_name".localized, text: $draft.name)
             }
             
             Section("ui_gear_items".localized) {
-                ForEach(profile.items) { item in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(item.category.rawValue.capitalized)
-                            .font(.headline)
-                        Text("\("ui_label_size".localized): \(item.size)")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        if let notes = item.notes, !notes.isEmpty {
-                            Text(notes)
-                                .font(.caption)
+                if draft.items.isEmpty {
+                    Text("ui_profile_add_gear_item_hint".localized)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                ForEach($draft.items) { $item in
+                    NavigationLink {
+                        EditGearProfileItemView(item: $item)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(item.category.localizedTitle(using: localizationService))
+                                .font(.headline)
+                            Text("\("ui_label_size".localized): \(item.size)")
+                                .font(.subheadline)
                                 .foregroundColor(.secondary)
+                            if let notes = item.notes, !notes.isEmpty {
+                                Text(notes)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
+                    }
+                }
+                .onDelete(perform: deleteItems)
+                
+                Button(action: { showAddItem = true }) {
+                    HStack {
+                        Image(systemName: "plus.circle")
+                        Text("ui_profile_add_gear_item".localized)
                     }
                 }
             }
         }
-        .navigationTitle(profile.name)
+        .navigationTitle("ui_profile_edit_gear_profile".localized)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("ui_save".localized) {
+                    draft.updatedAt = Date()
+                    onSave(draft)
+                }
+                .disabled(draft.name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+        }
+        .sheet(isPresented: $showAddItem) {
+            AddGearItemView { item in
+                draft.items.append(item)
+            }
+        }
+    }
+    
+    private func deleteItems(at offsets: IndexSet) {
+        draft.items.remove(atOffsets: offsets)
     }
 }
 
@@ -949,7 +754,7 @@ struct AddGearProfileView: View {
                 Section("ui_gear_items".localized) {
                     ForEach(items) { item in
                         VStack(alignment: .leading, spacing: 4) {
-                            Text(item.category.rawValue.capitalized)
+                            Text(item.category.localizedTitle(using: localizationService))
                                 .font(.headline)
                             Text("\("ui_label_size".localized): \(item.size)")
                                 .font(.subheadline)
@@ -978,9 +783,12 @@ struct AddGearProfileView: View {
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("ui_save".localized) {
+                        let trimmed = profileName.trimmingCharacters(in: .whitespacesAndNewlines)
                         let profile = GearProfile(
                             id: UUID().uuidString,
-                            name: profileName.isEmpty ? "Untitled Profile" : profileName,
+                            name: trimmed.isEmpty
+                                ? localizationService.localizedString("ui_gear_profile_untitled", table: "ui")
+                                : trimmed,
                             items: items,
                             createdAt: Date(),
                             updatedAt: Date()
@@ -1006,6 +814,7 @@ struct AddGearProfileView: View {
 
 struct AddGearItemView: View {
     @Environment(\.dismiss) var dismiss
+    @StateObject private var localizationService = LocalizationService.shared
     @State private var selectedCategory: GearItem.GearCategory = .wetsuit
     @State private var size = ""
     @State private var notes = ""
@@ -1018,7 +827,7 @@ struct AddGearItemView: View {
                 Section("ui_profile_category".localized) {
                     Picker("ui_profile_category".localized, selection: $selectedCategory) {
                         ForEach(GearItem.GearCategory.allCases, id: \.self) { category in
-                            Text(category.rawValue.capitalized).tag(category)
+                            Text(category.localizedTitle(using: localizationService)).tag(category)
                         }
                     }
                 }
@@ -1056,6 +865,38 @@ struct AddGearItemView: View {
                 }
             }
         }
+    }
+}
+
+struct EditGearProfileItemView: View {
+    @Binding var item: GearProfile.GearProfileItem
+    @StateObject private var localizationService = LocalizationService.shared
+    
+    var body: some View {
+        Form {
+            Section("ui_profile_category".localized) {
+                Picker("ui_profile_category".localized, selection: $item.category) {
+                    ForEach(GearItem.GearCategory.allCases, id: \.self) { category in
+                        Text(category.localizedTitle(using: localizationService)).tag(category)
+                    }
+                }
+            }
+            
+            Section("ui_size".localized) {
+                TextField("ui_profile_enter_size_placeholder".localized, text: $item.size)
+                    .keyboardType(.default)
+            }
+            
+            Section("ui_notes_optional".localized) {
+                TextEditor(text: Binding(
+                    get: { item.notes ?? "" },
+                    set: { item.notes = $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+                ))
+                .frame(height: 100)
+            }
+        }
+        .navigationTitle("ui_profile_edit_gear_item".localized)
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

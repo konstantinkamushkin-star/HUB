@@ -38,6 +38,7 @@
     "migrate:user-must-change-password": "node scripts/apply-user-must-change-password-migration.cjs",
     "create:super-admin": "node scripts/create-super-admin.cjs",
     "db:counts": "node scripts/db-show-counts.cjs",
+    "users:promote-basic-to-pro": "node scripts/promote-diver-basic-to-pro-trial.cjs",
     "seed:dive-sites": "node import_processed_dive_sites.js dive_sites_data.json",
     "import:opendivemap": "node scripts/import_opendivemap_geojson.js",
     "migrate:from-prisma": "node scripts/migrate-from-prisma-divehub.cjs"

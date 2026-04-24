@@ -82,7 +82,8 @@ enum AuthError: LocalizedError {
                         return localizationService.localizedString("editProfileNoPermission", table: "errors")
                     }
                     if code == 409 {
-                        return localizationService.localizedString("emailAlreadyExists", table: "errors")
+                        return networkError.errorDescription
+                            ?? localizationService.localizedString("emailAlreadyExists", table: "errors")
                     }
                     return networkError.errorDescription ?? localizationService.localizedString("serverError", table: "errors")
                 case .networkUnavailable:
@@ -115,6 +116,9 @@ struct AuthMePatchBody: Encodable {
 
 class AuthenticationService: ObservableObject {
     static let shared = AuthenticationService()
+
+    private static let pendingPostRegistrationProWelcomeKey = "pending_post_registration_pro_welcome"
+    private static let dismissedPostRegistrationProWelcomeIdsKey = "dismissed_post_registration_pro_welcome_user_ids"
     
     @Published var currentUser: User?
     @Published var isAuthenticated: Bool = false
@@ -122,6 +126,44 @@ class AuthenticationService: ObservableObject {
     @Published var error: AuthError?
     /// После входа с временным паролем партнёра — показать экран смены пароля.
     @Published var requiresPasswordReset: Bool = false
+    /// Полноэкранный баннер «спасибо за регистрацию + 4 месяца PRO».
+    @Published var showPostRegistrationProWelcome: Bool = false
+    
+    /// Вызывать после успешной **регистрации** (email или Apple/Google из формы регистрации).
+    func requestPostRegistrationProWelcomeForNewAccount() {
+        UserDefaults.standard.set(true, forKey: Self.pendingPostRegistrationProWelcomeKey)
+    }
+    
+    /// Показать баннер, если регистрация только что прошла и пользователь ещё не закрывал его.
+    func presentPostRegistrationProWelcomeIfPending() {
+        guard !showPostRegistrationProWelcome else { return }
+        guard let u = currentUser else { return }
+        let dismissed = Set(UserDefaults.standard.stringArray(forKey: Self.dismissedPostRegistrationProWelcomeIdsKey) ?? [])
+        guard !dismissed.contains(u.id) else {
+            UserDefaults.standard.removeObject(forKey: Self.pendingPostRegistrationProWelcomeKey)
+            return
+        }
+        guard u.role == .diverPro else { return }
+        if let exp = u.subscriptionExpiresAt {
+            guard exp > Date() else { return }
+        } else if u.subscriptionStatus != .active {
+            return
+        }
+        UserDefaults.standard.removeObject(forKey: Self.pendingPostRegistrationProWelcomeKey)
+        showPostRegistrationProWelcome = true
+    }
+    
+    func dismissPostRegistrationProWelcome() {
+        if let id = currentUser?.id {
+            var ids = UserDefaults.standard.stringArray(forKey: Self.dismissedPostRegistrationProWelcomeIdsKey) ?? []
+            if !ids.contains(id) {
+                ids.append(id)
+                UserDefaults.standard.set(ids, forKey: Self.dismissedPostRegistrationProWelcomeIdsKey)
+            }
+        }
+        UserDefaults.standard.removeObject(forKey: Self.pendingPostRegistrationProWelcomeKey)
+        showPostRegistrationProWelcome = false
+    }
     
     // Helper method to validate authentication state
     func validateAuthentication() {
@@ -320,6 +362,7 @@ class AuthenticationService: ObservableObject {
             isAuthenticated = true
             requiresPasswordReset = false
             saveSession()
+            requestPostRegistrationProWelcomeForNewAccount()
             isLoading = false
         } catch {
             isLoading = false
@@ -481,26 +524,12 @@ class AuthenticationService: ObservableObject {
         saveSession()
     }
     
-    // MARK: - Subscription Management
-    
-    func upgradeToPro(monthly: Bool) async throws {
-        guard var user = currentUser else { return }
-        
-        // TODO: Implement actual subscription API
-        user.role = .diverPro
-        user.subscriptionStatus = .active
-        updateUser(user)
-    }
-    
-    func cancelSubscription() async throws {
-        guard var user = currentUser else { return }
-        
-        // TODO: Implement actual cancellation API
-        user.subscriptionStatus = .cancelled
-        updateUser(user)
-    }
-    
     // MARK: - Password Recovery
+    
+    /// Same rules as API + Android: trim and lowercase (email DB matching).
+    private func normalizedPasswordResetEmail(_ raw: String) -> String {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
     
     func requestPasswordReset(email: String) async throws {
         isLoading = true
@@ -527,7 +556,7 @@ class AuthenticationService: ObservableObject {
         }
 
         do {
-            let request = PasswordResetRequest(email: email)
+            let request = PasswordResetRequest(email: normalizedPasswordResetEmail(email))
             let response: PasswordResetResponse = try await NetworkService.shared.request(
                 endpoint: "/api/auth/forgot-password",
                 method: .post,
@@ -574,7 +603,7 @@ class AuthenticationService: ObservableObject {
         }
         
         do {
-            let request = VerifyCodeRequest(email: email, code: code)
+            let request = VerifyCodeRequest(email: normalizedPasswordResetEmail(email), code: code)
             let _: VerifyCodeResponse = try await NetworkService.shared.request(
                 endpoint: "/api/auth/verify-reset-code",
                 method: .post,
@@ -629,7 +658,11 @@ class AuthenticationService: ObservableObject {
         }
         
         do {
-            let request = ResetPasswordRequest(email: email, code: code, newPassword: newPassword)
+            let request = ResetPasswordRequest(
+                email: normalizedPasswordResetEmail(email),
+                code: code,
+                newPassword: newPassword
+            )
             let _: ResetPasswordResponse = try await NetworkService.shared.request(
                 endpoint: "/api/auth/reset-password",
                 method: .post,

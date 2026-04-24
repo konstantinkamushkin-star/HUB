@@ -52,7 +52,8 @@ struct ProfileTabView: View {
         let profile = user.diverProfile
         var rows: [(String, String)] = []
 
-        if let username = profile?.username, !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let handle = user.username ?? profile?.username
+        if let username = handle, !username.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             let display = username.hasPrefix("@") ? username : "@\(username)"
             rows.append((localizationService.localizedString("profileOnboardingUsername", table: "onboarding"), display))
         }
@@ -137,27 +138,17 @@ struct ProfileTabView: View {
                         }
                     } else {
                         Section(localizationService.localizedString("account")) {
-                            NavigationLink(destination: EditProfileView()) {
-                                Label(localizationService.localizedString("editProfile"), systemImage: "pencil")
+                            if isDiverRole(user.role) {
+                                NavigationLink(destination: UnifiedProfileEditView()) {
+                                    Label(localizationService.localizedString("editProfile"), systemImage: "pencil")
+                                }
+                            } else {
+                                NavigationLink(destination: EditProfileView()) {
+                                    Label(localizationService.localizedString("editProfile"), systemImage: "pencil")
+                                }
                             }
 
                             if isDiverRole(user.role) {
-                                NavigationLink(destination: DiverProfileDetailsView()) {
-                                    Label(localizationService.localizedString("profileOnboardingTitle", table: "onboarding"), systemImage: "person.text.rectangle")
-                                }
-
-                                if user.role == .diverBasic {
-                                    NavigationLink(destination: SubscriptionView()) {
-                                        Label(localizationService.localizedString("upgradeToPro"), systemImage: "star.fill")
-                                            .foregroundColor(.diveAccent)
-                                    }
-                                } else if user.role == .diverPro {
-                                    NavigationLink(destination: SubscriptionView()) {
-                                        Label(localizationService.localizedString("proSubscription"), systemImage: "checkmark.circle.fill")
-                                            .foregroundColor(.green)
-                                    }
-                                }
-
                                 NavigationLink(destination: CertificationsView()) {
                                     Label(localizationService.localizedString("certifications"), systemImage: "doc.text")
                                 }
