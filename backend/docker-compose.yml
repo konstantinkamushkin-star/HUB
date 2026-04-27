@@ -68,6 +68,9 @@ services:
       REDIS_PORT: "6379"
       # Контейнерный UVM (сервис uvm). Для UVM на хосте задайте в .env: UVM_URL=http://host.docker.internal:8011
       UVM_URL: ${UVM_URL:-http://uvm:8010}
+      # Подводный AI в редакторе фото: Nest зовёт POST {AI_UNDERWATER_SERVICE_URL}/process (при 404 — fallback на UVM /v1/...).
+      # Должен совпадать с UVM/ai-service в той же docker-сети, иначе health вернёт available:false.
+      AI_UNDERWATER_SERVICE_URL: ${AI_UNDERWATER_SERVICE_URL:-http://uvm:8010}
       # Раскомментируйте при `docker compose --profile translate up`:
       # LIBRETRANSLATE_URL: http://libretranslate:5000
     depends_on:

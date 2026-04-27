@@ -139,8 +139,10 @@ if ! curl -fsS --connect-timeout 3 "http://127.0.0.1:${PUBLISH_PORT}/api/health"
   exit 1
 fi
 curl -fsS "http://127.0.0.1:${PUBLISH_PORT}/api/health" | head -c 500 && echo ""
+curl -fsS -X POST "http://127.0.0.1:${PUBLISH_PORT}/api/v1/underwater-ai/health" | head -c 200 && echo ""
 curl -fsSI "http://127.0.0.1:${PUBLISH_PORT}/privacy" | head -n 8
 
 echo ""
 echo "Снаружи: curl -fsS https://api.dive-hub.ru/api/health"
+echo "Подводный AI: curl -fsS -X POST https://api.dive-hub.ru/api/v1/underwater-ai/health  (ожидается {\"available\":true})"
 echo "Для https://dive-hub.ru/privacy — прокси на этот же порт (см. legal-pages.controller.ts в репозитории)."
