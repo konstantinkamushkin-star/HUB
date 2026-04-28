@@ -2,8 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { BrandLogo } from "@/components/BrandLogo";
-import { PartnerRegistrationForm } from "./PartnerRegistrationForm";
+import { PublicBackdrop } from "./PublicBackdrop";
+import { PublicFooter } from "./PublicFooter";
+import { PublicHeader } from "./PublicHeader";
 
 const appStoreUrl = process.env.NEXT_PUBLIC_APP_STORE_URL?.trim() || "";
 const playStoreUrl = process.env.NEXT_PUBLIC_GOOGLE_PLAY_URL?.trim() || "";
@@ -121,67 +122,43 @@ const features: {
 
 export function LandingView() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-sky-50 via-cyan-50/80 to-white text-slate-800">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute -left-20 top-20 h-72 w-72 rounded-full bg-sky-300/40 blur-3xl" />
-        <div className="absolute right-0 top-40 h-96 w-96 rounded-full bg-amber-200/35 blur-3xl" />
-        <div className="absolute bottom-20 left-1/3 h-64 w-64 rounded-full bg-cyan-300/30 blur-3xl" />
-      </div>
-
-      <header className="relative z-10 border-b border-sky-100/80 bg-white/75 backdrop-blur-md">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-4 sm:px-6">
-          <Link href="/" className="flex items-center gap-2">
-            <BrandLogo variant="mark" className="h-9 w-9 shrink-0 sm:h-10 sm:w-10" maskedMark />
-            <BrandLogo variant="wordmark" className="h-9 w-auto max-w-[200px] shrink-0 sm:h-10 sm:max-w-[240px]" />
-          </Link>
-          <nav className="flex flex-1 flex-wrap items-center justify-end gap-x-4 gap-y-2 text-xs text-slate-600 sm:gap-6 sm:text-sm">
-            <a href="#about" className="transition hover:text-sky-700">
-              О приложении
-            </a>
-            <a href="#download" className="transition hover:text-sky-700">
-              Скачать
-            </a>
-            <a href="#registration" className="transition hover:text-sky-700">
-              Анкета
-            </a>
-          </nav>
-        </div>
-      </header>
+    <div className="relative min-h-screen bg-gradient-to-b from-slate-50 via-sky-50/50 to-white text-slate-800">
+      <PublicBackdrop />
+      <PublicHeader />
 
       <main className="relative z-10">
-        <section className="mx-auto max-w-5xl px-4 pb-16 pt-12 sm:px-6 sm:pb-24 sm:pt-16">
-          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
+        <section className="mx-auto max-w-5xl px-4 pb-16 pt-10 sm:px-6 sm:pb-24 sm:pt-14">
+          <div className="grid items-center gap-10 lg:grid-cols-2 lg:gap-14">
             <div>
-              <p className="inline-flex items-center gap-2 rounded-full bg-sky-100/90 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-sky-800">
+              <p className="inline-flex items-center gap-2 rounded-full border border-sky-200/80 bg-white/90 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] text-sky-800 shadow-sm">
                 <span aria-hidden>✨</span> DiveHub
               </p>
-              <h1 className="mt-5 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl sm:leading-[1.1]">
+              <h1 className="mt-6 text-4xl font-bold tracking-tight text-slate-900 sm:text-5xl sm:leading-[1.08]">
                 Платформа для дайверов, инструкторов и дайв-центров
               </h1>
-              <p className="mt-6 text-lg leading-relaxed text-slate-600">
-                Откройте карту погружений, бронируйте выезды и ведите логбук — а
-                для бизнеса подайте заявку на подключение к каталогу. После
-                проверки супер-администратором карточка станет доступна в
-                приложении.
+              <p className="mt-6 max-w-xl text-lg leading-relaxed text-slate-600">
+                Карта погружений, бронирования и логбук в одном приложении. Для
+                бизнеса — заявка в каталог: после проверки карточка появится у
+                пользователей DiveHub.
               </p>
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
                 <a
                   href="#download"
-                  className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-sky-500 to-cyan-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-500/30 transition hover:from-sky-400 hover:to-cyan-400"
+                  className="inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-600 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/25 transition hover:from-sky-500 hover:to-cyan-500"
                 >
                   Скачать приложение
                 </a>
-                <a
-                  href="#registration"
-                  className="inline-flex items-center justify-center rounded-2xl border-2 border-sky-200 bg-white px-6 py-3.5 text-sm font-semibold text-sky-800 transition hover:border-sky-400 hover:bg-sky-50"
+                <Link
+                  href="/register"
+                  className="inline-flex items-center justify-center rounded-2xl border-2 border-sky-200 bg-white px-6 py-3.5 text-sm font-semibold text-sky-900 transition hover:border-sky-400 hover:bg-sky-50"
                 >
                   Заявка для дайв-центра или магазина
-                </a>
+                </Link>
               </div>
             </div>
             <div className="relative">
-              <div className="absolute -right-4 -top-4 h-24 w-24 rounded-3xl bg-amber-300/50 blur-2xl" />
-              <div className="relative overflow-hidden rounded-3xl border-4 border-white shadow-2xl shadow-sky-900/15 ring-1 ring-sky-100">
+              <div className="absolute -right-4 -top-4 h-28 w-28 rounded-3xl bg-amber-300/40 blur-2xl" />
+              <div className="relative overflow-hidden rounded-3xl border border-white/80 shadow-2xl shadow-sky-900/20 ring-1 ring-sky-100/80">
                 <Image
                   src={imgs.hero}
                   alt="Подводная съёмка, Филиппины 2024"
@@ -201,13 +178,13 @@ export function LandingView() {
 
         <section
           id="about"
-          className="border-y border-sky-100/90 bg-white/60 py-16 backdrop-blur-sm sm:py-24"
+          className="border-y border-sky-100/80 bg-white/70 py-16 backdrop-blur-md sm:py-24"
         >
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
-            <h2 className="text-2xl font-bold text-slate-900 sm:text-3xl">
+            <h2 className="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
               Кратко о DiveHub
             </h2>
-            <p className="mt-3 max-w-2xl text-lg text-slate-600">
+            <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-600">
               Мобильное приложение объединяет любителей подводного мира и
               профессиональные площадки: от поиска точек до бронирований и
               сообщества.
@@ -216,7 +193,7 @@ export function LandingView() {
               {features.map((f) => (
                 <li
                   key={f.title}
-                  className="group overflow-hidden rounded-3xl border border-sky-100 bg-white shadow-lg shadow-sky-900/5 transition hover:-translate-y-1 hover:shadow-xl"
+                  className="group overflow-hidden rounded-3xl border border-sky-100/90 bg-white/95 shadow-lg shadow-sky-900/[0.06] transition duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-sky-900/10"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden">
                     <Image
@@ -247,7 +224,7 @@ export function LandingView() {
 
         <section id="download" className="py-16 sm:py-24">
           <div className="mx-auto max-w-5xl px-4 sm:px-6">
-            <div className="overflow-hidden rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-100/80 to-cyan-100/60 shadow-xl shadow-sky-900/10">
+            <div className="overflow-hidden rounded-3xl border border-sky-100/90 bg-gradient-to-br from-sky-100/90 via-white/60 to-cyan-100/50 shadow-xl shadow-sky-900/[0.08]">
               <div className="grid gap-0 lg:grid-cols-2">
                 <div className="relative min-h-[220px] lg:min-h-[320px]">
                   <Image
@@ -275,56 +252,26 @@ export function LandingView() {
           </div>
         </section>
 
-        <section
-          id="registration"
-          className="border-t border-sky-100 bg-gradient-to-b from-white to-sky-50/80 py-16 sm:py-24"
-        >
-          <div className="mx-auto max-w-lg px-4 sm:px-6">
-            <div className="rounded-3xl border border-sky-100 bg-white p-6 shadow-xl shadow-sky-900/10 sm:p-8">
-              <PartnerRegistrationForm showIntro appearance="light" />
-            </div>
-            <p className="mt-6 text-center text-sm text-slate-500">
-              Подача заявки на подключение дайв-центра или магазина. После заполнения
-              формы заявка попадает в очередь верификации — её обработает
-              супер-администратор.
+        <section className="border-t border-sky-100/80 bg-gradient-to-b from-white to-sky-50/70 py-14 sm:py-20">
+          <div className="mx-auto max-w-2xl px-4 text-center sm:px-6">
+            <h2 className="text-xl font-bold tracking-tight text-slate-900 sm:text-2xl">
+              Дайв-центру или магазину
+            </h2>
+            <p className="mt-3 text-sm leading-relaxed text-slate-600 sm:text-base">
+              Подайте заявку на подключение к каталогу — отдельная страница с
+              формой и картой точки на карте.
             </p>
+            <Link
+              href="/register"
+              className="mt-8 inline-flex items-center justify-center rounded-2xl bg-gradient-to-r from-sky-600 to-cyan-600 px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-sky-600/20 transition hover:from-sky-500 hover:to-cyan-500"
+            >
+              Открыть форму заявки
+            </Link>
           </div>
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-sky-100 bg-white/80 py-10 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-6 px-4 text-center text-sm text-slate-600 sm:flex-row sm:text-left sm:px-6">
-          <div className="flex items-center gap-2">
-            <BrandLogo variant="mark" className="h-8 w-8 shrink-0" maskedMark />
-            <p className="font-medium text-slate-700">
-              © {new Date().getFullYear()} DiveHub
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <a href="#registration" className="hover:text-slate-900">
-              Анкета партнёра
-            </a>
-            <span className="hidden text-slate-300 sm:inline" aria-hidden>
-              |
-            </span>
-            <Link
-              href="/privacy"
-              className="hover:text-slate-900"
-            >
-              Конфиденциальность
-            </Link>
-            <span className="hidden text-slate-300 sm:inline" aria-hidden>
-              |
-            </span>
-            <Link
-              href="/agreement"
-              className="hover:text-slate-900"
-            >
-              Соглашение
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <PublicFooter />
     </div>
   );
 }

@@ -1,55 +1,38 @@
 "use client";
 
 import { useState } from "react";
+import { brandingLogoUrl } from "@/lib/branding";
 
-const MARK_SRC = "/branding/logo-mark.png";
-const WORDMARK_SRC = "/branding/logo-wordmark.png";
+const SRC = brandingLogoUrl;
 
 type Props = {
-  /** Квадратная иконка или горизонтальный логотип с текстом DIVEHUB */
-  variant?: "mark" | "wordmark";
-  /** Напр. mark: `h-8 w-8`, wordmark: `h-8 w-auto max-w-[200px]` */
+  /** Размер и отступы, напр. `h-8 w-8` или `h-9 w-9` */
   className?: string;
-  /** Скругление как у иконки приложения (только variant=mark) */
+  /** Совместимость со старыми вызовами компонента. */
+  variant?: "mark" | "wordmark";
   maskedMark?: boolean;
 };
 
-export function BrandLogo({
-  variant = "wordmark",
-  className,
-  maskedMark = false,
-}: Props) {
+/** Логотип бренда: файл `public/branding/logo.svg`. */
+export function BrandLogo({ className = "h-8 w-8" }: Props) {
   const [useFallback, setUseFallback] = useState(false);
-  const SRC = variant === "wordmark" ? WORDMARK_SRC : MARK_SRC;
-  const defaultClass =
-    variant === "wordmark" ? "h-9 w-auto max-w-[220px]" : "h-8 w-8";
 
   if (useFallback) {
-    const fbMask =
-      variant === "mark" && maskedMark ? "rounded-[22%] bg-sky-500" : "";
     return (
-      <span
-        className={`inline-flex items-center justify-center ${fbMask} ${className ?? defaultClass}`}
-        aria-hidden
-      >
+      <span className={`inline-flex items-center justify-center ${className}`} aria-hidden>
         <span className="text-xl leading-none">🤿</span>
       </span>
     );
   }
 
-  const maskClass =
-    variant === "mark" && maskedMark
-      ? "rounded-[22%] shadow-sm ring-1 ring-black/5"
-      : "";
-
   return (
-    // eslint-disable-next-line @next/next/no-img-element -- локальный брендинг
+    // eslint-disable-next-line @next/next/no-img-element -- локальный брендинг, заменяемый файл
     <img
       src={SRC}
       alt="DiveHub"
-      className={`object-contain object-left ${maskClass} ${className ?? defaultClass}`}
-      width={variant === "wordmark" ? undefined : 32}
-      height={variant === "wordmark" ? undefined : 32}
+      className={`object-contain ${className}`}
+      width={581}
+      height={581}
       decoding="async"
       onError={() => setUseFallback(true)}
     />

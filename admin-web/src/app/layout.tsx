@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
-import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
+import { RootProviders } from "@/components/RootProviders";
+import { brandingLogoUrl } from "@/lib/branding";
 import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
-  subsets: ["latin"],
+  subsets: ["latin", "cyrillic"],
 });
 
 const geistMono = Geist_Mono({
@@ -19,20 +19,9 @@ export const metadata: Metadata = {
   description:
     "Платформа для дайверов и дайв-бизнеса. Скачайте приложение и подайте заявку на подключение к каталогу.",
   icons: {
-    icon: [
-      { url: "/branding/favicon-32x32.png", sizes: "32x32", type: "image/png" },
-      { url: "/branding/favicon-16x16.png", sizes: "16x16", type: "image/png" },
-      { url: "/branding/logo.svg", type: "image/svg+xml" },
-    ],
-    shortcut: "/favicon.ico",
-    apple: [{ url: "/branding/apple-touch-icon.png", sizes: "180x180" }],
-    other: [
-      {
-        rel: "mask-icon",
-        url: "/branding/logo.svg",
-        color: "#0ea5e9",
-      },
-    ],
+    icon: [{ url: brandingLogoUrl, type: "image/png" }],
+    shortcut: brandingLogoUrl,
+    apple: brandingLogoUrl,
   },
 };
 
@@ -41,17 +30,12 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  /* Inline-фон: если не подтянулся Tailwind/_next/static (nginx), не оставлять «белый экран». */
-  const shellBg = "#09090b";
   return (
-    <html lang="ru" className="bg-zinc-950" style={{ backgroundColor: shellBg }}>
+    <html lang="ru" className="scroll-smooth">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-zinc-950 text-zinc-100 antialiased`}
-        style={{ backgroundColor: shellBg, margin: 0, minHeight: "100vh" }}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ChunkLoadRecovery />
-        {children}
-        <CookieConsentBanner />
+        <RootProviders>{children}</RootProviders>
       </body>
     </html>
   );
