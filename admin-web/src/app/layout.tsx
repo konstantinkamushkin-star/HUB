@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { RootProviders } from "@/components/RootProviders";
+import { ChunkLoadRecovery } from "@/components/ChunkLoadRecovery";
+import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import { brandingLogoUrl } from "@/lib/branding";
 import "./globals.css";
 
@@ -35,7 +36,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <RootProviders>{children}</RootProviders>
+        <ChunkLoadRecovery />
+        {children}
+        <CookieConsentBanner />
       </body>
     </html>
   );
