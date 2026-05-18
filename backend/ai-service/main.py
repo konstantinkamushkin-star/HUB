@@ -2,7 +2,7 @@
 Underwater image enhancement AI service.
 POST /process: legacy multipart (inference.process).
 POST /v1/process/photo/{engine}: UVM-совместимый API — Nikolaj Bech underwater color correction (same as full UVM).
-POST /v1/process/video/{engine}: покадрово тот же алгоритм.
+POST /v1/process/video/{engine}: fast (Bech keyframes + global LAB) или full (каждый кадр); макс. 60 с.
 """
 import inspect
 import os
@@ -36,12 +36,40 @@ if _UVM_SRC.is_dir():
             downscale_bgr_for_process as _downscale_bgr_for_process,
             upscale_bgr_to_original as _upscale_bgr_to_original,
         )
+        from uvm.api.video_global_tone import (
+            MAX_VIDEO_DURATION_SEC as _MAX_VIDEO_DURATION_SEC,
+            assert_video_within_max_duration as _assert_video_within_max_duration,
+            process_video_fast_global_bech as _process_video_fast_global_bech,
+            probe_video_meta as _probe_video_meta,
+        )
     except Exception:
         _downscale_bgr_for_process = None
         _upscale_bgr_to_original = None
+        _MAX_VIDEO_DURATION_SEC = None
+        _assert_video_within_max_duration = None
+        _process_video_fast_global_bech = None
+        _probe_video_meta = None
 else:
     _downscale_bgr_for_process = None
     _upscale_bgr_to_original = None
+    _MAX_VIDEO_DURATION_SEC = None
+    _assert_video_within_max_duration = None
+    _process_video_fast_global_bech = None
+    _probe_video_meta = None
+
+_VIDEO_MAX_SEC = float(_MAX_VIDEO_DURATION_SEC) if _MAX_VIDEO_DURATION_SEC is not None else 60.0
+
+
+def _video_duration_guard(frame_index: int, fps: float) -> None:
+    if _assert_video_within_max_duration is not None:
+        _assert_video_within_max_duration(frame_index=frame_index, fps=fps)
+        return
+    f = float(fps) if fps and fps > 0 else 25.0
+    if (frame_index + 1) / f > _VIDEO_MAX_SEC + 1e-3:
+        raise ValueError(
+            f"video exceeds max duration {_VIDEO_MAX_SEC:g}s "
+            f"(got ~{(frame_index + 1) / f:.2f}s at {f:.3f} fps)"
+        )
 
 
 def _encode_jpeg_hex(bgr: np.ndarray, quality: int = 92) -> str:
@@ -235,10 +263,20 @@ async def process_video_uvm_compat(
     engine: str,
     video: UploadFile = File(...),
     max_side: int = Query(1280, ge=480, le=3840),
+    video_mode: str = Query(
+        "fast",
+        description="fast: Bech keyframes + global LAB; full: Bech every frame",
+    ),
+    sample_frames: int = Query(
+        20,
+        ge=10,
+        le=30,
+        description="Keyframe count for fast mode (evenly spaced)",
+    ),
 ):
     """
     Совместимость с DiveHub (NetworkService.processVideoUnderwaterVisionModule):
-    multipart поле `video`, ответ — тело MP4.
+    multipart поле `video`, ответ — тело MP4. Ролик до 60 с (оба режима).
     """
     eng = (engine or "").strip().lower()
     if eng not in ("ai1", "ai2", "cursor", "seathru"):
@@ -246,9 +284,24 @@ async def process_video_uvm_compat(
             status_code=400,
             detail="invalid engine for video",
         )
+    mode = (video_mode or "fast").strip().lower()
+    if mode not in ("fast", "full"):
+        raise HTTPException(status_code=400, detail='invalid video_mode (use "fast" or "full")')
     payload = await video.read()
     if not payload:
         raise HTTPException(status_code=400, detail='multipart field "video" is required')
+    if (
+        mode == "fast"
+        and (
+            _process_video_fast_global_bech is None
+            or _downscale_bgr_for_process is None
+            or _probe_video_meta is None
+        )
+    ):
+        raise HTTPException(
+            status_code=503,
+            detail="fast video mode unavailable: uvm video_global_tone or video_tone not importable",
+        )
 
     with tempfile.TemporaryDirectory(prefix="ai_svc_video_") as td:
         in_path = os.path.join(td, "in.mp4")
@@ -256,12 +309,67 @@ async def process_video_uvm_compat(
         with open(in_path, "wb") as f:
             f.write(payload)
 
+        if mode == "fast":
+            try:
+                n_rep, fps_guess, w0, h0 = _probe_video_meta(in_path)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="invalid video")
+            fps = float(fps_guess) if fps_guess and fps_guess > 0 else 25.0
+            if n_rep > 0 and n_rep / fps > _VIDEO_MAX_SEC + 1e-3:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"video_too_long: max {_VIDEO_MAX_SEC:g}s",
+                )
+            try:
+
+                def _bech(work: np.ndarray) -> np.ndarray:
+                    return _process_video_frame_bgr(eng, work)
+
+                frames, keys = _process_video_fast_global_bech(
+                    in_path,
+                    out_path,
+                    fps=fps,
+                    fw=w0,
+                    fh=h0,
+                    max_side=max_side,
+                    sample_frames=sample_frames,
+                    downscale_bgr_for_process=_downscale_bgr_for_process,
+                    bech_on_bgr=_bech,
+                )
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=str(e))
+            except HTTPException:
+                raise
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"video_processing_failed: {e}") from e
+            if frames == 0 or not os.path.isfile(out_path):
+                raise HTTPException(status_code=400, detail="empty video stream")
+            out_bytes = open(out_path, "rb").read()
+            return Response(
+                content=out_bytes,
+                media_type="video/mp4",
+                headers={
+                    "X-UVM-Engine": eng,
+                    "X-UVM-Frames": str(frames),
+                    "X-UVM-Backend": "ai-service",
+                    "X-UVM-Video-Mode": "fast",
+                    "X-UVM-Fast-Keyframes": str(keys),
+                },
+            )
+
         cap = cv2.VideoCapture(in_path)
         if not cap.isOpened():
             raise HTTPException(status_code=400, detail="invalid video")
         fps = cap.get(cv2.CAP_PROP_FPS)
         if not fps or fps <= 0:
             fps = 25.0
+        n0 = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if n0 > 0 and n0 / float(fps) > _VIDEO_MAX_SEC + 1e-3:
+            cap.release()
+            raise HTTPException(
+                status_code=400,
+                detail=f"video_too_long: max {_VIDEO_MAX_SEC:g}s",
+            )
         fw = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         fh = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         if fw <= 0 or fh <= 0:
@@ -278,6 +386,10 @@ async def process_video_uvm_compat(
                 if not ok:
                     break
                 try:
+                    _video_duration_guard(frame_index=frames, fps=float(fps))
+                except ValueError as e:
+                    raise HTTPException(status_code=400, detail=str(e)) from e
+                try:
                     if _downscale_bgr_for_process is not None:
                         work, orig_wh = _downscale_bgr_for_process(frame, max_side)
                     else:
@@ -286,8 +398,6 @@ async def process_video_uvm_compat(
                 except HTTPException:
                     raise
                 except Exception as e:
-                    cap.release()
-                    writer.release()
                     raise HTTPException(status_code=500, detail=f"video_processing_failed: {e}") from e
                 if _upscale_bgr_to_original is not None:
                     out_frame = _upscale_bgr_to_original(out_small, orig_wh)
@@ -310,5 +420,6 @@ async def process_video_uvm_compat(
             "X-UVM-Engine": eng,
             "X-UVM-Frames": str(frames),
             "X-UVM-Backend": "ai-service",
+            "X-UVM-Video-Mode": "full",
         },
     )

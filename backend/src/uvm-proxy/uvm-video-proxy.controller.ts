@@ -26,6 +26,8 @@ export class UvmVideoProxyController {
     @Param('engine') engine: string,
     @UploadedFile() file: Express.Multer.File | undefined,
     @Query('max_side') maxSide: string | undefined,
+    @Query('video_mode') videoMode: string | undefined,
+    @Query('sample_frames') sampleFrames: string | undefined,
     @Res() res: Response,
   ) {
     if (!file?.buffer?.length) {
@@ -36,6 +38,8 @@ export class UvmVideoProxyController {
     const eng = encodeURIComponent((engine || '').trim().toLowerCase());
     const qs = new URLSearchParams();
     if (maxSide != null && maxSide !== '') qs.set('max_side', maxSide);
+    if (videoMode != null && videoMode !== '') qs.set('video_mode', videoMode);
+    if (sampleFrames != null && sampleFrames !== '') qs.set('sample_frames', sampleFrames);
     const q = qs.toString();
     const url = `${uvm}/v1/process/video/${eng}${q ? `?${q}` : ''}`;
 
