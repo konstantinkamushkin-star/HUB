@@ -31,6 +31,8 @@ export class UvmVideoProxyController {
     @Query('mode') mode: string | undefined,
     @Query('luma_boost') lumaBoost: string | undefined,
     @Query('max_side') maxSide: string | undefined,
+    @Query('video_mode') videoMode: string | undefined,
+    @Query('sample_frames') sampleFrames: string | undefined,
     @Res() res: Response,
   ) {
     if (!file?.buffer?.length) {
@@ -46,6 +48,8 @@ export class UvmVideoProxyController {
     if (mode != null && mode !== '') qs.set('mode', mode);
     if (lumaBoost != null && lumaBoost !== '') qs.set('luma_boost', lumaBoost);
     if (maxSide != null && maxSide !== '') qs.set('max_side', maxSide);
+    if (videoMode != null && videoMode !== '') qs.set('video_mode', videoMode);
+    if (sampleFrames != null && sampleFrames !== '') qs.set('sample_frames', sampleFrames);
     const q = qs.toString();
     const url = `${uvm}/v1/process/video/${eng}${q ? `?${q}` : ''}`;
 

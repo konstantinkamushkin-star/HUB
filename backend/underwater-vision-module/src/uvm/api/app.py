@@ -9,6 +9,15 @@ from fastapi import FastAPI, File, Query, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 
 from uvm.api.jpeg_utils import encode_jpeg_hex
+from uvm.api.video_global_tone import (
+    DEFAULT_SAMPLE_FRAMES,
+    MAX_VIDEO_DURATION_SEC,
+    SAMPLE_FRAMES_MAX,
+    SAMPLE_FRAMES_MIN,
+    assert_video_within_max_duration,
+    process_video_fast_global_bech,
+    probe_video_meta,
+)
 from uvm.api.video_tone import (
     downscale_bgr_for_process,
     post_lift_underwater_video_bgr,
@@ -308,10 +317,29 @@ async def process_video_by_path(
         le=3840,
         description='Длинная сторона кадра для обработки (меньше — быстрее; выход всё равно в исходном разрешении)',
     ),
+    video_mode: str = Query(
+        'fast',
+        description='fast: Bech on keyframes + global LAB tone; full: Bech every frame',
+    ),
+    sample_frames: int = Query(
+        DEFAULT_SAMPLE_FRAMES,
+        ge=SAMPLE_FRAMES_MIN,
+        le=SAMPLE_FRAMES_MAX,
+        description='Keyframes for fast mode (evenly spaced)',
+    ),
 ):
     eng = (engine or '').strip().lower()
     if eng not in _VALID_ENGINES or eng == 'seasplat':
         return JSONResponse({'error': 'invalid engine for video', 'allowed': ['ai1', 'ai2', 'cursor', 'seathru']}, status_code=400)
+    vmode = (video_mode or 'fast').strip().lower()
+    if vmode not in ('fast', 'full'):
+        return JSONResponse(
+            {
+                'error': 'invalid video_mode',
+                'allowed': ['fast', 'full'],
+            },
+            status_code=400,
+        )
     payload = await video.read()
     if not payload:
         return JSONResponse({'error': 'multipart field "video" is required'}, status_code=400)
@@ -322,12 +350,81 @@ async def process_video_by_path(
         with open(in_path, 'wb') as f:
             f.write(payload)
 
+        if vmode == 'fast':
+            try:
+                n_rep, fps_guess, w0, h0 = probe_video_meta(in_path)
+            except ValueError as e:
+                return JSONResponse({'error': 'invalid video', 'detail': str(e)}, status_code=400)
+            fps = float(fps_guess) if fps_guess and fps_guess > 0 else 25.0
+            if n_rep > 0 and n_rep / fps > MAX_VIDEO_DURATION_SEC + 1e-3:
+                return JSONResponse(
+                    {
+                        'error': 'video_too_long',
+                        'detail': f'max {MAX_VIDEO_DURATION_SEC:g}s',
+                        'reported_sec': round(n_rep / fps, 2),
+                    },
+                    status_code=400,
+                )
+            try:
+
+                def _bech(bgr: np.ndarray) -> np.ndarray:
+                    out, _rep = _process_frame_with_engine(
+                        eng,
+                        bgr,
+                        strength=strength,
+                        depth_hint_m=depth_hint_m,
+                        quality=quality,
+                        mode=mode,
+                    )
+                    return out
+
+                frames, keys = process_video_fast_global_bech(
+                    in_path,
+                    out_path,
+                    fps=fps,
+                    fw=w0,
+                    fh=h0,
+                    max_side=max_side,
+                    sample_frames=sample_frames,
+                    downscale_bgr_for_process=downscale_bgr_for_process,
+                    bech_on_bgr=_bech,
+                )
+            except ValueError as e:
+                return JSONResponse({'error': 'video_processing_failed', 'detail': str(e)}, status_code=400)
+            except Exception as e:
+                return JSONResponse({'error': 'video_processing_failed', 'detail': str(e)}, status_code=500)
+            if frames == 0 or not os.path.isfile(out_path):
+                return JSONResponse({'error': 'empty video stream'}, status_code=400)
+            out_bytes = open(out_path, 'rb').read()
+            return Response(
+                content=out_bytes,
+                media_type='video/mp4',
+                headers={
+                    'X-UVM-Engine': eng,
+                    'X-UVM-Frames': str(frames),
+                    'X-UVM-Backend': 'nikolaj_bech_underwater_color_correction',
+                    'X-UVM-Video-Mode': 'fast',
+                    'X-UVM-Fast-Keyframes': str(keys),
+                },
+            )
+
         cap = cv2.VideoCapture(in_path)
         if not cap.isOpened():
             return JSONResponse({'error': 'invalid video'}, status_code=400)
         fps = cap.get(cv2.CAP_PROP_FPS)
         if not fps or fps <= 0:
             fps = 25.0
+        n0 = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        if n0 > 0 and n0 / float(fps) > MAX_VIDEO_DURATION_SEC + 1e-3:
+            cap.release()
+            return JSONResponse(
+                {
+                    'error': 'video_too_long',
+                    'detail': f'max {MAX_VIDEO_DURATION_SEC:g}s',
+                    'reported_sec': round(n0 / float(fps), 2),
+                },
+                status_code=400,
+            )
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         if w <= 0 or h <= 0:
@@ -344,6 +441,10 @@ async def process_video_by_path(
                 ok, frame = cap.read()
                 if not ok:
                     break
+                try:
+                    assert_video_within_max_duration(frame_index=frames, fps=float(fps))
+                except ValueError as e:
+                    return JSONResponse({'error': 'video_too_long', 'detail': str(e)}, status_code=400)
                 work, orig_wh = downscale_bgr_for_process(frame, max_side)
                 out_small, rep = _process_frame_with_engine(
                     eng,
@@ -360,8 +461,6 @@ async def process_video_by_path(
                 frames += 1
                 last_report = rep
         except Exception as e:
-            cap.release()
-            writer.release()
             return JSONResponse({'error': 'video_processing_failed', 'detail': str(e)}, status_code=500)
         finally:
             cap.release()
@@ -377,6 +476,7 @@ async def process_video_by_path(
                 'X-UVM-Engine': eng,
                 'X-UVM-Frames': str(frames),
                 'X-UVM-Backend': str(last_report.get('backend', 'unknown')),
+                'X-UVM-Video-Mode': 'full',
             },
         )
 
