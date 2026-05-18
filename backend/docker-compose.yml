@@ -48,6 +48,9 @@ services:
 
   api:
     build: .
+    # Секреты и OAuth из backend/.env (APPLE_CLIENT_IDS, GOOGLE_CLIENT_ID, SMTP, …).
+    env_file:
+      - .env
     ports:
       # Если на хосте уже занят 3000 — в .env рядом с compose: API_PUBLISH_PORT=3001
       - "${API_PUBLISH_PORT:-3000}:3000"
@@ -71,6 +74,11 @@ services:
       # Подводный AI в редакторе фото: Nest зовёт POST {AI_UNDERWATER_SERVICE_URL}/process (при 404 — fallback на UVM /v1/...).
       # Должен совпадать с UVM/ai-service в той же docker-сети, иначе health вернёт available:false.
       AI_UNDERWATER_SERVICE_URL: ${AI_UNDERWATER_SERVICE_URL:-http://uvm:8010}
+      # OAuth (значения из .env; fallback для Apple — Bundle ID приложения)
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      APPLE_CLIENT_IDS: ${APPLE_CLIENT_IDS:-Dive-Hub.ru}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_IDS: ${GOOGLE_CLIENT_IDS:-}
       # Раскомментируйте при `docker compose --profile translate up`:
       # LIBRETRANSLATE_URL: http://libretranslate:5000
     depends_on:
