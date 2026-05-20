@@ -34,12 +34,14 @@ export class FeedController {
     @Request() req: { user: { sub: string } },
     @Query('limit') limitStr?: string,
     @Query('cursor') cursor?: string,
+    @Query('hashtag') hashtag?: string,
   ) {
     const limit = limitStr ? parseInt(limitStr, 10) : undefined;
     return this.feedService.listPosts(
       req.user.sub,
       Number.isFinite(limit) ? limit : undefined,
       cursor || null,
+      hashtag?.trim() || undefined,
     );
   }
 

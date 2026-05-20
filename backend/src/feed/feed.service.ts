@@ -241,10 +241,25 @@ export class FeedService {
     return { items, hasMore, nextCursor };
   }
 
+  private normalizeHashtag(raw?: string): string | null {
+    if (!raw?.trim()) {
+      return null;
+    }
+    let tag = raw.trim().toLowerCase();
+    if (tag.startsWith('#')) {
+      tag = tag.slice(1);
+    }
+    if (!/^[a-z][a-z0-9_]*$/.test(tag)) {
+      return null;
+    }
+    return tag;
+  }
+
   async listPosts(
     viewerId: string,
     limit = DEFAULT_FEED_LIMIT,
     cursor?: string | null,
+    hashtag?: string,
   ) {
     const authorIds = await this.visibleAuthorIds(viewerId);
     const lim = Math.min(Math.max(limit, 1), MAX_FEED_LIMIT);
@@ -255,6 +270,13 @@ export class FeedService {
       .orderBy('p.createdAt', 'DESC')
       .addOrderBy('p.id', 'DESC')
       .take(lim + 1);
+
+    const tag = this.normalizeHashtag(hashtag);
+    if (tag) {
+      qb.andWhere('LOWER(p.content) LIKE :hashtagPat', {
+        hashtagPat: `%#${tag}%`,
+      });
+    }
 
     if (cursor) {
       const c = decodeFeedCursor(cursor);
