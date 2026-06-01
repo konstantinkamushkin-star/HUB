@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { User } from '../users/entities/user.entity';
 import { UserLocationEntity } from './entities/user-location.entity';
 import { LocationService } from './location.service';
+import { LocationFriendsController } from './location-friends.controller';
 import { FriendsModule } from '../friends/friends.module';
 import { AuthModule } from '../auth/auth.module';
 
@@ -12,6 +13,7 @@ import { AuthModule } from '../auth/auth.module';
     FriendsModule,
     AuthModule,
   ],
+  controllers: [LocationFriendsController],
   providers: [LocationService],
   exports: [LocationService],
 })
