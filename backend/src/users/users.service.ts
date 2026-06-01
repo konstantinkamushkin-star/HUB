@@ -104,6 +104,7 @@ export class UsersService {
       .createQueryBuilder('u')
       .where('u.id != :me', { me: currentUserId })
       .andWhere('u.accountStatus = :active', { active: UserAccountStatus.ACTIVE })
+      .andWhere('u.show_in_friend_search = true')
       .andWhere(
         '(LOWER(u.email) LIKE LOWER(:p) OR LOWER(u."firstName") LIKE LOWER(:p) OR LOWER(u."lastName") LIKE LOWER(:p) OR LOWER(CONCAT(u."firstName", \' \', u."lastName")) LIKE LOWER(:p))',
         { p: pattern },

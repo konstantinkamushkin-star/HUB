@@ -6,12 +6,14 @@ import { Friendship } from './entities/friendship.entity';
 import { FriendsService } from './friends.service';
 import { FriendsController } from './friends.controller';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { LocationModule } from '../location/location.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Friendship, User]),
     AuthModule,
     NotificationsModule,
+    LocationModule,
   ],
   controllers: [FriendsController],
   providers: [FriendsService],

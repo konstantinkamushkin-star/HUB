@@ -10,16 +10,29 @@ import { DiveLogEntity } from '../dive-logs/entities/dive-log.entity';
 import { UserPushDevice } from '../push/entities/user-push-device.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
+import { LocationModule } from '../location/location.module';
+import { FriendsModule } from '../friends/friends.module';
+import { DiveSiteEntity } from '../dive-sites/entities/dive-site.entity';
+import { UserProfileSummaryService } from './user-profile-summary.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, FeedPost, FeedPostComment, DiveLogEntity, UserPushDevice]),
+    TypeOrmModule.forFeature([
+      User,
+      FeedPost,
+      FeedPostComment,
+      DiveLogEntity,
+      UserPushDevice,
+      DiveSiteEntity,
+    ]),
     AuthModule,
     AdminModule,
     PushModule,
+    LocationModule,
+    FriendsModule,
   ],
   controllers: [UsersController],
-  providers: [UsersService],
-  exports: [UsersService],
+  providers: [UsersService, UserProfileSummaryService],
+  exports: [UsersService, UserProfileSummaryService],
 })
 export class UsersModule {}

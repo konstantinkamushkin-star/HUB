@@ -124,6 +124,15 @@ export class User {
   @Column({ default: false })
   shareLogbook: boolean;
 
+  @Column({ name: 'share_location', default: false })
+  shareLocation: boolean;
+
+  @Column({ name: 'show_in_friend_search', default: true })
+  showInFriendSearch: boolean;
+
+  @Column({ name: 'public_profile', default: false })
+  publicProfile: boolean;
+
   /** Текст «о себе» для карточки инструктора в каталоге (редактирует админ центра). */
   @Column({ type: 'text', nullable: true })
   bio?: string | null;

@@ -28,6 +28,12 @@ export class ChatConversation {
   @Column({ name: 'bookingId', type: 'uuid', nullable: true })
   bookingId: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  title: string | null;
+
+  @Column({ name: 'tripId', type: 'uuid', nullable: true })
+  tripId: string | null;
+
   @OneToMany(() => ChatParticipant, (p) => p.conversation)
   participantRecords: ChatParticipant[];
 

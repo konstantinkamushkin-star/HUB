@@ -21,6 +21,7 @@ import { FriendsModule } from './friends/friends.module';
 import { FeedModule } from './feed/feed.module';
 import { ChatModule } from './chat/chat.module';
 import { UsersModule } from './users/users.module';
+import { CertificationsModule } from './certifications/certifications.module';
 import { MediaModule } from './media/media.module';
 import { DiveLogsModule } from './dive-logs/dive-logs.module';
 import { ReviewsModule } from './reviews/reviews.module';
@@ -34,6 +35,8 @@ import { BookingsModule } from './bookings/bookings.module';
 import { CenterServicesModule } from './center-services/center-services.module';
 import { TranslateModule } from './translate/translate.module';
 import { SupportModule } from './support/support.module';
+import { LocationModule } from './location/location.module';
+import { GroupTripsModule } from './group-trips/group-trips.module';
 
 @Module({
   controllers: [AppController, LegalPagesController, LocalizationController],
@@ -117,6 +120,7 @@ import { SupportModule } from './support/support.module';
     // Feature modules
     AuthModule,
     UsersModule,
+    CertificationsModule,
     FriendsModule,
     FeedModule,
     ChatModule,
@@ -141,6 +145,8 @@ import { SupportModule } from './support/support.module';
     CenterServicesModule,
     TranslateModule,
     SupportModule,
+    LocationModule,
+    GroupTripsModule,
   ],
   providers: [
     {

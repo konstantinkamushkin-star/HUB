@@ -430,7 +430,10 @@ export class ChatService {
     });
 
     const peerIds: string[] = [];
-    let peerDisplayName = 'Chat';
+    let peerDisplayName =
+      conv.kind === 'TRIP_GROUP' && conv.title?.trim()
+        ? conv.title.trim()
+        : 'Chat';
     const peerUserIds: string[] = [];
     for (const p of parts) {
       if (p.participantType === 'user' && p.participantId !== viewerId) {
@@ -539,6 +542,10 @@ export class ChatService {
         ? this.parseAppSupportTopicIdFromCanonicalKey(conv.canonicalKey)
         : null;
 
+    const userParticipantCount = parts.filter(
+      (p) => p.participantType === 'user',
+    ).length;
+
     return {
       id: conv.id,
       participants: peerIds,
@@ -546,6 +553,9 @@ export class ChatService {
       diveCenterId: conv.diveCenterId,
       shopId: conv.shopId,
       bookingId: conv.bookingId,
+      tripId: conv.tripId,
+      title: conv.title,
+      participantCount: userParticipantCount,
       lastMessage,
       unreadCount,
       createdAt: conv.createdAt,
@@ -553,6 +563,70 @@ export class ChatService {
       kind: conv.kind,
       topicId,
     };
+  }
+
+  /** Creates TRIP_GROUP chat for a group trip; returns conversation id. */
+  async createTripGroupChat(
+    tripId: string,
+    title: string,
+    memberUserIds: string[],
+  ): Promise<string> {
+    const uniq = [...new Set(memberUserIds)].filter(Boolean);
+    if (uniq.length < 1) {
+      throw new BadRequestException('At least one member required');
+    }
+
+    const key = `trip:${tripId}`;
+    let conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+    if (conv) {
+      return conv.id;
+    }
+
+    conv = this.convRepository.create({
+      kind: 'TRIP_GROUP',
+      canonicalKey: key,
+      diveCenterId: null,
+      shopId: null,
+      bookingId: null,
+      tripId,
+      title: title.slice(0, 255),
+    });
+    await this.convRepository.save(conv);
+
+    const rows = uniq.map((uid, i) =>
+      this.participantRepository.create({
+        conversationId: conv!.id,
+        participantType: 'user',
+        participantId: uid,
+        lastReadAt: i === 0 ? new Date() : null,
+      }),
+    );
+    await this.participantRepository.save(rows);
+    return conv.id;
+  }
+
+  async addUserToTripGroupChat(
+    conversationId: string,
+    userId: string,
+  ): Promise<void> {
+    const existing = await this.participantRepository.findOne({
+      where: {
+        conversationId,
+        participantType: 'user',
+        participantId: userId,
+      },
+    });
+    if (existing) {
+      return;
+    }
+    await this.participantRepository.save(
+      this.participantRepository.create({
+        conversationId,
+        participantType: 'user',
+        participantId: userId,
+        lastReadAt: null,
+      }),
+    );
   }
 
   async listConversations(userId: string) {

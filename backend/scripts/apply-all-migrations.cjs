@@ -68,6 +68,11 @@ const MIGRATION_FILES = [
   '031_commerce_gear_inventory.sql',
   '032_support_tickets_category_metadata.sql',
   '033_users_username.sql',
+  '034_add_dive_log_location_name.sql',
+  '035_create_user_certifications.sql',
+  '036_add_certificate_number.sql',
+  '037_user_locations_and_privacy.sql',
+  '038_group_trips_and_chat_trip.sql',
 ];
 
 function pick(envFile, key, fallback) {

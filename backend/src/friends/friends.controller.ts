@@ -19,19 +19,40 @@ import {
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { FriendsService } from './friends.service';
 import { SendFriendRequestDto } from './dto/send-friend-request.dto';
+import { LocationService } from '../location/location.service';
+import { Query } from '@nestjs/common';
 
 @ApiTags('friends')
 @Controller('friends')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class FriendsController {
-  constructor(private readonly friendsService: FriendsService) {}
+  constructor(
+    private readonly friendsService: FriendsService,
+    private readonly locationService: LocationService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'List accepted friends' })
   @ApiResponse({ status: 200, description: 'Friends list' })
   async listFriends(@Request() req: { user: { sub: string } }) {
     return this.friendsService.listFriends(req.user.sub);
+  }
+
+  @Get('locations')
+  @ApiOperation({ summary: 'Friend locations (shareLocation enabled)' })
+  listFriendLocations(
+    @Request() req: { user: { sub: string } },
+    @Query('lat') lat?: string,
+    @Query('lng') lng?: string,
+  ) {
+    const viewerLat = lat !== undefined ? parseFloat(lat) : undefined;
+    const viewerLng = lng !== undefined ? parseFloat(lng) : undefined;
+    return this.locationService.listFriendLocations(
+      req.user.sub,
+      viewerLat,
+      viewerLng,
+    );
   }
 
   @Get('requests/sent')
