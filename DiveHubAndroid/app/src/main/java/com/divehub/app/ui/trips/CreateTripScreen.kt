@@ -5,6 +5,8 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -28,6 +30,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -35,6 +38,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -47,6 +51,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -60,9 +65,14 @@ import androidx.navigation.NavController
 import coil.compose.AsyncImage
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.data.AuthRepository
 import com.divehub.app.data.ExploreRepository
+import com.divehub.app.data.remote.dto.hasActiveProSubscription
 import com.divehub.app.data.remote.dto.CourseListItemDto
 import com.divehub.app.data.remote.dto.CreateTripRequestDto
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.divehub.app.util.CountryDisplayNames
+import java.util.Locale
 import com.divehub.app.data.remote.dto.DiveCenterBriefDto
 import com.divehub.app.data.remote.dto.UpdateTripRequestDto
 import com.divehub.app.data.remote.dto.UserDto
@@ -76,7 +86,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.util.Locale
 import java.util.UUID
 
 private val dateRegex = Regex("^\\d{4}-\\d{2}-\\d{2}$")
@@ -112,6 +121,7 @@ data class CreateTripUiState(
     val centers: List<DiveCenterBriefDto> = emptyList(),
     val centersError: String? = null,
     val tripLoadError: String? = null,
+    val usesPersonalOrganizer: Boolean = false,
     val selectedCenterId: String? = null,
     val tripTypeDaily: Boolean = true,
     val hotelLabel: String = "",
@@ -136,8 +146,8 @@ data class CreateTripUiState(
     val expenseDraft: TripExpenseFormDraft? = null,
     val countries: List<String> = emptyList(),
     val loadingCountries: Boolean = false,
-    val importingTrip: Boolean = false,
-    val importError: String? = null,
+    val regions: List<String> = emptyList(),
+    val loadingRegions: Boolean = false,
     /** API root (e.g. `http://10.0.2.2:3000`) for resolving uploaded relative paths in previews. */
     val imageApiRoot: String = "",
     val photoUploadInProgress: Boolean = false,
@@ -165,14 +175,30 @@ class CreateTripViewModel(
     private val repo: TripsRepository,
     private val editingTripId: String? = null,
 ) : ViewModel() {
+    private val authRepo = AuthRepository(graph)
     private val _state = MutableStateFlow(CreateTripUiState())
     val state: StateFlow<CreateTripUiState> = _state.asStateFlow()
+
+    private suspend fun shouldUsePersonalOrganizer(centers: List<DiveCenterBriefDto>): Boolean {
+        if (centers.isNotEmpty()) return false
+        return authRepo.cachedUser()?.hasActiveProSubscription() == true
+    }
 
     init {
         viewModelScope.launch {
             val imageRoot = graph.tokenStore.getRootBaseUrl()
             val centersResult = runCatching { repo.listManagedDiveCenters() }
             if (centersResult.isFailure) {
+                val personal = authRepo.cachedUser()?.hasActiveProSubscription() == true
+                if (personal) {
+                    _state.value = CreateTripUiState(
+                        loadingCenters = false,
+                        usesPersonalOrganizer = true,
+                        imageApiRoot = imageRoot,
+                    )
+                    loadCountries()
+                    return@launch
+                }
                 _state.value = CreateTripUiState(
                     loadingCenters = false,
                     centersError = centersResult.exceptionOrNull()?.message ?: "Error",
@@ -181,17 +207,21 @@ class CreateTripViewModel(
                 return@launch
             }
             val list = centersResult.getOrThrow()
+            val personal = shouldUsePersonalOrganizer(list)
             val editId = editingTripId
             if (editId.isNullOrBlank()) {
                 val firstId = list.firstOrNull()?.id
                 _state.value = CreateTripUiState(
                     loadingCenters = false,
                     centers = list,
+                    usesPersonalOrganizer = personal,
                     selectedCenterId = firstId,
                     imageApiRoot = imageRoot,
                 )
-                loadInstructors(firstId)
-                loadCourses(firstId)
+                if (!personal) {
+                    loadInstructors(firstId)
+                    loadCourses(firstId)
+                }
                 loadCountries()
                 return@launch
             }
@@ -240,17 +270,39 @@ class CreateTripViewModel(
             loadInstructors(orgId)
             loadCourses(orgId)
             loadCountries()
+            if (t.country.orEmpty().isNotBlank()) {
+                loadRegions(t.country.orEmpty())
+            }
         }
     }
 
     private fun loadCountries() {
         viewModelScope.launch {
             _state.update { it.copy(loadingCountries = true) }
-            val list = runCatching { ExploreRepository(graph).getCountries() }.getOrElse { emptyList() }
+            val list = runCatching { ExploreRepository(graph).getCountries() }
+                .getOrElse { emptyList() }
+                .distinct()
+                .sorted()
             _state.update {
                 it.copy(
                     loadingCountries = false,
-                    countries = list.distinct().sorted(),
+                    countries = list,
+                )
+            }
+            if (_state.value.country.isNotBlank()) {
+                loadRegions(_state.value.country)
+            }
+        }
+    }
+
+    private fun loadRegions(country: String) {
+        viewModelScope.launch {
+            _state.update { it.copy(loadingRegions = true) }
+            val list = ExploreRepository(graph).getRegions(country)
+            _state.update {
+                it.copy(
+                    loadingRegions = false,
+                    regions = list,
                 )
             }
         }
@@ -315,7 +367,8 @@ class CreateTripViewModel(
     }
 
     fun setCountry(v: String) {
-        _state.update { it.copy(country = v) }
+        _state.update { it.copy(country = v, region = "", regions = emptyList()) }
+        if (v.isNotBlank()) loadRegions(v)
     }
 
     fun setRegion(v: String) {
@@ -552,10 +605,6 @@ class CreateTripViewModel(
         _state.update { it.copy(cabinPrices = it.cabinPrices.filterNot { c -> c.id == id }) }
     }
 
-    fun clearImportError() {
-        _state.update { it.copy(importError = null) }
-    }
-
     fun clearPhotoUploadError() {
         _state.update { it.copy(photoUploadError = null) }
     }
@@ -579,24 +628,6 @@ class CreateTripViewModel(
                 _state.update { it.copy(photoUploadError = e.message ?: "Upload failed") }
             }
             _state.update { it.copy(photoUploadInProgress = false) }
-        }
-    }
-
-    fun importTripFromWebsite(url: String) {
-        val centerId = _state.value.selectedCenterId ?: return
-        val u = url.trim()
-        if (u.isEmpty()) return
-        viewModelScope.launch {
-            _state.update { it.copy(importingTrip = true, importError = null) }
-            runCatching { repo.importTripFromUrl(u, centerId) }
-                .onSuccess { res ->
-                    _state.update { it.copy(importingTrip = false, createdTripId = res.tripId) }
-                }
-                .onFailure { e ->
-                    _state.update {
-                        it.copy(importingTrip = false, importError = e.message ?: "Error")
-                    }
-                }
         }
     }
 
@@ -867,12 +898,16 @@ class CreateTripViewModel(
     fun submit() {
         val s = _state.value
         val centerId = s.selectedCenterId
-        if (centerId.isNullOrBlank()) {
+        if (!s.usesPersonalOrganizer && centerId.isNullOrBlank()) {
             _state.update { it.copy(saveError = "no_center") }
             return
         }
         if (s.country.trim().length < 2) {
             _state.update { it.copy(saveError = "country") }
+            return
+        }
+        if (s.region.trim().length < 2) {
+            _state.update { it.copy(saveError = "region") }
             return
         }
         if (!dateRegex.matches(s.startDate.trim()) || !dateRegex.matches(s.endDate.trim())) {
@@ -881,23 +916,6 @@ class CreateTripViewModel(
         }
         if (s.endDate.trim() < s.startDate.trim()) {
             _state.update { it.copy(saveError = "dates_order") }
-            return
-        }
-        if (s.description.trim().length < 5) {
-            _state.update { it.copy(saveError = "description") }
-            return
-        }
-        val spots = s.totalSpots.trim().toIntOrNull()
-        if (spots == null || spots < 1 || spots > 500) {
-            _state.update { it.copy(saveError = "spots") }
-            return
-        }
-        if (s.tripTypeDaily && s.hotelLabel.trim().isEmpty()) {
-            _state.update { it.copy(saveError = "hotel") }
-            return
-        }
-        if (!s.tripTypeDaily && s.yachtLabel.trim().isEmpty()) {
-            _state.update { it.copy(saveError = "yacht") }
             return
         }
         for (day in s.programDays) {
@@ -915,6 +933,7 @@ class CreateTripViewModel(
         val programArr = s.programDays.toProgramDaysJsonArray()
         val expensesArr = s.additionalExpenses.toAdditionalExpensesJsonArray()
         val minDives = s.minimumDives.trim().toIntOrNull()
+        val spots = s.totalSpots.trim().toIntOrNull()?.coerceIn(1, 500) ?: 10
         val editId = s.editingTripId
         val isDaily = s.tripTypeDaily
         val photoUrls = s.photoUrlsText.lines().map { it.trim() }.filter { it.isNotEmpty() }
@@ -923,10 +942,10 @@ class CreateTripViewModel(
             _state.update { it.copy(saving = true, saveError = null) }
             if (editId.isNullOrBlank()) {
                 val body = CreateTripRequestDto(
-                    diveCenterId = centerId,
+                    diveCenterId = if (s.usesPersonalOrganizer) null else centerId,
                     tripType = if (isDaily) "daily" else "safari",
                     country = s.country.trim(),
-                    region = s.region.trim().ifBlank { null },
+                    region = s.region.trim(),
                     startDate = s.startDate.trim(),
                     endDate = s.endDate.trim(),
                     description = s.description.trim(),
@@ -957,7 +976,7 @@ class CreateTripViewModel(
                 val patch = UpdateTripRequestDto(
                     tripType = if (isDaily) "daily" else "safari",
                     country = s.country.trim(),
-                    region = s.region.trim().ifBlank { null },
+                    region = s.region.trim(),
                     startDate = s.startDate.trim(),
                     endDate = s.endDate.trim(),
                     description = s.description.trim(),
@@ -1007,9 +1026,41 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
     )
     val state by vm.state.collectAsState()
     val isEdit = !state.editingTripId.isNullOrBlank()
-    var countryMenuExpanded by remember { mutableStateOf(false) }
-    var showImportDialog by remember { mutableStateOf(false) }
-    var importUrlText by remember { mutableStateOf("") }
+    val langTag by graph.tokenStore.appLanguageTagFlow.collectAsStateWithLifecycle(initialValue = "ru")
+    val countryDisplayLocale = remember(langTag) {
+        Locale.forLanguageTag(langTag.ifBlank { "ru" })
+    }
+    fun localizedCountry(name: String): String = CountryDisplayNames.localized(name, countryDisplayLocale)
+    var countryQuery by remember { mutableStateOf("") }
+    var regionQuery by remember { mutableStateOf("") }
+    var countryFieldFocused by remember { mutableStateOf(false) }
+    var regionFieldFocused by remember { mutableStateOf(false) }
+
+    LaunchedEffect(state.country, countryDisplayLocale) {
+        if (state.country.isNotBlank() && !countryFieldFocused) {
+            countryQuery = localizedCountry(state.country)
+        }
+    }
+    LaunchedEffect(state.region) {
+        if (!regionFieldFocused) {
+            regionQuery = state.region
+        }
+    }
+
+    val filteredCountries = remember(countryQuery, state.countries, countryDisplayLocale) {
+        val q = countryQuery.trim()
+        val sorted = state.countries.sortedBy { localizedCountry(it) }
+        if (q.isEmpty()) sorted
+        else sorted.filter { c ->
+            localizedCountry(c).contains(q, ignoreCase = true) || c.contains(q, ignoreCase = true)
+        }
+    }
+    val filteredRegions = remember(regionQuery, state.regions) {
+        val q = regionQuery.trim()
+        val sorted = state.regions.sorted()
+        if (q.isEmpty()) sorted
+        else sorted.filter { r -> r.contains(q, ignoreCase = true) }
+    }
     val context = LocalContext.current
     val pickTripPhotos = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(12),
@@ -1309,73 +1360,8 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
         )
     }
 
-    if (showImportDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                if (!state.importingTrip) {
-                    showImportDialog = false
-                    importUrlText = ""
-                    vm.clearImportError()
-                }
-            },
-            title = { Text(stringResource(R.string.trip_create_import_title)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        stringResource(R.string.trip_create_import_body),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    OutlinedTextField(
-                        value = importUrlText,
-                        onValueChange = {
-                            importUrlText = it
-                            vm.clearImportError()
-                        },
-                        label = { Text(stringResource(R.string.trip_create_import_hint)) },
-                        singleLine = false,
-                        minLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = !state.importingTrip,
-                    )
-                    state.importError?.takeIf { it.isNotBlank() }?.let { err ->
-                        Text(err, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (state.importingTrip) {
-                        CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.dp)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        vm.importTripFromWebsite(importUrlText)
-                    },
-                    enabled = importUrlText.trim().isNotEmpty() && !state.importingTrip,
-                ) {
-                    Text(stringResource(R.string.trip_create_import_confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showImportDialog = false
-                        importUrlText = ""
-                        vm.clearImportError()
-                    },
-                    enabled = !state.importingTrip,
-                ) {
-                    Text(stringResource(R.string.common_cancel))
-                }
-            },
-        )
-    }
-
     LaunchedEffect(state.createdTripId) {
         val id = state.createdTripId ?: return@LaunchedEffect
-        showImportDialog = false
-        importUrlText = ""
-        vm.clearImportError()
         innerNav.navigate(InnerRoutes.tripDetail(id)) {
             popUpTo(InnerRoutes.TripCreate) { inclusive = true }
         }
@@ -1404,16 +1390,6 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
-                actions = {
-                    if (!isEdit && state.selectedCenterId != null) {
-                        TextButton(
-                            onClick = { showImportDialog = true },
-                            enabled = !state.importingTrip,
-                        ) {
-                            Text(stringResource(R.string.trip_create_import_short))
-                        }
-                    }
-                },
             )
         },
     ) { padding ->
@@ -1425,7 +1401,7 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
             ) {
                 CircularProgressIndicator()
             }
-            state.centersError != null -> Column(
+            state.centersError != null && !state.usesPersonalOrganizer -> Column(
                 Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -1447,7 +1423,7 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                     Text(stringResource(R.string.common_back))
                 }
             }
-            state.centers.isEmpty() -> Column(
+            state.centers.isEmpty() && !state.usesPersonalOrganizer -> Column(
                 Modifier.fillMaxSize().padding(padding).padding(24.dp),
                 verticalArrangement = Arrangement.Center,
             ) {
@@ -1468,22 +1444,24 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Text(stringResource(R.string.trip_create_center_label), style = MaterialTheme.typography.labelLarge)
-                if (isEdit) {
-                    Text(
-                        stringResource(R.string.trip_edit_center_locked_hint),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.centers.forEach { c ->
-                        FilterChip(
-                            selected = state.selectedCenterId == c.id,
-                            onClick = { if (!isEdit) vm.setSelectedCenter(c.id) },
-                            enabled = !isEdit,
-                            label = { Text(c.name) },
+                if (!state.usesPersonalOrganizer) {
+                    Text(stringResource(R.string.trip_create_center_label), style = MaterialTheme.typography.labelLarge)
+                    if (isEdit) {
+                        Text(
+                            stringResource(R.string.trip_edit_center_locked_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
+                    }
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        state.centers.forEach { c ->
+                            FilterChip(
+                                selected = state.selectedCenterId == c.id,
+                                onClick = { if (!isEdit) vm.setSelectedCenter(c.id) },
+                                enabled = !isEdit,
+                                label = { Text(c.name) },
+                            )
+                        }
                     }
                 }
                 Text(stringResource(R.string.trip_create_type_label), style = MaterialTheme.typography.labelLarge)
@@ -1522,65 +1500,121 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                }
-                if (state.countries.isNotEmpty()) {
-                    val countryFiltered = remember(state.country, state.countries) {
-                        val q = state.country.trim()
-                        state.countries.asSequence()
-                            .filter { c -> q.isEmpty() || c.contains(q, ignoreCase = true) }
-                            .take(120)
-                            .toList()
-                    }
-                    OutlinedTextField(
-                        value = state.country,
-                        onValueChange = {
-                            vm.setCountry(it)
-                            countryMenuExpanded = true
-                        },
-                        label = { Text(stringResource(R.string.trip_create_country)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
+                } else if (state.countries.isEmpty()) {
+                    Text(
+                        stringResource(R.string.trip_create_err_country),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    if (countryMenuExpanded && countryFiltered.isNotEmpty()) {
-                        Card(
+                } else {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedTextField(
+                            value = countryQuery,
+                            onValueChange = {
+                                countryQuery = it
+                                if (it.isBlank()) vm.setCountry("")
+                            },
+                            label = { Text(stringResource(R.string.trip_create_country)) },
+                            placeholder = { Text(stringResource(R.string.trip_create_country_hint)) },
+                            singleLine = true,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .heightIn(max = 220.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                            ),
-                        ) {
-                            Column(Modifier.verticalScroll(rememberScrollState())) {
-                                countryFiltered.forEach { c ->
-                                    TextButton(
-                                        onClick = {
-                                            vm.setCountry(c)
-                                            countryMenuExpanded = false
-                                        },
-                                        modifier = Modifier.fillMaxWidth(),
-                                    ) {
-                                        Text(c, modifier = Modifier.fillMaxWidth())
+                                .onFocusChanged { focus ->
+                                    countryFieldFocused = focus.isFocused
+                                    if (!focus.isFocused) {
+                                        val q = countryQuery.trim()
+                                        val match = state.countries.firstOrNull { c ->
+                                            localizedCountry(c).equals(q, ignoreCase = true) ||
+                                                c.equals(q, ignoreCase = true)
+                                        }
+                                        if (match != null) {
+                                            vm.setCountry(match)
+                                            countryQuery = localizedCountry(match)
+                                        } else if (state.country.isNotBlank()) {
+                                            countryQuery = localizedCountry(state.country)
+                                        } else {
+                                            countryQuery = ""
+                                        }
+                                    }
+                                },
+                        )
+                        if (countryFieldFocused && filteredCountries.isNotEmpty()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 220.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                ),
+                            ) {
+                                Column(Modifier.verticalScroll(rememberScrollState())) {
+                                    filteredCountries.take(12).forEach { c ->
+                                        TextButton(
+                                            onClick = {
+                                                vm.setCountry(c)
+                                                countryQuery = localizedCountry(c)
+                                                countryFieldFocused = false
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            Text(localizedCountry(c), modifier = Modifier.fillMaxWidth())
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                } else {
-                    OutlinedTextField(
-                        value = state.country,
-                        onValueChange = vm::setCountry,
-                        label = { Text(stringResource(R.string.trip_create_country)) },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
                 }
-                OutlinedTextField(
-                    value = state.region,
-                    onValueChange = vm::setRegion,
-                    label = { Text(stringResource(R.string.trip_create_region)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                if (state.country.isNotBlank()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedTextField(
+                            value = regionQuery,
+                            onValueChange = {
+                                regionQuery = it
+                                vm.setRegion(it)
+                            },
+                            label = { Text(stringResource(R.string.trip_create_region)) },
+                            placeholder = { Text(stringResource(R.string.trip_create_region_hint)) },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { regionFieldFocused = it.isFocused },
+                        )
+                        if (state.loadingRegions) {
+                            CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
+                        }
+                        if (regionFieldFocused && filteredRegions.isNotEmpty() && regionQuery.isNotBlank()) {
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 180.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                ),
+                            ) {
+                                Column(Modifier.verticalScroll(rememberScrollState())) {
+                                    filteredRegions.take(12).forEach { r ->
+                                        TextButton(
+                                            onClick = {
+                                                regionQuery = r
+                                                vm.setRegion(r)
+                                                regionFieldFocused = false
+                                            },
+                                            modifier = Modifier.fillMaxWidth(),
+                                        ) {
+                                            Text(r, modifier = Modifier.fillMaxWidth())
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        Text(
+                            stringResource(R.string.trip_create_region_custom_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
                 OutlinedTextField(
                     value = state.startDate,
                     onValueChange = vm::setStartDate,
@@ -1921,6 +1955,7 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                     val msg = when (key) {
                         "no_center" -> stringResource(R.string.trip_create_err_no_center)
                         "country" -> stringResource(R.string.trip_create_err_country)
+                        "region" -> stringResource(R.string.trip_create_err_region)
                         "dates_format" -> stringResource(R.string.trip_create_err_dates_format)
                         "dates_order" -> stringResource(R.string.trip_create_err_dates_order)
                         "description" -> stringResource(R.string.trip_create_err_description)
@@ -1940,7 +1975,18 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                 }
                 Spacer(Modifier.height(8.dp))
                 Button(
-                    onClick = { vm.submit() },
+                    onClick = {
+                        val q = countryQuery.trim()
+                        val match = state.countries.firstOrNull { c ->
+                            localizedCountry(c).equals(q, ignoreCase = true) ||
+                                c.equals(q, ignoreCase = true)
+                        }
+                        if (match != null) {
+                            vm.setCountry(match)
+                        }
+                        vm.setRegion(regionQuery.trim())
+                        vm.submit()
+                    },
                     enabled = !state.saving,
                     modifier = Modifier.fillMaxWidth(),
                 ) {

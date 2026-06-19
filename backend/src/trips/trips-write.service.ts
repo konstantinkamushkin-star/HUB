@@ -172,6 +172,42 @@ export class TripsWriteService {
     );
   }
 
+  /** DIVER_PRO with active subscription — publish trips as organizerType=user (see TRIPS_BACKEND_REQUIREMENTS). */
+  async assertUserCanCreateUserTrip(
+    userId: string,
+    userRole?: string,
+  ): Promise<void> {
+    const roleUpper = (userRole ?? '').toUpperCase();
+    if (roleUpper === 'SUPER_ADMIN') {
+      return;
+    }
+    const rows = await this.ds.query(
+      `SELECT role, "subscriptionTier", "subscriptionExpiresAt" FROM users WHERE id = $1 LIMIT 1`,
+      [userId],
+    );
+    if (!rows?.length) {
+      throw new ForbiddenException('User not found');
+    }
+    const row = rows[0] as {
+      role?: string;
+      subscriptionTier?: string | null;
+      subscriptionExpiresAt?: Date | string | null;
+    };
+    const role = String(row.role ?? '').toUpperCase();
+    const tier = String(row.subscriptionTier ?? '').toLowerCase();
+    if (role !== 'DIVER_PRO' || tier !== 'active') {
+      throw new ForbiddenException(
+        'Active PRO subscription required to publish trips as a diver',
+      );
+    }
+    if (row.subscriptionExpiresAt) {
+      const expires = new Date(row.subscriptionExpiresAt);
+      if (!Number.isNaN(expires.getTime()) && expires < new Date()) {
+        throw new ForbiddenException('PRO subscription has expired');
+      }
+    }
+  }
+
   /**
    * Organizer is either a dive center (managed by owner/instructor/admin-email match)
    * or a user row (organizer_id === userId).

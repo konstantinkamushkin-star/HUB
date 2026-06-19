@@ -10,7 +10,7 @@ data class DiveCenterBriefDto(
 )
 
 data class CreateTripRequestDto(
-    @SerializedName("diveCenterId") val diveCenterId: String,
+    @SerializedName("diveCenterId") val diveCenterId: String? = null,
     @SerializedName("tripType") val tripType: String,
     @SerializedName("country") val country: String,
     @SerializedName("region") val region: String? = null,

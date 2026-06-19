@@ -15,8 +15,10 @@ import {
 } from 'class-validator';
 
 export class CreateTripDto {
+  /** Omit for DIVER_PRO catalog trips (organizer = authenticated user). */
+  @IsOptional()
   @IsUUID()
-  diveCenterId: string;
+  diveCenterId?: string;
 
   @IsIn(['daily', 'safari'])
   tripType: 'daily' | 'safari';
@@ -26,10 +28,10 @@ export class CreateTripDto {
   @MaxLength(100)
   country: string;
 
-  @IsOptional()
   @IsString()
+  @MinLength(2)
   @MaxLength(100)
-  region?: string;
+  region: string;
 
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   startDate: string;
@@ -37,15 +39,16 @@ export class CreateTripDto {
   @Matches(/^\d{4}-\d{2}-\d{2}$/)
   endDate: string;
 
+  @IsOptional()
   @IsString()
-  @MinLength(5)
   @MaxLength(8000)
-  description: string;
+  description?: string;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
   @Max(500)
-  totalSpots: number;
+  totalSpots?: number;
 
   @IsOptional()
   @IsString()

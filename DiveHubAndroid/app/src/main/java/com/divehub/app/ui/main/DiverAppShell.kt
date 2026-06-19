@@ -26,9 +26,9 @@ import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.CameraEnhance
-import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Flight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -64,9 +64,9 @@ import com.divehub.app.ui.diveeditor.DiveEditorRoute
 import com.divehub.app.ui.explore.ExploreRoute
 import com.divehub.app.ui.feed.FeedRoute
 import com.divehub.app.ui.logbook.LogbookRoute
-import com.divehub.app.ui.map.MapTabRoute
 import com.divehub.app.ui.profile.ProfileScreen
 import com.divehub.app.ui.social.SocialRoute
+import com.divehub.app.ui.trips.TripsTabRoute
 
 private val IosNavBlue = Color(0xFF007AFF)
 private val IosBarFill = Color(0xE6FFFFFF)
@@ -115,11 +115,11 @@ fun DiverAppShell(
 
     LaunchedEffect(diveEditorEnabled) {
         if (diveEditorEnabled) {
-            if (tab == 6) tab = 7
+            if (tab == DiverTabIndices.PROFILE_NO_EDITOR) tab = DiverTabIndices.PROFILE_WITH_EDITOR
         } else {
             when (tab) {
-                7 -> tab = 6
-                6 -> tab = 0
+                DiverTabIndices.PROFILE_WITH_EDITOR -> tab = DiverTabIndices.PROFILE_NO_EDITOR
+                DiverTabIndices.DIVE_EDITOR -> tab = DiverTabIndices.EXPLORE
             }
         }
     }
@@ -136,32 +136,32 @@ fun DiverAppShell(
         ) {
             val bottomInset = DiverTabBarContentHeight + 10.dp
             when (tab) {
-                0 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
+                DiverTabIndices.EXPLORE -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
                     ExploreRoute(graph = graph, innerNav = innerNav)
                 }
-                1 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
-                    MapTabRoute(graph = graph, innerNav = innerNav)
+                DiverTabIndices.FEED -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { FeedRoute(graph) }
+                DiverTabIndices.LOGBOOK -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { LogbookRoute(graph) }
+                DiverTabIndices.TRIPS -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
+                    TripsTabRoute(graph = graph, innerNav = innerNav, currentUser = user)
                 }
-                2 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { FeedRoute(graph) }
-                3 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { LogbookRoute(graph) }
-                4 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
+                DiverTabIndices.SOCIAL -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
                     SocialRoute(
                         graph = graph,
                         innerNav = innerNav,
                         onOpenChat = { friendId ->
                             openChatFriendId = friendId
-                            tab = 5
+                            tab = DiverTabIndices.CHAT
                         },
                     )
                 }
-                5 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
+                DiverTabIndices.CHAT -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
                     ChatRoute(
                         graph = graph,
                         openFriendId = openChatFriendId,
                         onOpenFriendConsumed = { openChatFriendId = null },
                     )
                 }
-                6 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
+                DiverTabIndices.DIVE_EDITOR -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
                     if (diveEditorEnabled) {
                         DiveEditorRoute()
                     } else {
@@ -175,7 +175,7 @@ fun DiverAppShell(
                         )
                     }
                 }
-                7 -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
+                DiverTabIndices.PROFILE_WITH_EDITOR -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
                     ProfileScreen(
                         graph = graph,
                         sessionVm = sessionVm,
@@ -210,17 +210,17 @@ private fun DiverIosScrollTabBar(
 ) {
     val scroll = rememberScrollState()
     val entries: List<Triple<Int, ImageVector, String>> = buildList {
-            add(Triple(0, Icons.Default.Search, stringResource(R.string.nav_explore)))
-            add(Triple(1, Icons.Default.Map, stringResource(R.string.nav_map)))
-            add(Triple(2, Icons.AutoMirrored.Filled.Article, stringResource(R.string.nav_feed)))
-            add(Triple(3, Icons.AutoMirrored.Filled.MenuBook, stringResource(R.string.nav_logbook)))
-            add(Triple(4, Icons.Default.People, stringResource(R.string.nav_social)))
-            add(Triple(5, Icons.AutoMirrored.Filled.Chat, stringResource(R.string.nav_chat)))
+            add(Triple(DiverTabIndices.EXPLORE, Icons.Default.Search, stringResource(R.string.nav_explore)))
+            add(Triple(DiverTabIndices.FEED, Icons.AutoMirrored.Filled.Article, stringResource(R.string.nav_feed)))
+            add(Triple(DiverTabIndices.LOGBOOK, Icons.AutoMirrored.Filled.MenuBook, stringResource(R.string.nav_logbook)))
+            add(Triple(DiverTabIndices.TRIPS, Icons.Default.Flight, stringResource(R.string.nav_trips)))
+            add(Triple(DiverTabIndices.SOCIAL, Icons.Default.People, stringResource(R.string.nav_social)))
+            add(Triple(DiverTabIndices.CHAT, Icons.AutoMirrored.Filled.Chat, stringResource(R.string.nav_chat)))
             if (diveEditorEnabled) {
-                add(Triple(6, Icons.Default.CameraEnhance, stringResource(R.string.nav_dive_editor)))
-                add(Triple(7, Icons.Default.AccountCircle, stringResource(R.string.nav_profile)))
+                add(Triple(DiverTabIndices.DIVE_EDITOR, Icons.Default.CameraEnhance, stringResource(R.string.nav_dive_editor)))
+                add(Triple(DiverTabIndices.PROFILE_WITH_EDITOR, Icons.Default.AccountCircle, stringResource(R.string.nav_profile)))
             } else {
-                add(Triple(6, Icons.Default.AccountCircle, stringResource(R.string.nav_profile)))
+                add(Triple(DiverTabIndices.PROFILE_NO_EDITOR, Icons.Default.AccountCircle, stringResource(R.string.nav_profile)))
             }
         }
 

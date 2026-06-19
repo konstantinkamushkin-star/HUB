@@ -1,5 +1,6 @@
 package com.divehub.app.data.remote.dto
 
+import java.time.Instant
 import java.util.Locale
 
 fun UserDto.needsProfileOnboarding(): Boolean {
@@ -14,4 +15,23 @@ fun UserDto.needsProfileOnboarding(): Boolean {
         else -> false
     }
     return !completed
+}
+
+fun UserDto.hasActiveProSubscription(): Boolean {
+    val r = role?.uppercase(Locale.ROOT).orEmpty()
+    if (r != "DIVER_PRO") return false
+    val tier = subscriptionTier?.lowercase(Locale.ROOT)
+        ?: subscriptionStatus?.lowercase(Locale.ROOT)
+        ?: return false
+    if (tier != "active") return false
+    val raw = subscriptionExpiresAt?.trim().orEmpty()
+    if (raw.isEmpty()) return true
+    val expires = runCatching { Instant.parse(raw) }.getOrNull() ?: return true
+    return expires.isAfter(Instant.now())
+}
+
+fun UserDto.canCreateCatalogTrip(): Boolean {
+    val r = role?.uppercase(Locale.ROOT).orEmpty()
+    if (r in setOf("DIVE_CENTER_ADMIN", "INSTRUCTOR", "SUPER_ADMIN")) return true
+    return hasActiveProSubscription()
 }

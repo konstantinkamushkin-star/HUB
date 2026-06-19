@@ -51,29 +51,22 @@ export class TripsController {
     if (dto.endDate < dto.startDate) {
       throw new BadRequestException('endDate must be on or after startDate');
     }
-    await this.tripsWrite.assertUserCanImportTripsForDiveCenter(
-      dto.diveCenterId,
-      req.user.sub,
-      req.user.role,
-    );
-    const isDaily = dto.tripType === 'daily';
-    return this.tripsWrite.createTrip({
-      organizerId: dto.diveCenterId,
-      organizerType: 'dive_center',
+    const diveCenterId = dto.diveCenterId?.trim() || '';
+    const tripPayload = {
       tripType: dto.tripType,
-      hotelId: isDaily ? dto.hotelId ?? null : null,
-      yachtId: !isDaily ? dto.yachtId ?? null : null,
-      hotelLabel: isDaily ? dto.hotelLabel?.trim() || null : null,
-      yachtLabel: !isDaily ? dto.yachtLabel?.trim() || null : null,
+      hotelId: dto.tripType === 'daily' ? dto.hotelId ?? null : null,
+      yachtId: dto.tripType === 'safari' ? dto.yachtId ?? null : null,
+      hotelLabel: dto.tripType === 'daily' ? dto.hotelLabel?.trim() || null : null,
+      yachtLabel: dto.tripType === 'safari' ? dto.yachtLabel?.trim() || null : null,
       country: dto.country.trim(),
-      region: dto.region?.trim() || null,
+      region: dto.region.trim(),
       startDate: dto.startDate,
       endDate: dto.endDate,
       minimumCertificationLevel: dto.minimumCertificationLevel?.trim() || null,
       minimumDives: dto.minimumDives ?? null,
-      description: dto.description.trim(),
+      description: (dto.description ?? '').trim(),
       photoUrls: dto.photoUrls?.length ? dto.photoUrls : [],
-      totalSpots: dto.totalSpots,
+      totalSpots: dto.totalSpots ?? 10,
       nitroxAvailable: dto.nitroxAvailable ?? false,
       equipmentRentalAvailable: dto.equipmentRentalAvailable ?? false,
       groupLeaderId: dto.groupLeaderId ?? null,
@@ -86,6 +79,31 @@ export class TripsController {
       availableCourseIds: dto.availableCourseIds?.length
         ? dto.availableCourseIds
         : [],
+    };
+
+    if (diveCenterId) {
+      await this.tripsWrite.assertUserCanImportTripsForDiveCenter(
+        diveCenterId,
+        req.user.sub,
+        req.user.role,
+      );
+      return this.tripsWrite.createTrip({
+        organizerId: diveCenterId,
+        organizerType: 'dive_center',
+        ...tripPayload,
+      });
+    }
+
+    await this.tripsWrite.assertUserCanCreateUserTrip(
+      req.user.sub,
+      req.user.role,
+    );
+    return this.tripsWrite.createTrip({
+      organizerId: req.user.sub,
+      organizerType: 'user',
+      ...tripPayload,
+      groupLeaderId: null,
+      availableCourseIds: [],
     });
   }
 

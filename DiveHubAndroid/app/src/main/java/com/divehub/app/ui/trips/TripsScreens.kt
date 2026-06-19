@@ -44,6 +44,11 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import com.divehub.app.ui.social.GroupTripsTabContent
+import com.divehub.app.ui.social.SocialViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -62,6 +67,8 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.repository.TripsRepository
 import com.divehub.app.data.remote.dto.TripListItemDto
+import com.divehub.app.data.remote.dto.UserDto
+import com.divehub.app.data.remote.dto.canCreateCatalogTrip
 import com.divehub.app.data.remote.dto.participantUserRows
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.util.absoluteMediaUrl
@@ -72,66 +79,149 @@ private enum class TripsListFilter { ALL, UPCOMING, FULL, DAILY, SAFARI }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
+fun TripsTabRoute(
+    graph: AppGraph,
+    innerNav: NavController,
+    currentUser: UserDto? = null,
+) {
+    TripsHubRoute(
+        graph = graph,
+        innerNav = innerNav,
+        showBackNavigation = false,
+        currentUser = currentUser,
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
 fun TripsRoute(graph: AppGraph, innerNav: NavController) {
-    val vm: TripsListViewModel = viewModel(factory = TripsListViewModel.factory(graph))
-    val state by vm.state.collectAsState()
+    TripsHubRoute(graph = graph, innerNav = innerNav, showBackNavigation = true)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TripsHubRoute(
+    graph: AppGraph,
+    innerNav: NavController,
+    showBackNavigation: Boolean,
+    currentUser: UserDto? = null,
+) {
+    var hubTab by remember { mutableIntStateOf(0) }
+    val tripsVm: TripsListViewModel = viewModel(factory = TripsListViewModel.factory(graph))
+    val tripsState by tripsVm.state.collectAsState()
+    val socialVm: SocialViewModel = viewModel(factory = SocialViewModel.factory(graph))
+    val socialState by socialVm.state.collectAsState()
+
+    LaunchedEffect(Unit) {
+        socialVm.refresh()
+    }
+
+    val showCreateFab = currentUser?.canCreateCatalogTrip() == true
 
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.nav_trips)) },
                 navigationIcon = {
-                    IconButton(onClick = { innerNav.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    if (showBackNavigation) {
+                        IconButton(onClick = { innerNav.popBackStack() }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                        }
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = { vm.refresh() },
-                        enabled = !state.loading,
-                    ) {
-                        Icon(
-                            Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.common_refresh_list),
-                        )
+                    if (hubTab == 0) {
+                        IconButton(
+                            onClick = { tripsVm.refresh() },
+                            enabled = !tripsState.loading,
+                        ) {
+                            Icon(
+                                Icons.Default.Refresh,
+                                contentDescription = stringResource(R.string.common_refresh_list),
+                            )
+                        }
                     }
                 },
             )
         },
-    ) { padding ->
-        when {
-            state.loading && state.trips.isEmpty() -> Box(
-                Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
-            state.error != null && state.trips.isEmpty() -> Column(
-                Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(state.error ?: stringResource(R.string.common_error))
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = { vm.refresh() }) {
-                    Text(stringResource(R.string.common_retry))
+        floatingActionButton = {
+            if (showCreateFab && hubTab == 0) {
+                FloatingActionButton(onClick = { innerNav.navigate(InnerRoutes.TripCreate) }) {
+                    Icon(
+                        Icons.Default.Add,
+                        contentDescription = stringResource(R.string.trip_create_cd_fab),
+                    )
                 }
             }
-            else -> PullToRefreshBox(
-                isRefreshing = state.loading && state.trips.isNotEmpty(),
-                onRefresh = { vm.refresh() },
-                modifier = Modifier.fillMaxSize().padding(padding),
+        },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            TabRow(selectedTabIndex = hubTab) {
+                Tab(
+                    selected = hubTab == 0,
+                    onClick = { hubTab = 0 },
+                    text = { Text(stringResource(R.string.trips_catalog)) },
+                )
+                Tab(
+                    selected = hubTab == 1,
+                    onClick = { hubTab = 1 },
+                    text = { Text(stringResource(R.string.social_tab_group_trips)) },
+                )
+            }
+            when (hubTab) {
+                0 -> TripsCatalogContent(
+                    state = tripsState,
+                    onRefresh = { tripsVm.refresh() },
+                    onTripClick = { tripId -> innerNav.navigate(InnerRoutes.tripDetail(tripId)) },
+                )
+                1 -> GroupTripsTabContent(
+                    state = socialState,
+                    vm = socialVm,
+                    innerNav = innerNav,
+                    onOpenChat = {},
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TripsCatalogContent(
+    state: TripsListUiState,
+    onRefresh: () -> Unit,
+    onTripClick: (String) -> Unit,
+) {
+    when {
+        state.loading && state.trips.isEmpty() -> Box(
+            Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center,
+        ) {
+            CircularProgressIndicator()
+        }
+        state.error != null && state.trips.isEmpty() -> Column(
+            Modifier.fillMaxSize().padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(state.error ?: stringResource(R.string.common_error))
+            Spacer(Modifier.height(12.dp))
+            TextButton(onClick = onRefresh) {
+                Text(stringResource(R.string.common_retry))
+            }
+        }
+        else -> PullToRefreshBox(
+            isRefreshing = state.loading && state.trips.isNotEmpty(),
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize(),
+        ) {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    items(state.trips, key = { it.id }) { trip ->
-                        TripListCard(trip = trip, onClick = {
-                            innerNav.navigate(InnerRoutes.tripDetail(trip.id))
-                        })
-                    }
+                items(state.trips, key = { it.id }) { trip ->
+                    TripListCard(trip = trip, onClick = { onTripClick(trip.id) })
                 }
             }
         }

@@ -137,11 +137,13 @@ class TripViewModel: ObservableObject {
     }
     
     func canCreateTrip(user: User) -> Bool {
-        // Only dive centers or users with professional subscription can create trips
-        if user.role == .diveCenterAdmin {
+        if user.role == .diveCenterAdmin || user.role == .instructor {
             return true
         }
         if user.role == .diverPro, user.subscriptionStatus == .active {
+            return true
+        }
+        if user.role == .superAdmin {
             return true
         }
         return false

@@ -121,8 +121,11 @@ enum NetworkError: LocalizedError {
         }
         let lower = trimmed.lowercased()
         if lower.contains("invalid email") || lower.contains("invalid password")
-            || lower.contains("invalid credentials") || lower.contains("unauthorized") {
+            || lower.contains("invalid credentials") {
             return L.localizedString("invalidCredentials", table: "errors")
+        }
+        if lower == "unauthorized" {
+            return L.localizedString("pleaseSignIn", table: "errors")
         }
         if lower.contains("too many requests") || lower.contains("throttl") {
             return L.localizedString("tooManyRequests", table: "errors")
@@ -191,12 +194,14 @@ class NetworkService {
 
     struct UnderwaterPhotoProfile: Sendable {
         let engine: String
+        let strength: Double?
         let mode: String?
     }
 
-    /// Дефолтный движок для серверной обработки (все алиасы — один алгоритм Nikolaj Bech).
+    /// Production default — Bech engine alias on server (`ai2`).
     static let cardLookProfile = UnderwaterPhotoProfile(
         engine: "ai2",
+        strength: nil,
         mode: nil
     )
 
@@ -274,6 +279,16 @@ class NetworkService {
     }
     
     private let session: URLSession
+    private lazy var underwaterVisionPhotoSession: URLSession = {
+        let configuration = URLSessionConfiguration.default
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
+        configuration.timeoutIntervalForRequest = 120
+        configuration.timeoutIntervalForResource = 120
+        configuration.httpMaximumConnectionsPerHost = 4
+        configuration.waitsForConnectivity = true
+        return URLSession(configuration: configuration)
+    }()
     
     private init() {
         let configuration = URLSessionConfiguration.default
@@ -310,7 +325,7 @@ class NetworkService {
     
     // MARK: - HTTP error body (Nest / FastAPI)
     
-    private static func extractAPIErrorMessage(from data: Data) -> String? {
+    nonisolated private static func extractAPIErrorMessage(from data: Data) -> String? {
         guard let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             return nil
         }
@@ -351,7 +366,7 @@ class NetworkService {
     
     // MARK: - JSON decoding (Nest + PostgreSQL timestamp shapes)
     
-    static func apiJSONDecoder() -> JSONDecoder {
+    nonisolated static func apiJSONDecoder() -> JSONDecoder {
         let d = JSONDecoder()
         d.dateDecodingStrategy = .custom { decoder in
             try decodeJSONDate(from: decoder)
@@ -393,19 +408,43 @@ class NetworkService {
     }
     
     // MARK: - Generic Request Method
-    
+
     func request<T: Decodable>(
         endpoint: String,
         method: HTTPMethod = .get,
-        body: Encodable? = nil,
+        headers: [String: String]? = nil
+    ) async throws -> T {
+        try await request(endpoint: endpoint, method: method, body: nil as String?, jsonBody: nil, headers: headers)
+    }
+
+    func request<T: Decodable, B: Encodable>(
+        endpoint: String,
+        method: HTTPMethod = .get,
+        body: B?,
+        jsonBody: Data? = nil,
         headers: [String: String]? = nil
     ) async throws -> T {
         let fullURL = baseURL + endpoint
-        
+
         guard let url = URL(string: fullURL) else {
             throw NetworkError.invalidURL
         }
-        
+
+        let bodyData: Data?
+        if let jsonBody {
+            bodyData = jsonBody
+        } else if let body {
+            bodyData = try Self.encodeRequestBody(body)
+        } else {
+            bodyData = nil
+        }
+
+        if let bodyData, bodyData.isEmpty {
+            throw NetworkError.unknown(NSError(domain: "NetworkService", code: -3, userInfo: [
+                NSLocalizedDescriptionKey: "Request body is empty",
+            ]))
+        }
+
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -414,44 +453,41 @@ class NetworkService {
             request.setValue("close", forHTTPHeaderField: "Connection")
         }
         #endif
-        
+
         // Add authentication token if available
         if let token = getAuthToken() {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        
+
         // Add custom headers
         headers?.forEach { key, value in
             request.setValue(value, forHTTPHeaderField: key)
         }
-        
-        // Add body if provided
-        if let body = body {
-            let encoder = JSONEncoder()
-            encoder.dateEncodingStrategy = .iso8601
-            request.httpBody = try encoder.encode(body)
-            
+
+        if let bodyData {
+            request.httpBody = bodyData
+
             #if DEBUG
-            if let jsonData = request.httpBody,
-               let jsonString = String(data: jsonData, encoding: .utf8) {
+            if let jsonString = String(data: bodyData, encoding: .utf8) {
                 print("🌐 [NetworkService] \(method.rawValue) \(baseURL + endpoint)")
-                print("📤 Request Body: \(jsonString)")}
+                print("📤 Request Body: \(jsonString)")
+            }
             #endif
         } else {
             #if DEBUG
             print("🌐 [NetworkService] \(method.rawValue) \(baseURL + endpoint)")
             #endif
         }
-        
+
         do {
             let (data, httpResponse) = try await sessionDataWithRateLimitRetry(for: request)
-            
+
             #if DEBUG
             if let responseString = String(data: data, encoding: .utf8) {
                 print("📥 Response [\(httpResponse.statusCode)]: \(responseString.prefix(500))")
             }
             #endif
-            
+
             guard (200...299).contains(httpResponse.statusCode) else {
                 // Log error response body for debugging
                 if let responseString = String(data: data, encoding: .utf8) {
@@ -459,7 +495,7 @@ class NetworkService {
                     print("❌ [NetworkService] Error Response [\(httpResponse.statusCode)]: \(responseString)")
                     #endif
                 }
-                
+
                 // Try to refresh token if 401 and we have a refresh token
                 if httpResponse.statusCode == 401 && getAuthToken() != nil && KeychainService.shared.getRefreshToken() != nil {
                     do {
@@ -472,30 +508,27 @@ class NetworkService {
                         headers?.forEach { key, value in
                             retryRequest.setValue(value, forHTTPHeaderField: key)
                         }
-                        
-                        if let body = body {
-                            let encoder = JSONEncoder()
-                            encoder.dateEncodingStrategy = .iso8601
-                            retryRequest.httpBody = try encoder.encode(body)
-                        }
-                        
+
+                        retryRequest.httpBody = bodyData
+
                         let (retryData, retryHttpResponse) = try await sessionDataWithRateLimitRetry(for: retryRequest)
                         guard (200...299).contains(retryHttpResponse.statusCode) else {
                             throw httpFailureError(data: retryData, statusCode: retryHttpResponse.statusCode)
                         }
-                        
+
                         let decoder = Self.apiJSONDecoder()
                         return try decoder.decode(T.self, from: retryData)
+                    } catch let networkError as NetworkError {
+                        throw networkError
                     } catch {
-                        // If refresh fails, clear tokens and throw error
                         clearAuthTokens()
                         throw NetworkError.serverError(401)
                     }
                 }
-                
+
                 throw httpFailureError(data: data, statusCode: httpResponse.statusCode)
             }
-            
+
             let decoder = Self.apiJSONDecoder()
             do {
                 let decoded = try decoder.decode(T.self, from: data)
@@ -517,6 +550,30 @@ class NetworkService {
             }
             throw NetworkError.unknown(error)
         }
+    }
+
+    private static func encodeRequestBody<B: Encodable>(_ body: B) throws -> Data {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(body)
+    }
+
+    nonisolated private static func encodeJSONObject(_ object: [String: Any]) throws -> Data {
+        guard JSONSerialization.isValidJSONObject(object) else {
+            throw NetworkError.unknown(NSError(domain: "NetworkService", code: -2, userInfo: [
+                NSLocalizedDescriptionKey: "Invalid JSON payload",
+            ]))
+        }
+        return try JSONSerialization.data(withJSONObject: object, options: [])
+    }
+
+    func request<T: Decodable>(
+        endpoint: String,
+        method: HTTPMethod = .get,
+        jsonBody: Data?,
+        headers: [String: String]? = nil
+    ) async throws -> T {
+        try await request(endpoint: endpoint, method: method, body: nil as String?, jsonBody: jsonBody, headers: headers)
     }
     
     // MARK: - Helper Methods
@@ -614,6 +671,9 @@ extension NetworkService {
             }
             if let minRating = filters.minRating {
                 queryItems.append(URLQueryItem(name: "minRating", value: String(minRating)))
+            }
+            if let country = filters.country, !country.isEmpty {
+                queryItems.append(URLQueryItem(name: "country", value: country))
             }
         }
             
@@ -985,6 +1045,18 @@ extension NetworkService {
             
             if let minRating = filters.minRating {
                 queryItems.append(URLQueryItem(name: "min_rating", value: String(minRating)))
+            }
+
+            if let country = filters.country {
+                queryItems.append(URLQueryItem(name: "country", value: country))
+            }
+
+            if let minDepth = filters.minDepth {
+                queryItems.append(URLQueryItem(name: "min_depth", value: String(minDepth)))
+            }
+
+            if let maxDepth = filters.maxDepth {
+                queryItems.append(URLQueryItem(name: "max_depth", value: String(maxDepth)))
             }
         }
         
@@ -1394,28 +1466,45 @@ extension NetworkService {
     
     // MARK: - Feed API
     
-    func getFeedPosts(cursor: String? = nil, limit: Int = 20) async throws -> FeedPage {
+    func getFeedPosts(cursor: String? = nil, limit: Int = 20, hashtag: String? = nil) async throws -> FeedPage {
         var parts = ["limit=\(limit)"]
         if let cursor, let enc = cursor.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
             parts.append("cursor=\(enc)")
+        }
+        if let hashtag {
+            let normalized = hashtag.trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+                .replacingOccurrences(of: "#", with: "")
+            if !normalized.isEmpty,
+               let enc = normalized.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) {
+                parts.append("hashtag=\(enc)")
+            }
         }
         let q = parts.joined(separator: "&")
         return try await request(endpoint: "/api/feed/posts?\(q)")
     }
     
-    func createFeedPost(type: FeedPost.PostType, content: String?, diveLogId: String?, photos: [String]) async throws -> FeedPost {
+    func createFeedPost(
+        type: FeedPost.PostType,
+        content: String?,
+        diveLogId: String?,
+        photos: [String] = [],
+        videos: [String] = []
+    ) async throws -> FeedPost {
         struct CreatePostRequest: Codable {
             let type: String
             let content: String?
             let diveLogId: String?
             let photos: [String]
+            let videos: [String]
         }
         
         let request = CreatePostRequest(
             type: type.rawValue,
             content: content,
             diveLogId: diveLogId,
-            photos: photos
+            photos: photos,
+            videos: videos
         )
         
         return try await self.request(endpoint: "/api/feed/posts", method: .post, body: request)
@@ -1555,35 +1644,67 @@ extension NetworkService {
     
     /// Returns absolute URL for use in posts / chat attachments.
     func uploadMediaImage(_ imageData: Data, fileName: String = "photo.jpg") async throws -> String {
+        try await performMediaUpload(data: imageData, fileName: fileName, mimeType: "image/jpeg", allowAuthRetry: true)
+    }
+
+    func uploadMediaVideo(_ videoData: Data, fileName: String = "video.mp4") async throws -> String {
+        let ext = (fileName as NSString).pathExtension.lowercased()
+        let mimeType = ext == "mov" ? "video/quicktime" : "video/mp4"
+        return try await performMediaUpload(data: videoData, fileName: fileName, mimeType: mimeType, allowAuthRetry: true)
+    }
+
+    private func performMediaUpload(
+        data: Data,
+        fileName: String,
+        mimeType: String,
+        allowAuthRetry: Bool
+    ) async throws -> String {
         guard let url = URL(string: baseURL + "/api/media/upload") else {
             throw NetworkError.invalidURL
         }
+        let boundary = UUID().uuidString
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: \(mimeType)\r\n\r\n".data(using: .utf8)!)
+        body.append(data)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         if let token = getAuthToken() {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"\(fileName)\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-        body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
-        let (data, response) = try await session.data(for: request)
-        guard let http = response as? HTTPURLResponse else {
-            throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
+
+        let (responseData, http) = try await sessionDataWithRateLimitRetry(for: request)
+        if http.statusCode == 401, allowAuthRetry {
+            _ = try await refreshAccessToken()
+            return try await performMediaUpload(
+                data: data,
+                fileName: fileName,
+                mimeType: mimeType,
+                allowAuthRetry: false
+            )
         }
         guard (200...299).contains(http.statusCode) else {
-            throw NetworkError.serverError(http.statusCode)
+            throw httpFailureError(data: responseData, statusCode: http.statusCode)
         }
-        let decoded = try JSONDecoder().decode(MediaUploadResponse.self, from: data)
-        if decoded.url.hasPrefix("http") {
-            return decoded.url
+        let decoded = try JSONDecoder().decode(MediaUploadResponse.self, from: responseData)
+        let path = decoded.url.isEmpty ? decoded.path : decoded.url
+        if path.hasPrefix("http") {
+            return path
         }
-        return baseURL + decoded.url
+        return baseURL + path
+    }
+
+    private func performMediaImageUpload(
+        imageData: Data,
+        fileName: String,
+        allowAuthRetry: Bool
+    ) async throws -> String {
+        try await performMediaUpload(data: imageData, fileName: fileName, mimeType: "image/jpeg", allowAuthRetry: allowAuthRetry)
     }
     
     func registerPushDeviceToken(_ token: String) async throws {
@@ -1729,7 +1850,38 @@ extension NetworkService {
         let response: Response = try await request(endpoint: "/api/v1/dive-sites/countries")
         return (response.success, response.data)
     }
-    
+
+    func getSiteTypesFromDiveSites() async throws -> (success: Bool, data: [String]) {
+        struct Response: Decodable {
+            let success: Bool
+            let data: [String]
+        }
+        let response: Response = try await request(endpoint: "/api/v1/dive-sites/site-types")
+        return (response.success, response.data)
+    }
+
+    func getCountriesFromDiveCenters() async throws -> (success: Bool, data: [String]) {
+        struct Response: Decodable {
+            let success: Bool
+            let data: [String]
+        }
+        let response: Response = try await request(endpoint: "/api/v1/dive-centers/countries")
+        return (response.success, response.data)
+    }
+
+    func getRegionsFromDiveSites(country: String) async throws -> [String] {
+        struct Response: Decodable {
+            let success: Bool
+            let data: [String]
+        }
+        guard let encoded = country.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            throw NetworkError.invalidURL
+        }
+        let response: Response = try await request(endpoint: "/api/v1/dive-sites/regions?country=\(encoded)")
+        guard response.success else { return [] }
+        return response.data
+    }
+
     func getCountriesFull() async throws -> [Country] {
         struct CountryResponse: Codable {
             let id: String
@@ -2053,58 +2205,182 @@ extension NetworkService {
     }
     
     // MARK: - Certifications API
-    
+
+    nonisolated private static func certificationIssueDateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    nonisolated private static func makeCreateCertificationPayload(
+        draft: CreateCertificationDraft,
+        cardImageUrl: String?
+    ) throws -> Data {
+        let trimmedAgency = Self.stableString(draft.agency).trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLevel = Self.stableString(draft.level).trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedAgency.isEmpty, !trimmedLevel.isEmpty else {
+            throw NetworkError.unknown(NSError(domain: "NetworkService", code: -4, userInfo: [
+                NSLocalizedDescriptionKey: "Organization and level are required",
+            ]))
+        }
+
+        var payload: [String: Any] = [
+            "agency": trimmedAgency,
+            "level": trimmedLevel,
+            "issueDate": certificationIssueDateString(from: draft.issueDate),
+            "verificationStatus": draft.verificationStatus,
+        ]
+        if let instructorNumber = draft.instructorNumber.map({ Self.stableString($0).trimmingCharacters(in: .whitespacesAndNewlines) }),
+           !instructorNumber.isEmpty {
+            payload["instructorNumber"] = instructorNumber
+        }
+        if let certificateNumber = draft.certificateNumber.map({ Self.stableString($0).trimmingCharacters(in: .whitespacesAndNewlines) }),
+           !certificateNumber.isEmpty {
+            payload["certificateNumber"] = certificateNumber
+        }
+        if let cardImageUrl = cardImageUrl.map({ Self.stableString($0).trimmingCharacters(in: .whitespacesAndNewlines) }),
+           !cardImageUrl.isEmpty {
+            payload["cardImageUrl"] = cardImageUrl
+        }
+
+        return try encodeJSONObject(payload)
+    }
+
+    nonisolated private static func stableString(_ text: String) -> String {
+        SafeString.bounded(text, maxUTF16Units: 512)
+    }
+
+    nonisolated private static func buildCertCardMultipartBody(imageData: Data, boundary: String) -> Data {
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+        return body
+    }
+
+    nonisolated static func resolvedAPIBaseURL() -> String {
+        let raw = UserDefaults.standard.string(forKey: apiBaseURLUserDefaultsKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !raw.isEmpty {
+            return raw.hasSuffix("/") ? String(raw.dropLast()) : raw
+        }
+        return productionAPIBaseURL
+    }
+
     func getCertifications(userId: String) async throws -> [Certification] {
         let endpoint = "/api/users/\(userId)/certifications"
-        return try await request(endpoint: endpoint)
-    }
-    
-    func createCertification(userId: String, certification: Certification, cardImageData: Data?) async throws -> Certification {
-        // First upload image if provided
-        var cardImageUrl: String? = nil
-        if let imageData = cardImageData {
-            do {
-                cardImageUrl = try await uploadCertificationImage(imageData: imageData)
-            } catch {
-                // Continue without image if upload fails
+        do {
+            return try await request(endpoint: endpoint)
+        } catch let error as NetworkError {
+            if case .serverError(404) = error {
+                throw NetworkError.serverErrorWithDetail(
+                    404,
+                    LocalizationService.shared.localizedString("certificationsApiUnavailable", table: "settings")
+                )
             }
+            if case .serverErrorWithDetail(404, _) = error {
+                throw NetworkError.serverErrorWithDetail(
+                    404,
+                    LocalizationService.shared.localizedString("certificationsApiUnavailable", table: "settings")
+                )
+            }
+            throw error
         }
-        
-        // Create certification request matching backend DTO
-        struct CreateCertificationRequest: Codable {
-            let agency: String
-            let level: String
-            let issueDate: String
-            let instructorNumber: String?
-            let cardImageUrl: String?
-            let verificationStatus: String?
-        }
-        
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        
-        let request = CreateCertificationRequest(
-            agency: certification.organization,
-            level: certification.level,
-            issueDate: formatter.string(from: certification.issueDate ?? Date()),
-            instructorNumber: certification.instructorNumber,
-            cardImageUrl: cardImageUrl,
-            verificationStatus: certification.verificationStatus.rawValue
-        )
-        
-        let endpoint = "/api/users/\(userId)/certifications"
-        return try await self.request(endpoint: endpoint, method: .post, body: request)
     }
     
+    nonisolated func createCertification(
+        userId: String,
+        draft: CreateCertificationDraft,
+        cardImageData: Data?,
+        accessToken: String
+    ) async throws -> Certification {
+        try await CertificationSubmitAPI.create(
+            userId: userId,
+            draft: draft,
+            cardImageData: cardImageData,
+            accessToken: accessToken
+        )
+    }
+
     func deleteCertification(certificationId: String) async throws {
         let endpoint = "/api/users/certifications/\(certificationId)"
         let _: EmptyResponse = try await request(endpoint: endpoint, method: .delete)
     }
+
+    func updateCertificationCardImage(
+        certificationId: String,
+        cardImageData: Data
+    ) async throws -> Certification {
+        let cardImageUrl = try await uploadImage(imageData: cardImageData)
+        return try await updateCertification(
+            certificationId: certificationId,
+            agency: nil,
+            level: nil,
+            issueDate: nil,
+            instructorNumber: nil,
+            certificateNumber: nil,
+            cardImageUrl: cardImageUrl
+        )
+    }
+
+    func updateCertification(
+        certificationId: String,
+        agency: String?,
+        level: String?,
+        issueDate: Date?,
+        instructorNumber: String?,
+        certificateNumber: String?,
+        cardImageUrl: String? = nil
+    ) async throws -> Certification {
+        struct UpdateCertificationRequest: Encodable {
+            let agency: String?
+            let level: String?
+            let issueDate: String?
+            let instructorNumber: String?
+            let certificateNumber: String?
+            let cardImageUrl: String?
+
+            enum CodingKeys: String, CodingKey {
+                case agency, level, issueDate, instructorNumber, certificateNumber, cardImageUrl
+            }
+
+            func encode(to encoder: Encoder) throws {
+                var container = encoder.container(keyedBy: CodingKeys.self)
+                if let agency { try container.encode(agency, forKey: .agency) }
+                if let level { try container.encode(level, forKey: .level) }
+                if let issueDate { try container.encode(issueDate, forKey: .issueDate) }
+                if let instructorNumber { try container.encode(instructorNumber, forKey: .instructorNumber) }
+                if let certificateNumber { try container.encode(certificateNumber, forKey: .certificateNumber) }
+                if let cardImageUrl { try container.encode(cardImageUrl, forKey: .cardImageUrl) }
+            }
+        }
+
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+
+        let endpoint = "/api/users/certifications/\(certificationId)"
+        return try await request(
+            endpoint: endpoint,
+            method: .patch,
+            body: UpdateCertificationRequest(
+                agency: agency,
+                level: level,
+                issueDate: issueDate.map { formatter.string(from: $0) },
+                instructorNumber: instructorNumber,
+                certificateNumber: certificateNumber,
+                cardImageUrl: cardImageUrl
+            )
+        )
+    }
     
     private func uploadCertificationImage(imageData: Data) async throws -> String {
-        // Use the same avatar upload endpoint for now
-        // The endpoint returns avatarUrl, which we can use for certification images
-        return try await uploadProfileImage(imageData: imageData)
+        try await uploadImage(imageData: imageData)
     }
     
     // MARK: - Media Upload
@@ -2113,25 +2389,20 @@ extension NetworkService {
         guard let url = URL(string: baseURL + "/api/media/upload") else {
             throw NetworkError.invalidURL
         }
-        
+
+        let boundary = UUID().uuidString
+        let body = await Task.detached(priority: .userInitiated) {
+            Self.buildCertCardMultipartBody(imageData: imageData, boundary: boundary)
+        }.value
+
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        
-        // Create multipart form data
-        let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
+
         if let token = getAuthToken() {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
-        
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"image.jpg\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-        body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        
+
         request.httpBody = body
         let (data, response) = try await session.data(for: request)
         
@@ -2347,7 +2618,7 @@ extension NetworkService {
         request.httpMethod = "GET"
         request.timeoutInterval = 6
         do {
-            let (_, response) = try await session.data(for: request)
+            let (_, response) = try await underwaterVisionPhotoSession.data(for: request)
             guard let http = response as? HTTPURLResponse, http.statusCode == 200 else { return false }
             return true
         } catch {
@@ -2397,14 +2668,33 @@ extension NetworkService {
         return String(raw.prefix(400))
     }
     
-    /// `POST /v1/process/photo/{engine}` — multipart только `image` (алгоритм как в upstream, без query).
+    /// `POST /v1/process/photo/{engine}` — multipart `image`; optional `strength` / `depth_hint_m` в query.
+    /// С `Accept: image/jpeg` сервер отдаёт сырой JPEG + `X-UVM-Report`; без — legacy JSON с hex.
     func processPhotoUnderwaterVisionModule(
         imageJPEG: Data,
         engine: String,
+        strength: Double? = nil,
+        depthHintMeters: Double? = nil,
         mode: String? = nil
     ) async throws -> Data {
         let base = Self.underwaterVisionModuleBaseURLString()
         var items: [URLQueryItem] = []
+        if let strength {
+            items.append(
+                URLQueryItem(
+                    name: "strength",
+                    value: String(format: "%.6f", locale: Self.underwaterVisionQueryLocale, strength)
+                )
+            )
+        }
+        if let d = depthHintMeters {
+            items.append(
+                URLQueryItem(
+                    name: "depth_hint_m",
+                    value: String(format: "%.6f", locale: Self.underwaterVisionQueryLocale, d)
+                )
+            )
+        }
         if let mode, !mode.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             items.append(URLQueryItem(name: "mode", value: mode))
         }
@@ -2414,10 +2704,12 @@ extension NetworkService {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.setValue("image/jpeg", forHTTPHeaderField: "Accept")
+        request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
         let boundary = UUID().uuidString
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        var body = Data()
-        // Только файл — engine в path
+        var body = Data(capacity: imageJPEG.count + 512)
+        // Только файл — engine/strength в query (сервер надёжно различает ai1/ai2/cursor)
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
         body.append("Content-Disposition: form-data; name=\"image\"; filename=\"photo.jpg\"\r\n".data(using: .utf8)!)
         body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
@@ -2425,34 +2717,21 @@ extension NetworkService {
         body.append("\r\n".data(using: .utf8)!)
         body.append("--\(boundary)--\r\n".data(using: .utf8)!)
         request.httpBody = body
-        let config = URLSessionConfiguration.default
-        config.requestCachePolicy = .reloadIgnoringLocalCacheData
-        config.urlCache = nil
-        // Загрузка JPEG + обработка на UVM через Nest могут занимать >2 мин на слабом канале.
-        config.timeoutIntervalForRequest = 300
-        config.timeoutIntervalForResource = 600
-        let longSession = URLSession(configuration: config)
-        let (data, response) = try await longSession.data(for: request)
+        let (data, response) = try await underwaterVisionPhotoSession.data(for: request)
         guard let http = response as? HTTPURLResponse else { throw NetworkError.noData }
         guard (200...299).contains(http.statusCode) else {
             let parsed = Self.underwaterVisionErrorMessage(from: data)
             let msg = parsed ?? Self.underwaterVisionErrorFallback(data: data)
             throw NetworkError.visionModuleHTTPError(statusCode: http.statusCode, message: msg)
         }
-        var serverReportEngine: String = ""
-        var reportBackend: String = ""
-        var aiSlotsBackend: String = ""
-        if let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-           let rep = obj["report"] as? [String: Any] {
-            if let re = rep["engine"] as? String {
-                serverReportEngine = re
-            }
-            if let backend = rep["backend"] as? String {
-                reportBackend = backend
-            }
-            if let slots = rep["ai_slots_backend"] as? String {
-                aiSlotsBackend = slots
-            }
+        var serverReportEngine = Self.underwaterVisionReportEngine(
+            from: http.value(forHTTPHeaderField: "X-UVM-Report")
+        )
+        if serverReportEngine.isEmpty,
+           let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+           let rep = obj["report"] as? [String: Any],
+           let re = rep["engine"] as? String {
+            serverReportEngine = re
         }
         if !serverReportEngine.isEmpty,
            serverReportEngine.lowercased() != engine.lowercased() {
@@ -2460,6 +2739,10 @@ extension NetworkService {
                 statusCode: 502,
                 message: "Engine mismatch: requested '\(engine)', server used '\(serverReportEngine)'. Check UVM_URL/proxy target."
             )
+        }
+        if let contentType = http.value(forHTTPHeaderField: "Content-Type"),
+           contentType.lowercased().contains("image/jpeg") {
+            return data
         }
         struct UVMEnvelope: Decodable {
             let image_jpeg_base64: String
@@ -2469,6 +2752,16 @@ extension NetworkService {
             throw NetworkError.decodingError
         }
         return jpeg
+    }
+
+    private static func underwaterVisionReportEngine(from reportHeader: String?) -> String {
+        guard let reportHeader,
+              let reportData = reportHeader.data(using: .utf8),
+              let rep = try? JSONSerialization.jsonObject(with: reportData) as? [String: Any],
+              let engine = rep["engine"] as? String else {
+            return ""
+        }
+        return engine
     }
 
     /// `POST /v1/process/video/{engine}` — multipart `video`; returns processed mp4 bytes.
@@ -2481,6 +2774,9 @@ extension NetworkService {
     ) async throws -> Data {
         let base = Self.underwaterVisionModuleBaseURLString()
         var items: [URLQueryItem] = [
+            // UVM prod: `fast` | `full` (bech keyframes + global tone). `bech_turbo` — только после обновления UVM.
+            URLQueryItem(name: "video_mode", value: "fast"),
+            URLQueryItem(name: "sample_frames", value: "12"),
             URLQueryItem(name: "max_side", value: "1280")
         ]
         let trimmed = base.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -3038,6 +3334,24 @@ extension NetworkService {
     }
 
     /// Импорт поездки по прямой ссылке сайта для текущего дайв-центра.
+    struct ManagedDiveCenterBrief: Codable, Identifiable, Hashable {
+        let id: String
+        let name: String
+    }
+
+    private static func apiCalendarDateString(from date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    func listManagedDiveCenters() async throws -> [ManagedDiveCenterBrief] {
+        try await request(endpoint: "/api/admin/centers/managed", method: .get)
+    }
+
     func importTripFromWebsite(url: String, diveCenterId: String) async throws -> Trip {
         struct ImportReq: Codable {
             let url: String
@@ -3056,35 +3370,38 @@ extension NetworkService {
     }
     
     func createTrip(_ trip: Trip, hotelName: String? = nil, hotelUrl: String? = nil, yachtName: String? = nil, yachtUrl: String? = nil) async throws -> Trip {
-        // Create DTO for trip creation (exclude id, createdAt, updatedAt, organizerId - server sets it from auth token)
-        struct CreateTripDTO: Codable {
-            let organizerType: String
+        struct CreateTripDTO: Encodable {
+            let diveCenterId: String?
             let tripType: String
-            let hotelId: String? // For daily trips - can be hotel name or ID
-            let yachtId: String? // For safari trips - can be yacht name or ID
             let country: String
-            let region: String?
-            let startDate: Date
-            let endDate: Date
+            let region: String
+            let startDate: String
+            let endDate: String
+            let description: String
+            let totalSpots: Int
             let minimumCertificationLevel: String?
             let minimumDives: Int?
-            let description: String
-            let photos: [String]
-            let totalSpots: Int
-            let availableCourses: [String]
             let nitroxAvailable: Bool
-            let groupLeaderId: String?
-            let program: [ProgramDayDTO]
-            let additionalExpenses: [ExpenseDTO]
             let equipmentRentalAvailable: Bool
+            let hotelId: String?
+            let yachtId: String?
+            let hotelLabel: String?
+            let yachtLabel: String?
+            let groupLeaderId: String?
+            let programDays: [ProgramDayDTO]
+            let additionalExpenses: [ExpenseDTO]
             let priceDetails: PriceDetailsDTO
-            
-            struct ProgramDayDTO: Codable {
-                let date: Date
+            let photoUrls: [String]
+            let availableCourseIds: [String]
+
+            struct ProgramDayDTO: Encodable {
+                let id: String?
+                let date: String
                 let activities: [ActivityDTO]
                 let description: String?
-                
-                struct ActivityDTO: Codable {
+
+                struct ActivityDTO: Encodable {
+                    let id: String?
                     let time: String
                     let activity: String
                     let diveSiteId: String?
@@ -3092,111 +3409,101 @@ extension NetworkService {
                     let notes: String?
                 }
             }
-            
-            struct ExpenseDTO: Codable {
+
+            struct ExpenseDTO: Encodable {
                 let expenseType: String
                 let description: String
                 let cost: Double
                 let currency: String
             }
-            
-            struct PriceDetailsDTO: Codable {
+
+            struct PriceDetailsDTO: Encodable {
                 let roomPrices: [RoomPriceDTO]?
                 let yachtPrices: [YachtPriceDTO]?
                 let divingPrice: Double?
                 let nonDivingPrice: Double?
                 let currency: String
-                
-                struct RoomPriceDTO: Codable {
+
+                struct RoomPriceDTO: Encodable {
                     let roomType: String
-                    // Note: roomCount is not sent to backend - backend doesn't expect it
                     let divingPrice: Double
                     let nonDivingPrice: Double
                 }
-                
-                struct YachtPriceDTO: Codable {
+
+                struct YachtPriceDTO: Encodable {
                     let cabinType: String
-                    // Note: cabinCount is not sent to backend - backend doesn't expect it
                     let divingPrice: Double
                     let nonDivingPrice: Double
                 }
             }
         }
-        
-        // Convert Trip to DTO
-        // For daily trips, create hotel first if name is provided, then use its ID
-        // For safari trips, create yacht first if name is provided, then use its ID
-        var finalHotelId: String? = nil
-        var finalYachtId: String? = nil
-        
-        if trip.tripType == .daily {
-            if let hotelName = hotelName, !hotelName.isEmpty {
-                // Try to find existing hotel by name first
-                let hotels = try? await getHotels()
-                
-                if let existingHotel = hotels?.first(where: { $0.name.lowercased() == hotelName.lowercased() }) {
-                    finalHotelId = existingHotel.id
-                } else {
-                    // Create new hotel
-                    do {
-                        let newHotel = try await createHotel(name: hotelName, url: hotelUrl?.isEmpty == false ? hotelUrl : nil)
-                        finalHotelId = newHotel.id
-                    } catch {
-                        throw error
-                    }
-                }
+
+        struct TripCreatedResponse: Decodable {
+            let id: String
+        }
+
+        var finalHotelId: String?
+        var finalYachtId: String?
+
+        if trip.tripType == .daily, let hotelName, !hotelName.isEmpty {
+            let hotels = try? await getHotels()
+            if let existingHotel = hotels?.first(where: { $0.name.lowercased() == hotelName.lowercased() }) {
+                finalHotelId = existingHotel.id
+            } else if let newHotel = try? await createHotel(name: hotelName, url: hotelUrl?.isEmpty == false ? hotelUrl : nil) {
+                finalHotelId = newHotel.id
             }
         }
-        
-        if trip.tripType == .safari, let yachtName = yachtName, !yachtName.isEmpty {
-            // Try to find existing yacht by name first
+
+        if trip.tripType == .safari, let yachtName, !yachtName.isEmpty {
             let yachts = try? await getYachts()
             if let existingYacht = yachts?.first(where: { $0.name.lowercased() == yachtName.lowercased() }) {
                 finalYachtId = existingYacht.id
-            } else {
-                // Create new yacht
-                do {
-                    let newYacht = try await createYacht(name: yachtName, url: yachtUrl?.isEmpty == false ? yachtUrl : nil)
-                    finalYachtId = newYacht.id
-                } catch {
-                    throw error
-                }
+            } else if let newYacht = try? await createYacht(name: yachtName, url: yachtUrl?.isEmpty == false ? yachtUrl : nil) {
+                finalYachtId = newYacht.id
             }
-        }// Validate groupLeaderId - if it exists, verify the instructor exists on backend
-        // If not found, set to nil to avoid "Instructor not found" error
+        }
+
         var finalGroupLeaderId: String? = trip.groupLeaderId
         if let groupLeaderId = trip.groupLeaderId {
-            // Try to verify instructor exists by fetching instructors for the dive center
-            // If we can't verify or instructor doesn't exist, set to nil
             let instructors = try? await getDiveCenterInstructors(diveCenterId: trip.organizerId)
-            if let instructors = instructors, !instructors.contains(where: { $0.id == groupLeaderId }) {
-                // Instructor not found in the list - set to nil
+            if let instructors, !instructors.contains(where: { $0.id == groupLeaderId }) {
                 finalGroupLeaderId = nil
             }
         }
-        
+
+        let trimmedRegion = trip.region?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let hotelLabel = trip.tripType == .daily && finalHotelId == nil
+            ? hotelName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            : nil
+        let yachtLabel = trip.tripType == .safari && finalYachtId == nil
+            ? yachtName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            : nil
+
         let dto = CreateTripDTO(
-            organizerType: trip.organizerType.rawValue,
+            diveCenterId: trip.organizerType == .diveCenter ? trip.organizerId : nil,
             tripType: trip.tripType.rawValue,
-            hotelId: finalHotelId,
-            yachtId: finalYachtId,
-            country: trip.country,
-            region: trip.region, // Now sending region to backend
-            startDate: trip.startDate,
-            endDate: trip.endDate,
-            minimumCertificationLevel: trip.minimumCertificationLevel,
-            minimumDives: trip.minimumDives,
+            country: trip.country.trimmingCharacters(in: .whitespacesAndNewlines),
+            region: trimmedRegion,
+            startDate: Self.apiCalendarDateString(from: trip.startDate),
+            endDate: Self.apiCalendarDateString(from: trip.endDate),
             description: trip.description,
-            photos: trip.photos,
             totalSpots: trip.totalSpots,
-            availableCourses: trip.availableCourses,
+            minimumCertificationLevel: trip.minimumCertificationLevel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            minimumDives: trip.minimumDives,
             nitroxAvailable: trip.nitroxAvailable,
+            equipmentRentalAvailable: trip.equipmentRentalAvailable,
+            hotelId: trip.tripType == .daily ? finalHotelId : nil,
+            yachtId: trip.tripType == .safari ? finalYachtId : nil,
+            hotelLabel: hotelLabel,
+            yachtLabel: yachtLabel,
             groupLeaderId: finalGroupLeaderId,
-            program: trip.program.map { day in
+            programDays: trip.program.map { day in
                 CreateTripDTO.ProgramDayDTO(
-                    date: day.date,
+                    id: day.id,
+                    date: Self.apiCalendarDateString(from: day.date),
                     activities: day.activities.map { activity in
                         CreateTripDTO.ProgramDayDTO.ActivityDTO(
+                            id: activity.id,
                             time: activity.time,
                             activity: activity.activity,
                             diveSiteId: activity.diveSiteId,
@@ -3215,12 +3522,10 @@ extension NetworkService {
                     currency: expense.currency
                 )
             },
-            equipmentRentalAvailable: trip.equipmentRentalAvailable,
             priceDetails: CreateTripDTO.PriceDetailsDTO(
                 roomPrices: trip.priceDetails.roomPrices?.map { roomPrice in
                     CreateTripDTO.PriceDetailsDTO.RoomPriceDTO(
                         roomType: roomPrice.roomType,
-                        // roomCount is not sent to backend
                         divingPrice: roomPrice.divingPrice,
                         nonDivingPrice: roomPrice.nonDivingPrice
                     )
@@ -3228,7 +3533,6 @@ extension NetworkService {
                 yachtPrices: trip.priceDetails.yachtPrices?.map { yachtPrice in
                     CreateTripDTO.PriceDetailsDTO.YachtPriceDTO(
                         cabinType: yachtPrice.cabinType,
-                        // cabinCount is not sent to backend
                         divingPrice: yachtPrice.divingPrice,
                         nonDivingPrice: yachtPrice.nonDivingPrice
                     )
@@ -3236,44 +3540,49 @@ extension NetworkService {
                 divingPrice: trip.priceDetails.divingPrice,
                 nonDivingPrice: trip.priceDetails.nonDivingPrice,
                 currency: trip.priceDetails.currency
-            )
+            ),
+            photoUrls: trip.photos,
+            availableCourseIds: trip.availableCourses
         )
-        let createdTrip: Trip = try await request(endpoint: "/api/trips", method: .post, body: dto)
-        return createdTrip
+        let created: TripCreatedResponse = try await request(endpoint: "/api/trips", method: .post, body: dto)
+        return try await getTrip(id: created.id)
     }
     
     func updateTrip(_ trip: Trip, hotelName: String? = nil, hotelUrl: String? = nil, yachtName: String? = nil, yachtUrl: String? = nil) async throws -> Trip {
         
         // Create UpdateTripDTO - similar to CreateTripDTO but excludes fields that server doesn't accept
         // IMPORTANT: We need to explicitly encode nil values as null for the server to clear fields
-        struct UpdateTripDTO: Codable {
-            let organizerType: String
+        struct UpdateTripDTO: Encodable {
             let tripType: String
-            let hotelId: String?
-            let yachtId: String?
             let country: String
             let region: String?
-            let startDate: Date
-            let endDate: Date
+            let startDate: String
+            let endDate: String
+            let description: String
+            let totalSpots: Int
             let minimumCertificationLevel: String?
             let minimumDives: Int?
-            let description: String
-            let photos: [String]
-            let totalSpots: Int
-            let availableCourses: [String]
             let nitroxAvailable: Bool
-            let groupLeaderId: String?
-            let program: [ProgramDayDTO] // Note: server expects "program", not "programDays"
-            let additionalExpenses: [ExpenseDTO]
             let equipmentRentalAvailable: Bool
+            let hotelId: String?
+            let yachtId: String?
+            let hotelLabel: String?
+            let yachtLabel: String?
+            let groupLeaderId: String?
+            let programDays: [ProgramDayDTO]
+            let additionalExpenses: [ExpenseDTO]
             let priceDetails: PriceDetailsDTO
-            
-            struct ProgramDayDTO: Codable {
-                let date: Date
+            let photoUrls: [String]
+            let availableCourseIds: [String]
+
+            struct ProgramDayDTO: Encodable {
+                let id: String?
+                let date: String
                 let activities: [ActivityDTO]
                 let description: String?
-                
-                struct ActivityDTO: Codable {
+
+                struct ActivityDTO: Encodable {
+                    let id: String?
                     let time: String
                     let activity: String
                     let diveSiteId: String?
@@ -3281,35 +3590,37 @@ extension NetworkService {
                     let notes: String?
                 }
             }
-            
-            struct ExpenseDTO: Codable {
+
+            struct ExpenseDTO: Encodable {
                 let expenseType: String
                 let description: String
                 let cost: Double
                 let currency: String
             }
-            
-            struct PriceDetailsDTO: Codable {
+
+            struct PriceDetailsDTO: Encodable {
                 let roomPrices: [RoomPriceDTO]?
                 let yachtPrices: [YachtPriceDTO]?
                 let divingPrice: Double?
                 let nonDivingPrice: Double?
                 let currency: String
-                
-                struct RoomPriceDTO: Codable {
+
+                struct RoomPriceDTO: Encodable {
                     let roomType: String
-                    // Note: roomCount is not sent to backend - backend doesn't expect it
                     let divingPrice: Double
                     let nonDivingPrice: Double
                 }
-                
-                struct YachtPriceDTO: Codable {
+
+                struct YachtPriceDTO: Encodable {
                     let cabinType: String
-                    // Note: cabinCount is not sent to backend - backend doesn't expect it
                     let divingPrice: Double
                     let nonDivingPrice: Double
                 }
             }
+        }
+
+        struct TripUpdatedResponse: Decodable {
+            let id: String
         }
         
         // Convert Trip to DTO
@@ -3487,28 +3798,39 @@ extension NetworkService {
             }
         }
         
+        let hotelLabel = trip.tripType == .daily && finalHotelId == nil
+            ? hotelName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            : nil
+        let yachtLabel = trip.tripType == .safari && finalYachtId == nil
+            ? yachtName?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
+            : nil
+        let updateDescription = trip.description.trimmingCharacters(in: .whitespacesAndNewlines)
+        let finalDescription = updateDescription.count >= 5 ? updateDescription : "—"
+
         let dto = UpdateTripDTO(
-            organizerType: trip.organizerType.rawValue,
             tripType: trip.tripType.rawValue,
-            hotelId: finalHotelId,
-            yachtId: finalYachtId,
-            country: trip.country,
-            region: trip.region, // Now sending region to backend
-            startDate: trip.startDate,
-            endDate: trip.endDate,
-            minimumCertificationLevel: trip.minimumCertificationLevel,
-            minimumDives: trip.minimumDives,
-            description: trip.description,
-            photos: trip.photos,
+            country: trip.country.trimmingCharacters(in: .whitespacesAndNewlines),
+            region: trip.region?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            startDate: Self.apiCalendarDateString(from: trip.startDate),
+            endDate: Self.apiCalendarDateString(from: trip.endDate),
+            description: finalDescription,
             totalSpots: trip.totalSpots,
-            availableCourses: trip.availableCourses,
+            minimumCertificationLevel: trip.minimumCertificationLevel?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
+            minimumDives: trip.minimumDives,
             nitroxAvailable: trip.nitroxAvailable,
+            equipmentRentalAvailable: trip.equipmentRentalAvailable,
+            hotelId: trip.tripType == .daily ? finalHotelId : nil,
+            yachtId: trip.tripType == .safari ? finalYachtId : nil,
+            hotelLabel: hotelLabel,
+            yachtLabel: yachtLabel,
             groupLeaderId: finalGroupLeaderId,
-            program: trip.program.map { day in
+            programDays: trip.program.map { day in
                 UpdateTripDTO.ProgramDayDTO(
-                    date: day.date,
+                    id: day.id,
+                    date: Self.apiCalendarDateString(from: day.date),
                     activities: day.activities.map { activity in
                         UpdateTripDTO.ProgramDayDTO.ActivityDTO(
+                            id: activity.id,
                             time: activity.time,
                             activity: activity.activity,
                             diveSiteId: activity.diveSiteId,
@@ -3527,12 +3849,10 @@ extension NetworkService {
                     currency: expense.currency
                 )
             },
-            equipmentRentalAvailable: trip.equipmentRentalAvailable,
             priceDetails: UpdateTripDTO.PriceDetailsDTO(
                 roomPrices: trip.priceDetails.roomPrices?.map { roomPrice in
                     UpdateTripDTO.PriceDetailsDTO.RoomPriceDTO(
                         roomType: roomPrice.roomType,
-                        // roomCount is not sent to backend
                         divingPrice: roomPrice.divingPrice,
                         nonDivingPrice: roomPrice.nonDivingPrice
                     )
@@ -3540,7 +3860,6 @@ extension NetworkService {
                 yachtPrices: trip.priceDetails.yachtPrices?.map { yachtPrice in
                     UpdateTripDTO.PriceDetailsDTO.YachtPriceDTO(
                         cabinType: yachtPrice.cabinType,
-                        // cabinCount is not sent to backend
                         divingPrice: yachtPrice.divingPrice,
                         nonDivingPrice: yachtPrice.nonDivingPrice
                     )
@@ -3548,21 +3867,12 @@ extension NetworkService {
                 divingPrice: trip.priceDetails.divingPrice,
                 nonDivingPrice: trip.priceDetails.nonDivingPrice,
                 currency: trip.priceDetails.currency
-            )
+            ),
+            photoUrls: trip.photos,
+            availableCourseIds: trip.availableCourses
         )
-        // Try PUT first for full updates (especially when tripType changes)
-        // PATCH may not support changing tripType, so we use PUT for complete replacement
-        do {
-            let result: Trip = try await request(endpoint: "/api/trips/\(trip.id)", method: .put, body: dto)
-            return result
-        } catch let putError as NetworkError {
-            // If PUT fails with 404, try PATCH (but let 401 pass through for token refresh)
-            if case .serverError(404) = putError {
-                let result: Trip = try await request(endpoint: "/api/trips/\(trip.id)", method: .patch, body: dto)
-                return result
-            }
-            throw putError
-        }
+        let _: TripUpdatedResponse = try await request(endpoint: "/api/trips/\(trip.id)", method: .patch, body: dto)
+        return try await getTrip(id: trip.id)
     }
     
     func deleteTrip(tripId: String) async throws {
@@ -4288,5 +4598,11 @@ private extension Data {
             i = j
         }
         self = data
+    }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

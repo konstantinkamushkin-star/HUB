@@ -17,6 +17,7 @@ struct CreateTripView: View {
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var authService: AuthenticationService
     @StateObject private var localizationService = LocalizationService.shared
+    @StateObject private var countryHelper = CountryLocalizationHelper.shared
     
     // Use shared view model if provided, otherwise use local one
     private var activeViewModel: TripViewModel {
@@ -32,78 +33,19 @@ struct CreateTripView: View {
     @State private var yachtName: String = ""
     @State private var yachtUrl: String = ""
     @State private var country: String = ""
-    @State private var countries: [Country] = [] // Store Country objects instead of strings for proper localization
+    @State private var countries: [Country] = []
     @State private var isLoadingCountries = false
-    @State private var countrySearchText: String = ""
-    @State private var showCountrySuggestions = false
-    @FocusState private var isCountryFieldFocused: Bool
     
     @State private var region: String = ""
-    @State private var regions: [Country.Region] = [] // Store Region objects instead of strings for proper localization
+    @State private var regions: [Country.Region] = []
     @State private var isLoadingRegions = false
+    @State private var countrySearchText: String = ""
     @State private var regionSearchText: String = ""
+    @State private var showCountrySuggestions = false
     @State private var showRegionSuggestions = false
+    @FocusState private var isCountryFieldFocused: Bool
     @FocusState private var isRegionFieldFocused: Bool
     
-    // Filtered countries based on search text
-    // Countries starting with search text come first, then countries containing the text
-    private var filteredCountries: [Country] {
-        if countrySearchText.isEmpty {
-            return countries
-        }
-        let searchText = countrySearchText.lowercased()
-        let matchingCountries = countries.filter { country in
-            country.displayName.localizedCaseInsensitiveContains(searchText)
-        }
-        
-        // Sort: countries starting with search text first, then others
-        return matchingCountries.sorted { country1, country2 in
-            let country1Lower = country1.displayName.lowercased()
-            let country2Lower = country2.displayName.lowercased()
-            
-            let country1Starts = country1Lower.hasPrefix(searchText)
-            let country2Starts = country2Lower.hasPrefix(searchText)
-            
-            if country1Starts && !country2Starts {
-                return true // country1 comes first
-            } else if !country1Starts && country2Starts {
-                return false // country2 comes first
-            } else {
-                // Both start with search text or both don't - sort alphabetically
-                return country1Lower < country2Lower
-            }
-        }
-    }
-    
-    // Filtered regions based on search text
-    // Regions starting with search text come first, then regions containing the text
-    private var filteredRegions: [Country.Region] {
-        if regionSearchText.isEmpty {
-            return regions
-        }
-        let searchText = regionSearchText.lowercased()
-        let matchingRegions = regions.filter { region in
-            region.displayName.localizedCaseInsensitiveContains(searchText)
-        }
-        
-        // Sort: regions starting with search text first, then others
-        return matchingRegions.sorted { region1, region2 in
-            let region1Lower = region1.displayName.lowercased()
-            let region2Lower = region2.displayName.lowercased()
-            
-            let region1Starts = region1Lower.hasPrefix(searchText)
-            let region2Starts = region2Lower.hasPrefix(searchText)
-            
-            if region1Starts && !region2Starts {
-                return true // region1 comes first
-            } else if !region1Starts && region2Starts {
-                return false // region2 comes first
-            } else {
-                // Both start with search text or both don't - sort alphabetically
-                return region1Lower < region2Lower
-            }
-        }
-    }
     @State private var startDate = Date()
     @State private var endDate = Date()
     @State private var minimumCertificationLevel: String = "Open Water"
@@ -143,10 +85,11 @@ struct CreateTripView: View {
     
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var showImportFromSiteSheet = false
-    @State private var importUrl = ""
-    @State private var isImportingFromSite = false
-    @State private var importSheetError: String?
+    @State private var managedCenters: [NetworkService.ManagedDiveCenterBrief] = []
+    @State private var selectedCenterId: String?
+    @State private var isLoadingCenters = true
+    @State private var centersError: String?
+    @State private var usesPersonalOrganizer = false
     
     var body: some View {
         NavigationStack {
@@ -183,7 +126,7 @@ struct CreateTripView: View {
                 )
                 .onDisappear {}
             }
-            .onChange(of: showRoomPriceForm) { oldValue, newValue in}
+            .onValueChange(of: showRoomPriceForm) { oldValue, newValue in}
             .sheet(isPresented: $showCabinPriceForm) {
                 CabinPriceFormView(
                     cabinPrice: editingCabinPrice, // Pass value instead of binding
@@ -236,9 +179,9 @@ struct CreateTripView: View {
                     }
                 )
             }
-            .onChange(of: showExpenseForm) { oldValue, newValue in}
-            .onChange(of: showParticipantPicker) { oldValue, newValue in}
-            .onChange(of: showCabinPriceForm) { oldValue, newValue in}
+            .onValueChange(of: showExpenseForm) { oldValue, newValue in}
+            .onValueChange(of: showParticipantPicker) { oldValue, newValue in}
+            .onValueChange(of: showCabinPriceForm) { oldValue, newValue in}
     }
     
     private func formWithBasicModifiers(navigationTitle: String) -> some View {
@@ -259,62 +202,13 @@ struct CreateTripView: View {
                     .disabled(!isFormValid || isLoading)
                 }
             }
-            .sheet(isPresented: $showImportFromSiteSheet) {
-                NavigationStack {
-                    Form {
-                        Section("ui_url_34_o".localized) {
-                            TextField("ui_trips_https_example_com_trips".localized, text: $importUrl)
-                                .keyboardType(.URL)
-                                .autocapitalization(.none)
-                                .disableAutocorrection(true)
-                                .onChange(of: importUrl) { _, _ in
-                                    importSheetError = nil
-                                }
-                            Text("ui_trips_supports_public_http_https".localized)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            if let importSheetError, !importSheetError.isEmpty {
-                                Text(importSheetError)
-                                    .font(.caption)
-                                    .foregroundColor(.red)
-                            }
-                            if isImportingFromSite {
-                                HStack {
-                                    ProgressView()
-                                    Text("ui_trips_import_loading".localized)
-                                }
-                            }
-                        }
-                    }
-                    .navigationTitle("ui_trips_import_from_site".localized)
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button(localizationService.localizedString("cancel", table: "common")) {
-                                showImportFromSiteSheet = false
-                                importSheetError = nil
-                            }
-                        }
-                        ToolbarItem(placement: .navigationBarTrailing) {
-                            Button("ui_1434nn_n342nn".localized) {
-                                Task { await importTripFromWebsite() }
-                            }
-                            .disabled(importUrl.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isImportingFromSite)
-                        }
-                    }
-                }
-            }
-            .onAppear {}
-            .onChange(of: trip?.id) { oldValue, newValue in}
-            .onChange(of: localizationService.currentLanguage) { oldValue, newValue in// Reload countries and regions when language changes to update localized names
-                // Note: We don't need to reload the data, just trigger a view update
-                // The displayName computed property will automatically use the new language
+            .onValueChange(of: localizationService.currentLanguage) { oldValue, newValue in
                 Task {
-                    // Force view update by reloading countries (this will update the displayName)
                     if !countries.isEmpty {
                         await loadCountries()
                     }
-                    // Reload regions if we have a country selected
                     if !country.isEmpty {
+                        countrySearchText = countryHelper.getLocalizedCountryName(country)
                         await loadRegions(for: country)
                     }
                 }
@@ -354,7 +248,6 @@ struct CreateTripView: View {
                         .foregroundColor(.red)
                 }
             }
-            importFromWebsiteSection
             basicInformationSection
             requirementsSection
             descriptionSection
@@ -369,36 +262,130 @@ struct CreateTripView: View {
         }
     }
 
-    private var importFromWebsiteSection: some View {
-        Section("ui_trips_import_from_site".localized) {
-            if trip == nil, let user = authService.currentUser, let dcId = user.diveCenterId, !dcId.isEmpty {
-                Button {
-                    importUrl = ""
-                    importSheetError = nil
-                    showImportFromSiteSheet = true
-                } label: {
-                    Label("ui_trips_add_trip_by_link".localized, systemImage: "link.badge.plus")
+    private var sortedCountries: [Country] {
+        countries.sorted {
+            countryHelper.getLocalizedCountryName($0.name)
+                .localizedCaseInsensitiveCompare(countryHelper.getLocalizedCountryName($1.name)) == .orderedAscending
+        }
+    }
+    
+    private var filteredCountries: [Country] {
+        let query = countrySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty { return sortedCountries }
+        return sortedCountries.filter { countryObj in
+            let localized = countryHelper.getLocalizedCountryName(countryObj.name)
+            return localized.localizedCaseInsensitiveContains(query)
+                || countryObj.name.localizedCaseInsensitiveContains(query)
+        }
+    }
+    
+    private var filteredRegions: [Country.Region] {
+        let sorted = regions.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        let query = regionSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty { return sorted }
+        return sorted.filter { $0.name.localizedCaseInsensitiveContains(query) }
+    }
+    
+    private func selectCountry(_ countryObj: Country) {
+        country = countryObj.name
+        countrySearchText = countryHelper.getLocalizedCountryName(countryObj.name)
+        showCountrySuggestions = false
+        isCountryFieldFocused = false
+        region = ""
+        regionSearchText = ""
+        Task { await loadRegions(for: countryObj.name) }
+    }
+    
+    private func commitCountryFromSearch() {
+        let query = countrySearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if query.isEmpty {
+            country = ""
+            region = ""
+            regionSearchText = ""
+            regions = []
+            return
+        }
+        if let exact = sortedCountries.first(where: {
+            countryHelper.getLocalizedCountryName($0.name).caseInsensitiveCompare(query) == .orderedSame
+                || $0.name.caseInsensitiveCompare(query) == .orderedSame
+        }) {
+            if country != exact.name {
+                selectCountry(exact)
+            } else {
+                countrySearchText = countryHelper.getLocalizedCountryName(exact.name)
+            }
+            return
+        }
+        if !country.isEmpty,
+           query == countryHelper.getLocalizedCountryName(country) || query.caseInsensitiveCompare(country) == .orderedSame {
+            return
+        }
+        country = ""
+        region = ""
+        regionSearchText = ""
+        regions = []
+    }
+    
+    private func commitRegionFromSearch() {
+        region = regionSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        showRegionSuggestions = false
+    }
+
+    @ViewBuilder
+    private var diveCenterPicker: some View {
+        if usesPersonalOrganizer {
+            EmptyView()
+        } else if isLoadingCenters {
+            HStack {
+                Text(localizationService.localizedString("selectCenter", table: "booking"))
+                Spacer()
+                ProgressView()
+            }
+        } else if let centersError, !centersError.isEmpty {
+            Text(centersError)
+                .font(.caption)
+                .foregroundColor(.red)
+        } else if managedCenters.isEmpty {
+            Text(localizationService.localizedString("noManagedCenters", table: "trips"))
+                .foregroundColor(.secondary)
+        } else if managedCenters.count == 1, let center = managedCenters.first {
+            HStack {
+                Text(localizationService.localizedString("selectCenter", table: "booking"))
+                Spacer()
+                Text(center.name)
+                    .foregroundColor(.secondary)
+            }
+            .onAppear {
+                if selectedCenterId == nil {
+                    selectedCenterId = center.id
                 }
-                .buttonStyle(.borderless)
-                .disabled(isLoading || isImportingFromSite)
-                Text("ui_trips_open_trip_url_form_hint".localized)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            } else if trip == nil {
-                Text("ui_trips_import_link_available_hint".localized)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            }
+        } else {
+            Picker(
+                localizationService.localizedString("selectCenter", table: "booking"),
+                selection: $selectedCenterId
+            ) {
+                Text(localizationService.localizedString("none", table: "trips")).tag(Optional<String>.none)
+                ForEach(managedCenters) { center in
+                    Text(center.name).tag(Optional(center.id))
+                }
+            }
+            .onValueChange(of: selectedCenterId) { _, newValue in
+                guard let centerId = newValue else { return }
+                Task { await activeViewModel.loadInstructors(diveCenterId: centerId) }
             }
         }
     }
     
     private var basicInformationSection: some View {
         Section(localizationService.localizedString("basicInformation", table: "trips")) {
+            diveCenterPicker
+
             Picker(localizationService.localizedString("tripType", table: "trips"), selection: $tripType) {
                 Text(localizationService.localizedString("daily", table: "trips")).tag(Trip.TripType.daily)
                 Text(localizationService.localizedString("safari", table: "trips")).tag(Trip.TripType.safari)
             }
-            .onChange(of: tripType) { oldValue, newValue in
+            .onValueChange(of: tripType) { oldValue, newValue in
                 // Clear hotel/yacht data when trip type changes
                 if oldValue != newValue {
                     if newValue == .daily {
@@ -411,6 +398,148 @@ struct CreateTripView: View {
                 }
             }
             
+            if isLoadingCountries {
+                HStack {
+                    Text(localizationService.localizedString("country", table: "trips"))
+                    Spacer()
+                    ProgressView()
+                }
+            } else if countries.isEmpty {
+                Text(localizationService.localizedString("noOptionsAvailable", table: "common"))
+                    .foregroundColor(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField(
+                        localizationService.localizedString("country", table: "trips"),
+                        text: $countrySearchText
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isCountryFieldFocused)
+                    .onValueChange(of: countrySearchText) { _, newValue in
+                        showCountrySuggestions = isCountryFieldFocused
+                            && (!newValue.isEmpty || !filteredCountries.isEmpty)
+                    }
+                    .onValueChange(of: isCountryFieldFocused) { _, focused in
+                        if focused {
+                            showCountrySuggestions = !countrySearchText.isEmpty || !filteredCountries.isEmpty
+                        } else {
+                            commitCountryFromSearch()
+                            showCountrySuggestions = false
+                        }
+                    }
+                    .onSubmit {
+                        commitCountryFromSearch()
+                        showCountrySuggestions = false
+                        isCountryFieldFocused = false
+                    }
+                    
+                    if showCountrySuggestions && !filteredCountries.isEmpty {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(filteredCountries.prefix(12), id: \.name) { countryObj in
+                                    Button {
+                                        selectCountry(countryObj)
+                                    } label: {
+                                        HStack {
+                                            Text(countryHelper.getLocalizedCountryName(countryObj.name))
+                                                .foregroundColor(.primary)
+                                            Spacer()
+                                        }
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 12)
+                                    }
+                                    .buttonStyle(.plain)
+                                    if countryObj.name != filteredCountries.prefix(12).last?.name {
+                                        Divider()
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 220)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(.separator), lineWidth: 1)
+                        )
+                    }
+                }
+            }
+            
+            if !country.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    TextField(
+                        localizationService.localizedString("region", table: "trips"),
+                        text: $regionSearchText
+                    )
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isRegionFieldFocused)
+                    .onValueChange(of: regionSearchText) { _, newValue in
+                        region = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                        showRegionSuggestions = isRegionFieldFocused
+                            && !newValue.isEmpty
+                            && !filteredRegions.isEmpty
+                    }
+                    .onValueChange(of: isRegionFieldFocused) { _, focused in
+                        if !focused {
+                            commitRegionFromSearch()
+                            showRegionSuggestions = false
+                        }
+                    }
+                    .onSubmit {
+                        commitRegionFromSearch()
+                        showRegionSuggestions = false
+                        isRegionFieldFocused = false
+                    }
+                    
+                    if isLoadingRegions {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    }
+                    
+                    if showRegionSuggestions && !filteredRegions.isEmpty {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(filteredRegions.prefix(12), id: \.name) { regionObj in
+                                    Button {
+                                        region = regionObj.name
+                                        regionSearchText = regionObj.name
+                                        showRegionSuggestions = false
+                                        isRegionFieldFocused = false
+                                    } label: {
+                                        HStack {
+                                            Text(countryHelper.getLocalizedRegionName(regionObj.name, countryName: country))
+                                                .foregroundColor(.primary)
+                                            Spacer()
+                                        }
+                                        .padding(.vertical, 8)
+                                        .padding(.horizontal, 12)
+                                    }
+                                    .buttonStyle(.plain)
+                                    if regionObj.name != filteredRegions.prefix(12).last?.name {
+                                        Divider()
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxHeight: 180)
+                        .background(Color(.systemBackground))
+                        .cornerRadius(8)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(Color(.separator), lineWidth: 1)
+                        )
+                    }
+                    
+                    Text(localizationService.localizedString("regionCustomHint", table: "trips"))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            DatePicker(localizationService.localizedString("startDate", table: "trips"), selection: $startDate, displayedComponents: .date)
+            DatePicker(localizationService.localizedString("endDate", table: "trips"), selection: $endDate, displayedComponents: .date)
+            
             if tripType == .daily {
                 TextField("ui_trips_hotel_name_required".localized, text: $hotelName)
                 TextField("ui_trips_hotel_link_optional".localized, text: $hotelUrl)
@@ -422,194 +551,6 @@ struct CreateTripView: View {
                     .keyboardType(.URL)
                     .autocapitalization(.none)
             }
-            
-            if isLoadingCountries {
-                HStack {
-                    Text(localizationService.localizedString("country", table: "trips"))
-                    Spacer()
-                    ProgressView()
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 4) {
-                    TextField(localizationService.localizedString("country", table: "trips"), text: $countrySearchText)
-                        .textFieldStyle(.roundedBorder)
-                        .focused($isCountryFieldFocused)
-                        .onChange(of: countrySearchText) { oldValue, newValue in
-                            showCountrySuggestions = isCountryFieldFocused && !newValue.isEmpty && !filteredCountries.isEmpty
-                        }
-                        .onChange(of: country) { oldValue, newValue in// Load regions when country changes
-                            if !newValue.isEmpty && newValue != oldValue {Task {
-                                    await loadRegions(for: newValue)
-                                }
-                            } else if newValue.isEmpty {regions = []
-                                region = ""
-                                regionSearchText = ""
-                            }
-                        }
-                        .onChange(of: isCountryFieldFocused) { oldValue, newValue in
-                            if !newValue {// When field loses focus, update country value
-                                if let exactMatch = countries.first(where: { $0.displayName.caseInsensitiveCompare(countrySearchText) == .orderedSame }) {country = exactMatch.displayName
-                                    countrySearchText = exactMatch.displayName
-                                } else {// Allow free text if no exact match
-                                    country = countrySearchText
-                                }
-                                showCountrySuggestions = false
-                            } else {
-                                // When field gains focus, show suggestions if there's text
-                                if !countrySearchText.isEmpty {
-                                    showCountrySuggestions = !filteredCountries.isEmpty
-                                }
-                            }
-                        }
-                        .onSubmit {
-                            // When user presses return, try to find exact match
-                            if let exactMatch = countries.first(where: { $0.displayName.caseInsensitiveCompare(countrySearchText) == .orderedSame }) {
-                                country = exactMatch.displayName
-                                countrySearchText = exactMatch.displayName
-                            } else {
-                                // Allow free text if no exact match
-                                country = countrySearchText
-                            }
-                            showCountrySuggestions = false
-                            isCountryFieldFocused = false
-                        }
-                        .onAppear {
-                            if countrySearchText.isEmpty {
-                                countrySearchText = country
-                            }
-                        }
-                    
-                    if showCountrySuggestions && !filteredCountries.isEmpty {
-                        ScrollView {
-                            VStack(alignment: .leading, spacing: 0) {
-                                ForEach(filteredCountries.prefix(10), id: \.id) { countryObj in
-                                    Button(action: {country = countryObj.displayName
-                                        countrySearchText = countryObj.displayName
-                                        showCountrySuggestions = false
-                                        isCountryFieldFocused = false
-                                    }) {
-                                        HStack {
-                                            Text(countryObj.displayName)
-                                                .foregroundColor(.primary)
-                                            Spacer()
-                                        }
-                                        .padding(.vertical, 8)
-                                        .padding(.horizontal, 12)
-                                    }
-                                    .buttonStyle(.plain)
-                                    
-                                    if countryObj.id != filteredCountries.prefix(10).last?.id {
-                                        Divider()
-                                    }
-                                }
-                            }
-                        }
-                        .frame(maxHeight: 200)
-                        .background(Color(.systemBackground))
-                        .cornerRadius(8)
-                        .shadow(radius: 2)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Color(.separator), lineWidth: 1)
-                        )
-                    }
-                }
-            }
-            
-            // Region field
-            VStack(alignment: .leading, spacing: 4) {
-                TextField(localizationService.localizedString("region", table: "trips"), text: $regionSearchText)
-                    .textFieldStyle(.roundedBorder)
-                    .focused($isRegionFieldFocused)
-                    .disabled(isLoadingRegions)
-                    .onChange(of: regionSearchText) { oldValue, newValue in
-                        showRegionSuggestions = isRegionFieldFocused && !newValue.isEmpty && !filteredRegions.isEmpty
-                    }
-                    .onChange(of: isRegionFieldFocused) { oldValue, newValue in
-                        if !newValue {
-                            // When field loses focus, update region value
-                            if let exactMatch = regions.first(where: { $0.displayName.caseInsensitiveCompare(regionSearchText) == .orderedSame }) {
-                                region = exactMatch.displayName
-                                regionSearchText = exactMatch.displayName
-                            } else {
-                                // Allow free text if no exact match
-                                region = regionSearchText
-                            }
-                            showRegionSuggestions = false
-                        } else {
-                            // When field gains focus, show suggestions if there's text
-                            if !regionSearchText.isEmpty {
-                                showRegionSuggestions = !filteredRegions.isEmpty
-                            }
-                        }
-                    }
-                    .onSubmit {
-                        // When user presses return, try to find exact match
-                        if let exactMatch = regions.first(where: { $0.displayName.caseInsensitiveCompare(regionSearchText) == .orderedSame }) {
-                            region = exactMatch.displayName
-                            regionSearchText = exactMatch.displayName
-                        } else {
-                            // Allow free text if no exact match
-                            region = regionSearchText
-                        }
-                        showRegionSuggestions = false
-                        isRegionFieldFocused = false
-                    }
-                    .onAppear {
-                        if regionSearchText.isEmpty {
-                            regionSearchText = region
-                        }
-                    }
-                
-                if isLoadingRegions {
-                    HStack {
-                        Spacer()
-                        ProgressView()
-                            .scaleEffect(0.8)
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
-                }
-                
-                if showRegionSuggestions && !filteredRegions.isEmpty {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 0) {
-                            ForEach(filteredRegions.prefix(10), id: \.id) { regionObj in
-                                Button(action: {
-                                    region = regionObj.displayName
-                                    regionSearchText = regionObj.displayName
-                                    showRegionSuggestions = false
-                                    isRegionFieldFocused = false
-                                }) {
-                                    HStack {
-                                        Text(regionObj.displayName)
-                                            .foregroundColor(.primary)
-                                        Spacer()
-                                    }
-                                    .padding(.vertical, 8)
-                                    .padding(.horizontal, 12)
-                                }
-                                .buttonStyle(.plain)
-                                
-                                if regionObj.id != filteredRegions.prefix(10).last?.id {
-                                    Divider()
-                                }
-                            }
-                        }
-                    }
-                    .frame(maxHeight: 200)
-                    .background(Color(.systemBackground))
-                    .cornerRadius(8)
-                    .shadow(radius: 2)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color(.separator), lineWidth: 1)
-                    )
-                }
-            }
-            
-            DatePicker(localizationService.localizedString("startDate", table: "trips"), selection: $startDate, displayedComponents: .date)
-            DatePicker(localizationService.localizedString("endDate", table: "trips"), selection: $endDate, displayedComponents: .date)
         }
     }
     
@@ -633,7 +574,7 @@ struct CreateTripView: View {
                 Label(localizationService.localizedString("addPhotos", table: "trips"), systemImage: "photo")
             }
             .buttonStyle(.plain)
-            .onChange(of: selectedPhotos) { oldValue, newItems in
+            .onValueChange(of: selectedPhotos) { oldValue, newItems in
                 Task {
                     photoImages = []
                     for item in newItems {
@@ -948,75 +889,137 @@ struct CreateTripView: View {
     }
     
     private var isFormValid: Bool {
-        let countryValid = !country.isEmpty
-        // Hotel/yacht name is required
-        let hotelOrYachtValid: Bool
-        if tripType == .daily {
-            hotelOrYachtValid = !hotelName.isEmpty
-        } else {
-            hotelOrYachtValid = !yachtName.isEmpty
-        }
-        let datesValid = endDate > startDate
-        let spotsValid = totalSpots > 0
-        
-        return countryValid && hotelOrYachtValid && datesValid && spotsValid
+        let regionValue = regionSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let hasOrganizer = usesPersonalOrganizer || selectedCenterId != nil
+        return hasOrganizer
+            && !country.isEmpty
+            && regionValue.count >= 2
+            && endDate >= startDate
     }
     
     private func loadData() async {
+        await loadManagedCenters()
         await activeViewModel.loadHotels()
         await activeViewModel.loadYachts()
         await activeViewModel.loadCourses()
-        
-        if let user = authService.currentUser,
-           let diveCenterId = user.diveCenterId {
-            await activeViewModel.loadInstructors(diveCenterId: diveCenterId)
+
+        if let centerId = selectedCenterId {
+            await activeViewModel.loadInstructors(diveCenterId: centerId)
         }
-        
-        // Load countries from backend
+
         await loadCountries()
-        
-        // Load regions if country is already set
+
         if !country.isEmpty {
             await loadRegions(for: country)
+        }
+    }
+
+    private func loadManagedCenters() async {
+        isLoadingCenters = true
+        centersError = nil
+        defer { isLoadingCenters = false }
+
+        do {
+            let centers = try await NetworkService.shared.listManagedDiveCenters()
+            managedCenters = centers
+            if let user = authService.currentUser,
+               user.role == .diverPro,
+               user.subscriptionStatus == .active,
+               centers.isEmpty {
+                usesPersonalOrganizer = true
+                centersError = nil
+            } else if centers.isEmpty {
+                usesPersonalOrganizer = false
+                centersError = localizationService.localizedString("noManagedCenters", table: "trips")
+                selectedCenterId = nil
+            } else {
+                usesPersonalOrganizer = false
+                centersError = nil
+                if selectedCenterId == nil {
+                    if let existingTrip = trip {
+                        selectedCenterId = centers.first(where: { $0.id == existingTrip.organizerId })?.id
+                            ?? centers.first?.id
+                    } else if let currentUser = authService.currentUser {
+                        selectedCenterId = currentUser.diveCenterId.flatMap { userCenterId in
+                            centers.first(where: { $0.id == userCenterId })?.id
+                        } ?? centers.first?.id
+                    } else {
+                        selectedCenterId = centers.first?.id
+                    }
+                }
+            }
+            if let centerId = selectedCenterId, !usesPersonalOrganizer {
+                await activeViewModel.loadInstructors(diveCenterId: centerId)
+            }
+        } catch {
+            if let user = authService.currentUser,
+               user.role == .diverPro,
+               user.subscriptionStatus == .active {
+                usesPersonalOrganizer = true
+                managedCenters = []
+                centersError = nil
+                selectedCenterId = nil
+            } else {
+                usesPersonalOrganizer = false
+                centersError = error.localizedDescription
+                managedCenters = []
+                selectedCenterId = nil
+            }
         }
     }
     
     private func loadCountries() async {
         isLoadingCountries = true
-        do {
-            // Use getCountriesFull() to get Country objects with localization support
-            countries = try await NetworkService.shared.getCountriesFull()} catch {
-            // If loading fails, use empty list or fallback
-            print("Failed to load countries: \(error.localizedDescription)")
-            countries = []
-        }
+        await countryHelper.loadCountries()
+        let names = Array(Set(countryHelper.countryNames + countryHelper.diveCenterCountryNames))
+            .filter { !$0.isEmpty }
+            .sorted()
+        countries = names.map { Country(id: $0, name: $0) }
         isLoadingCountries = false
     }
     
-    private func loadRegions(for countryName: String) async {isLoadingRegions = true
-        do {
-            // Get all countries with full data including regions
-            let allCountries = try await NetworkService.shared.getCountriesFull()
-            if let matchingCountry = allCountries.first(where: { $0.name == countryName || $0.displayName == countryName }) {
-                // Extract region objects from the country's regions (keep Region objects for localization)
-                if let countryRegions = matchingCountry.regions, !countryRegions.isEmpty {
-                    regions = countryRegions
-                } else {
-                    regions = []
-                }
-            } else {// Try to get regions using the old API method as fallback
-                // Note: Fallback API returns [String], so we need to convert to Region objects
-                let loadedRegionNames = try await NetworkService.shared.getRegions(country: countryName)// Convert string region names to Region objects (without localized names)
-                regions = loadedRegionNames.map { regionName in
-                    Country.Region(name: regionName, localizedNames: [:])
-                }
-            }
-        } catch {
-            // If loading fails, use empty list
-            print("Failed to load regions for \(countryName): \(error.localizedDescription)")
-            regions = []
+    private func loadRegions(for countryName: String) async {
+        isLoadingRegions = true
+        defer { isLoadingRegions = false }
+        
+        if let apiNames = try? await NetworkService.shared.getRegionsFromDiveSites(country: countryName),
+           !apiNames.isEmpty {
+            regions = apiNames.map { Country.Region(name: $0, localizedNames: [:]) }
+            return
         }
-        isLoadingRegions = false
+        
+        regions = await loadRegionsFromDiveSitesList(countryName: countryName)
+    }
+    
+    private func regionName(from site: DiveSite) -> String? {
+        guard let address = site.location.address else { return nil }
+        let parts = address
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        guard parts.count >= 2 else { return nil }
+        let regionName = parts[0]
+        return regionName.isEmpty ? nil : regionName
+    }
+    
+    private func loadRegionsFromDiveSitesList(countryName: String) async -> [Country.Region] {
+        do {
+            var filters = DiveSiteFilters()
+            filters.country = countryName
+            let sites = try await NetworkService.shared.getDiveSites(filters: filters, page: 1, limit: 400)
+            let names = Array(Set(sites.compactMap { regionName(from: $0) })).sorted()
+            if !names.isEmpty {
+                return names.map { Country.Region(name: $0, localizedNames: [:]) }
+            }
+        } catch {}
+        
+        do {
+            let sites = try await NetworkService.shared.getPopularDiveSites(country: countryName, limit: 400)
+            let names = Array(Set(sites.compactMap { regionName(from: $0) })).sorted()
+            return names.map { Country.Region(name: $0, localizedNames: [:]) }
+        } catch {
+            return []
+        }
     }
     
     private func loadTripData(_ trip: Trip) {
@@ -1043,10 +1046,9 @@ struct CreateTripView: View {
             }
         }
         country = trip.country
-        countrySearchText = trip.country
+        countrySearchText = countryHelper.getLocalizedCountryName(trip.country)
         region = trip.region ?? ""
         regionSearchText = trip.region ?? ""
-        // Load regions for the country
         Task {
             await loadRegions(for: trip.country)
         }
@@ -1106,67 +1108,33 @@ struct CreateTripView: View {
                     photoImages = loadedImages}
             }} else {}}
     
-    private func importTripFromWebsite() async {
-        let sourceUrl = importUrl.trimmingCharacters(in: .whitespacesAndNewlines)
-        importSheetError = nil
-        guard let user = authService.currentUser else {
-            importSheetError = "Требуется авторизация."
-            return
-        }
-        guard let diveCenterId = user.diveCenterId, !diveCenterId.isEmpty else {
-            importSheetError = "В профиле не указан дайв-центр (diveCenterId)."
-            return
-        }
-        guard let parsed = URL(string: sourceUrl), ["http", "https"].contains(parsed.scheme?.lowercased() ?? "") else {
-            importSheetError = "Укажите корректный URL (http/https)."
-            return
-        }
-        isImportingFromSite = true
-        defer { isImportingFromSite = false }
-        do {
-            let imported = try await NetworkService.shared.importTripFromWebsite(
-                url: sourceUrl,
-                diveCenterId: diveCenterId
-            )
-            showImportFromSiteSheet = false
-            importSheetError = nil
-            onTripSaved?(imported)
-            dismiss()
-        } catch {
-            importSheetError = error.localizedDescription
-        }
-    }
-
     private func saveTrip() async {
         guard let user = authService.currentUser else {
             return
         }
         
-        // Update country value before saving if user typed something
-        if !countrySearchText.isEmpty {
-            if let exactMatch = countries.first(where: { $0.displayName.caseInsensitiveCompare(countrySearchText) == .orderedSame }) {
-                country = exactMatch.displayName
-            } else {
-                country = countrySearchText
+        commitCountryFromSearch()
+        commitRegionFromSearch()
+
+        let organizerType: Trip.OrganizerType
+        let organizerId: String
+
+        if usesPersonalOrganizer {
+            organizerType = .user
+            organizerId = user.id
+        } else {
+            guard let centerId = selectedCenterId else {
+                errorMessage = localizationService.localizedString("selectCenterRequired", table: "trips")
+                return
             }
-        }
-        
-        // Update region value before saving if user typed something
-        if !regionSearchText.isEmpty {
-            if let exactMatch = regions.first(where: { $0.displayName.caseInsensitiveCompare(regionSearchText) == .orderedSame }) {
-                region = exactMatch.displayName
-            } else {
-                region = regionSearchText
-            }
+            organizerType = .diveCenter
+            organizerId = centerId
         }
         
         isLoading = true
         errorMessage = nil
         
         // TODO: Upload photos first to get URLs
-        
-        let organizerType: Trip.OrganizerType = user.role == .diveCenterAdmin ? .diveCenter : .user
-        let organizerId = user.diveCenterId ?? user.id
         
         // Determine hotelId/yachtId - will be resolved in updateTrip based on tripType
         // For editing, pass hotelName/yachtName as hotelId/yachtId, updateTrip will resolve to actual IDs
@@ -1182,7 +1150,7 @@ struct CreateTripView: View {
             finalYachtId = !yachtName.isEmpty ? yachtName : nil
         }
         
-        let finalRegion = region.isEmpty ? nil : region// Calculate bookedSpots: use existing booked spots if editing, otherwise count participants
+        let finalRegion = region
         let finalBookedSpots: Int
         if let existingTrip = trip {
             // When editing, preserve existing booked spots (they come from actual bookings)
