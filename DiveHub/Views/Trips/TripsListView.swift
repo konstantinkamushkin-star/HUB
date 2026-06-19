@@ -13,8 +13,10 @@ import Combine
 class CountryLocalizationHelper: ObservableObject {
     static let shared = CountryLocalizationHelper()
     
-    /// Raw English country names from backend (used as filter values)
+    /// Raw English country names from backend dive sites (used as filter values)
     @Published var countryNames: [String] = []
+    /// Countries that have at least one dive center
+    @Published var diveCenterCountryNames: [String] = []
     @Published private(set) var isLoading = false
     
     /// Mapping: English name → ISO 3166-1 alpha-2 code, built once from system Locale
@@ -119,31 +121,98 @@ class CountryLocalizationHelper: ObservableObject {
     func loadCountries() async {
         guard !isLoading else { return }
         isLoading = true
-        do {
-            let response = try await NetworkService.shared.getCountriesFromDiveSites()
-            countryNames = response.data
-        } catch {
-            print("[CountryLocalizationHelper] Failed to load countries: \(error)")
+        defer { isLoading = false }
+
+        if let sites = try? await NetworkService.shared.getCountriesFromDiveSites().data, !sites.isEmpty {
+            countryNames = sites
         }
-        isLoading = false
+        if let centers = try? await NetworkService.shared.getCountriesFromDiveCenters().data, !centers.isEmpty {
+            diveCenterCountryNames = centers
+        }
+        applyFallbackCountriesIfNeeded()
+    }
+
+    /// ISO-backed English country names when API lists are empty or unreachable.
+    static func fallbackCountryNames() -> [String] {
+        let englishLocale = Locale(identifier: "en")
+        var names = Locale.Region.isoRegions.compactMap { region -> String? in
+            englishLocale.localizedString(forRegionCode: region.identifier)
+        }
+        names.append(contentsOf: ["United States", "United Kingdom", "Russia", "Czech Republic"])
+        return Array(Set(names.filter { !$0.isEmpty })).sorted()
+    }
+
+    func applyFallbackCountriesIfNeeded() {
+        if countryNames.isEmpty {
+            countryNames = Self.fallbackCountryNames()
+        }
+    }
+
+    /// Maps localized or English UI input to the English name stored in the API.
+    func resolveStoredCountryName(from input: String) -> String {
+        let query = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return "" }
+        let pool = Array(Set(countryNames + diveCenterCountryNames + Self.fallbackCountryNames()))
+        if let english = pool.first(where: { $0.caseInsensitiveCompare(query) == .orderedSame }) {
+            return english
+        }
+        if let match = pool.first(where: {
+            getLocalizedCountryName($0).caseInsensitiveCompare(query) == .orderedSame
+        }) {
+            return match
+        }
+        return query
     }
     
     func ensureLoaded() {
-        guard countryNames.isEmpty && !isLoading else { return }
+        guard (countryNames.isEmpty || diveCenterCountryNames.isEmpty) && !isLoading else { return }
         Task { await loadCountries() }
     }
     
+    /// Countries for dive site filter pickers — full backend list when loaded.
+    func countriesForFilter(fallbackFrom loadedCountryNames: [String]) -> [String] {
+        if !countryNames.isEmpty {
+            return countryNames
+        }
+        return Array(Set(loadedCountryNames.filter { !$0.isEmpty })).sorted()
+    }
+
+    /// Countries for dive center filter pickers — only countries with centers.
+    func countriesForDiveCenterFilter(fallbackFrom loadedCountryNames: [String]) -> [String] {
+        if !diveCenterCountryNames.isEmpty {
+            return diveCenterCountryNames
+        }
+        return Array(Set(loadedCountryNames.filter { !$0.isEmpty })).sorted()
+    }
     /// Returns the localized display name for a country stored as English name in DB
-    func getLocalizedCountryName(_ englishName: String) -> String {
-        if let isoCode = nameToISOCode[englishName.lowercased()] {
-            let appLocale = LocalizationService.shared.currentLanguage.locale
-            if let localized = appLocale.localizedString(forRegionCode: isoCode), !localized.isEmpty {
+    func getLocalizedCountryName(_ storedName: String) -> String {
+        let trimmed = storedName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return storedName }
+        let key = trimmed.lowercased()
+        
+        let appLocale = LocalizationService.shared.currentLanguage.locale
+        
+        if key.count == 2,
+           let localized = appLocale.localizedString(forRegionCode: key.uppercased()),
+           !localized.isEmpty {
+            return localized
+        }
+        
+        if let isoCode = nameToISOCode[key],
+           let localized = appLocale.localizedString(forRegionCode: isoCode),
+           !localized.isEmpty {
+            return localized
+        }
+        
+        for region in Locale.Region.isoRegions {
+            let code = region.identifier
+            if let localized = appLocale.localizedString(forRegionCode: code),
+               localized.lowercased() == key {
                 return localized
             }
-        } else {
-            print("[CountryLocalizationHelper] No ISO code for: '\(englishName)'")
         }
-        return englishName
+        
+        return trimmed
     }
     
     // Legacy: kept for backward compatibility with TripsListView
@@ -156,8 +225,49 @@ class CountryLocalizationHelper: ObservableObject {
     }
 }
 
+@MainActor
+class DiveSiteFilterOptionsHelper: ObservableObject {
+    static let shared = DiveSiteFilterOptionsHelper()
+
+    @Published private(set) var siteTypeRawValues: [String] = []
+    @Published private(set) var isLoading = false
+
+    private init() {
+        Task { await loadSiteTypes() }
+    }
+
+    func loadSiteTypes() async {
+        guard !isLoading else { return }
+        isLoading = true
+        do {
+            let response = try await NetworkService.shared.getSiteTypesFromDiveSites()
+            siteTypeRawValues = response.data
+        } catch {
+            print("[DiveSiteFilterOptionsHelper] Failed to load site types: \(error)")
+        }
+        isLoading = false
+    }
+
+    func ensureLoaded() {
+        guard siteTypeRawValues.isEmpty && !isLoading else { return }
+        Task { await loadSiteTypes() }
+    }
+
+    func siteTypesForFilter(fallbackFrom loaded: [DiveSiteType]) -> [DiveSiteType] {
+        if !siteTypeRawValues.isEmpty {
+            return siteTypeRawValues
+                .compactMap { DiveSiteType(rawValue: $0) }
+                .sorted { $0.rawValue < $1.rawValue }
+        }
+        return Array(Set(loaded)).sorted { $0.rawValue < $1.rawValue }
+    }
+}
+
 
 struct TripsListView: View {
+    /// When `true`, omits the outer `NavigationView` for use inside `NavigationStack` (e.g. `UserTripsHubView`).
+    var embeddedInNavigationStack: Bool = false
+
     @StateObject private var viewModel = TripViewModel()
     @StateObject private var localizationService = LocalizationService.shared
     @StateObject private var countryHelper = CountryLocalizationHelper.shared
@@ -171,10 +281,21 @@ struct TripsListView: View {
     
     var body: some View {
         Group {
-            NavigationView {
-                contentView
-                    .navigationTitle(localizationService.localizedString("trips", table: "trips"))
-                    .toolbar {
+            if embeddedInNavigationStack {
+                tripsListChrome
+            } else {
+                NavigationView {
+                    tripsListChrome
+                        .navigationTitle(localizationService.localizedString("trips", table: "trips"))
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var tripsListChrome: some View {
+        contentView
+            .toolbar {
                         ToolbarItem(placement: .navigationBarLeading) {
                             Button(action: { showFilters = true }) {
                                 Image(systemName: "line.3.horizontal.decrease.circle")
@@ -232,7 +353,7 @@ struct TripsListView: View {
                             TripBookingView(trip: trip)
                         }
                     }
-                    .onChange(of: showBooking) { oldValue, newValue in
+                    .onValueChange(of: showBooking) { oldValue, newValue in
                         // Close TripDetailView sheet before opening TripBookingView sheet
                         if newValue, let trip = selectedTrip {
                             // Store trip for booking sheet BEFORE closing detail view
@@ -258,14 +379,12 @@ struct TripsListView: View {
                         // Ensure countries are loaded for localization
                         await countryHelper.loadCountries()
                     }
-                    .onChange(of: localizationService.currentLanguage) { oldValue, newValue in
+                    .onValueChange(of: localizationService.currentLanguage) { oldValue, newValue in
                         // Reload countries when language changes to update localized names
                         Task {
                             await countryHelper.loadCountries()
                         }
                     }
-            }
-        }
     }
     
     @ViewBuilder
@@ -355,11 +474,7 @@ struct TripFiltersView: View {
     
     // Extract available options from trips — ordered by backend list if loaded
     private var availableCountries: [String] {
-        let tripCountries = Set(trips.map { $0.country }.filter { !$0.isEmpty })
-        if countryHelper.countryNames.isEmpty {
-            return tripCountries.sorted()
-        }
-        return countryHelper.countryNames.filter { tripCountries.contains($0) }
+        countryHelper.countriesForFilter(fallbackFrom: trips.map(\.country))
     }
     
     private func getLocalizedCountryName(_ countryName: String) -> String {
@@ -501,7 +616,7 @@ struct TripFiltersView: View {
                 // Ensure countries are loaded for localization
                 await countryHelper.loadCountries()
             }
-            .onChange(of: localizationService.currentLanguage) { oldValue, newValue in
+            .onValueChange(of: localizationService.currentLanguage) { oldValue, newValue in
                 // Reload countries when language changes to update localized names
                 Task {
                     await countryHelper.loadCountries()
@@ -832,7 +947,7 @@ struct TripDetailView: View {
                 // Ensure countries are loaded for localization
                 await countryHelper.loadCountries()
             }
-            .onChange(of: localizationService.currentLanguage) { oldValue, newValue in
+            .onValueChange(of: localizationService.currentLanguage) { oldValue, newValue in
                 // Reload countries when language changes to update localized names
                 Task {
                     await countryHelper.loadCountries()

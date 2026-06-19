@@ -137,15 +137,9 @@ class TripViewModel: ObservableObject {
     }
     
     func canCreateTrip(user: User) -> Bool {
-        if user.role == .diveCenterAdmin || user.role == .instructor {
+        if user.role == .diveCenterAdmin || user.role == .instructor || user.role == .superAdmin {
             return true
         }
-        if user.role == .diverPro, user.subscriptionStatus == .active {
-            return true
-        }
-        if user.role == .superAdmin {
-            return true
-        }
-        return false
+        return user.hasActiveProSubscription
     }
 }

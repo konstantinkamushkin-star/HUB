@@ -239,6 +239,8 @@ struct CreateTripView: View {
             }
     }
     
+    private var isSimpleCreateFlow: Bool { trip == nil }
+
     private var mainForm: some View {
         Form {
             if let err = errorMessage, !err.isEmpty {
@@ -249,16 +251,18 @@ struct CreateTripView: View {
                 }
             }
             basicInformationSection
-            requirementsSection
-            descriptionSection
-            photosSection
-            capacitySection
-            coursesSection
-            optionsSection
-            groupLeaderSection
-            priceDetailsSection
-            programSection
-            additionalExpensesSection
+            if !isSimpleCreateFlow {
+                requirementsSection
+                descriptionSection
+                photosSection
+                capacitySection
+                coursesSection
+                optionsSection
+                groupLeaderSection
+                priceDetailsSection
+                programSection
+                additionalExpensesSection
+            }
         }
     }
 
@@ -320,10 +324,17 @@ struct CreateTripView: View {
            query == countryHelper.getLocalizedCountryName(country) || query.caseInsensitiveCompare(country) == .orderedSame {
             return
         }
-        country = ""
-        region = ""
-        regionSearchText = ""
-        regions = []
+        let resolved = countryHelper.resolveStoredCountryName(from: query)
+        guard resolved.count >= 2 else {
+            country = ""
+            region = ""
+            regionSearchText = ""
+            regions = []
+            return
+        }
+        country = resolved
+        countrySearchText = countryHelper.getLocalizedCountryName(resolved)
+        Task { await loadRegions(for: resolved) }
     }
     
     private func commitRegionFromSearch() {
@@ -404,9 +415,6 @@ struct CreateTripView: View {
                     Spacer()
                     ProgressView()
                 }
-            } else if countries.isEmpty {
-                Text(localizationService.localizedString("noOptionsAvailable", table: "common"))
-                    .foregroundColor(.secondary)
             } else {
                 VStack(alignment: .leading, spacing: 4) {
                     TextField(
@@ -417,11 +425,12 @@ struct CreateTripView: View {
                     .focused($isCountryFieldFocused)
                     .onValueChange(of: countrySearchText) { _, newValue in
                         showCountrySuggestions = isCountryFieldFocused
-                            && (!newValue.isEmpty || !filteredCountries.isEmpty)
+                            && !filteredCountries.isEmpty
+                            && !newValue.isEmpty
                     }
                     .onValueChange(of: isCountryFieldFocused) { _, focused in
                         if focused {
-                            showCountrySuggestions = !countrySearchText.isEmpty || !filteredCountries.isEmpty
+                            showCountrySuggestions = !countrySearchText.isEmpty && !filteredCountries.isEmpty
                         } else {
                             commitCountryFromSearch()
                             showCountrySuggestions = false
@@ -466,8 +475,7 @@ struct CreateTripView: View {
                 }
             }
             
-            if !country.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 4) {
                     TextField(
                         localizationService.localizedString("region", table: "trips"),
                         text: $regionSearchText
@@ -534,13 +542,13 @@ struct CreateTripView: View {
                     Text(localizationService.localizedString("regionCustomHint", table: "trips"))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                }
             }
             
             DatePicker(localizationService.localizedString("startDate", table: "trips"), selection: $startDate, displayedComponents: .date)
             DatePicker(localizationService.localizedString("endDate", table: "trips"), selection: $endDate, displayedComponents: .date)
             
-            if tripType == .daily {
+            if !isSimpleCreateFlow {
+                if tripType == .daily {
                 TextField("ui_trips_hotel_name_required".localized, text: $hotelName)
                 TextField("ui_trips_hotel_link_optional".localized, text: $hotelUrl)
                     .keyboardType(.URL)
@@ -550,6 +558,7 @@ struct CreateTripView: View {
                 TextField("ui_trips_yacht_link_optional".localized, text: $yachtUrl)
                     .keyboardType(.URL)
                     .autocapitalization(.none)
+            }
             }
         }
     }
@@ -890,14 +899,20 @@ struct CreateTripView: View {
     
     private var isFormValid: Bool {
         let regionValue = regionSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let countryValue = country.isEmpty
+            ? countryHelper.resolveStoredCountryName(from: countrySearchText)
+            : country
         let hasOrganizer = usesPersonalOrganizer || selectedCenterId != nil
         return hasOrganizer
-            && !country.isEmpty
+            && countryValue.count >= 2
             && regionValue.count >= 2
             && endDate >= startDate
     }
     
     private func loadData() async {
+        if authService.currentUser?.hasActiveProSubscription == true {
+            usesPersonalOrganizer = true
+        }
         await loadManagedCenters()
         await activeViewModel.loadHotels()
         await activeViewModel.loadYachts()
@@ -923,8 +938,7 @@ struct CreateTripView: View {
             let centers = try await NetworkService.shared.listManagedDiveCenters()
             managedCenters = centers
             if let user = authService.currentUser,
-               user.role == .diverPro,
-               user.subscriptionStatus == .active,
+               user.hasActiveProSubscription,
                centers.isEmpty {
                 usesPersonalOrganizer = true
                 centersError = nil
@@ -953,8 +967,7 @@ struct CreateTripView: View {
             }
         } catch {
             if let user = authService.currentUser,
-               user.role == .diverPro,
-               user.subscriptionStatus == .active {
+               user.hasActiveProSubscription {
                 usesPersonalOrganizer = true
                 managedCenters = []
                 centersError = nil
@@ -971,9 +984,15 @@ struct CreateTripView: View {
     private func loadCountries() async {
         isLoadingCountries = true
         await countryHelper.loadCountries()
-        let names = Array(Set(countryHelper.countryNames + countryHelper.diveCenterCountryNames))
-            .filter { !$0.isEmpty }
-            .sorted()
+        let names = Array(
+            Set(
+                countryHelper.countryNames
+                    + countryHelper.diveCenterCountryNames
+                    + CountryLocalizationHelper.fallbackCountryNames()
+            )
+        )
+        .filter { !$0.isEmpty }
+        .sorted()
         countries = names.map { Country(id: $0, name: $0) }
         isLoadingCountries = false
     }
@@ -1130,6 +1149,11 @@ struct CreateTripView: View {
             organizerType = .diveCenter
             organizerId = centerId
         }
+
+        let savedCountry = country.isEmpty
+            ? countryHelper.resolveStoredCountryName(from: countrySearchText)
+            : country
+        let savedRegion = regionSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
         
         isLoading = true
         errorMessage = nil
@@ -1150,7 +1174,7 @@ struct CreateTripView: View {
             finalYachtId = !yachtName.isEmpty ? yachtName : nil
         }
         
-        let finalRegion = region
+        let finalRegion = savedRegion
         let finalBookedSpots: Int
         if let existingTrip = trip {
             // When editing, preserve existing booked spots (they come from actual bookings)
@@ -1189,7 +1213,7 @@ struct CreateTripView: View {
             tripType: tripType,
             hotelId: finalHotelId,
             yachtId: finalYachtId,
-            country: country,
+            country: savedCountry,
             region: finalRegion,
             startDate: startDate,
             endDate: endDate,

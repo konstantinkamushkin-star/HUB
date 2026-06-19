@@ -90,6 +90,19 @@ struct User: Identifiable, Codable, Hashable {
         }
         return email.components(separatedBy: "@").first ?? "User"
     }
+
+    /// @handle из `diver_profile.username` (с бэкенда).
+    var username: String? {
+        diverProfile?.username
+    }
+
+    /// PRO trip creation / entitlements (nil tier treated as active until expiry).
+    var hasActiveProSubscription: Bool {
+        guard role == .diverPro else { return false }
+        if subscriptionStatus == .expired || subscriptionStatus == .cancelled { return false }
+        if let exp = subscriptionExpiresAt, exp < Date() { return false }
+        return true
+    }
     
     enum SubscriptionStatus: String, Codable, Hashable {
         case active
@@ -185,6 +198,7 @@ struct Certification: Identifiable, Codable {
     var issueDate: Date?
     var verificationStatus: VerificationStatus
     var instructorNumber: String?
+    var certificateNumber: String?
     
     var displayName: String {
         return "\(organization) - \(level)"
@@ -205,6 +219,7 @@ struct Certification: Identifiable, Codable {
         case issueDate
         case verificationStatus
         case instructorNumber
+        case certificateNumber
     }
     
     // Custom decoder для правильного маппинга
@@ -216,8 +231,9 @@ struct Certification: Identifiable, Codable {
         cardImageURL = try container.decodeIfPresent(String.self, forKey: .cardImageURL)
         issueDate = try container.decodeIfPresent(Date.self, forKey: .issueDate)
         let statusString = try container.decodeIfPresent(String.self, forKey: .verificationStatus) ?? "PENDING"
-        verificationStatus = VerificationStatus(rawValue: statusString) ?? .pending
+        verificationStatus = VerificationStatus(rawValue: statusString.uppercased()) ?? .pending
         instructorNumber = try container.decodeIfPresent(String.self, forKey: .instructorNumber)
+        certificateNumber = try container.decodeIfPresent(String.self, forKey: .certificateNumber)
     }
     
     // Custom encoder для правильного маппинга
@@ -230,10 +246,20 @@ struct Certification: Identifiable, Codable {
         try container.encodeIfPresent(issueDate, forKey: .issueDate)
         try container.encode(verificationStatus.rawValue, forKey: .verificationStatus)
         try container.encodeIfPresent(instructorNumber, forKey: .instructorNumber)
+        try container.encodeIfPresent(certificateNumber, forKey: .certificateNumber)
     }
     
     // Memberwise initializer для использования в коде
-    init(id: String, organization: String, level: String, cardImageURL: String?, issueDate: Date?, verificationStatus: VerificationStatus, instructorNumber: String?) {
+    init(
+        id: String,
+        organization: String,
+        level: String,
+        cardImageURL: String?,
+        issueDate: Date?,
+        verificationStatus: VerificationStatus,
+        instructorNumber: String?,
+        certificateNumber: String? = nil
+    ) {
         self.id = id
         self.organization = organization
         self.level = level
@@ -241,6 +267,7 @@ struct Certification: Identifiable, Codable {
         self.issueDate = issueDate
         self.verificationStatus = verificationStatus
         self.instructorNumber = instructorNumber
+        self.certificateNumber = certificateNumber
     }
 }
 
@@ -266,4 +293,57 @@ struct Achievement: Identifiable, Codable {
     var description: String
     var iconName: String
     var unlockedAt: Date?
+    /// 0…1 для заблокированных; `nil` если прогресс не показываем.
+    var progressFraction: Double?
+    var progressText: String?
+
+    init(
+        id: String,
+        title: String,
+        description: String,
+        iconName: String,
+        unlockedAt: Date?,
+        progressFraction: Double? = nil,
+        progressText: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.description = description
+        self.iconName = iconName
+        self.unlockedAt = unlockedAt
+        self.progressFraction = progressFraction
+        self.progressText = progressText
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case title
+        case description
+        case iconName
+        case unlockedAt
+        case progressFraction
+        case progressText
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        description = try c.decode(String.self, forKey: .description)
+        iconName = try c.decode(String.self, forKey: .iconName)
+        unlockedAt = try c.decodeIfPresent(Date.self, forKey: .unlockedAt)
+        progressFraction = try c.decodeIfPresent(Double.self, forKey: .progressFraction)
+        progressText = try c.decodeIfPresent(String.self, forKey: .progressText)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(title, forKey: .title)
+        try c.encode(description, forKey: .description)
+        try c.encode(iconName, forKey: .iconName)
+        try c.encodeIfPresent(unlockedAt, forKey: .unlockedAt)
+        try c.encodeIfPresent(progressFraction, forKey: .progressFraction)
+        try c.encodeIfPresent(progressText, forKey: .progressText)
+    }
 }
