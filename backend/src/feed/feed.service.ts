@@ -14,6 +14,9 @@ import { FeedPostComment } from './entities/feed-post-comment.entity';
 import { CreateFeedPostDto } from './dto/create-feed-post.dto';
 import { DiveLogEntity } from '../dive-logs/entities/dive-log.entity';
 import { DiveSiteEntity } from '../dive-sites/entities/dive-site.entity';
+import {
+  normalizeStoredMediaUrls,
+} from '../common/media-url.util';
 
 function toPublicUser(user: User): Omit<User, 'password'> {
   const { password: _, ...rest } = user;
@@ -193,6 +196,7 @@ export class FeedService {
       diveLogId: post.diveLogId,
       diveLog,
       photos: Array.isArray(post.photos) ? post.photos : [],
+      videos: Array.isArray(post.videos) ? post.videos : [],
       likes: likeCount,
       comments: commentCount,
       isLiked,
@@ -304,13 +308,18 @@ export class FeedService {
     if (dto.type === 'dive' && !dto.diveLogId) {
       throw new BadRequestException('Dive posts require diveLogId');
     }
-    const photos = dto.photos ?? [];
+    if (dto.type === 'video' && !(dto.videos?.length)) {
+      throw new BadRequestException('Video posts require videos');
+    }
+    const photos = normalizeStoredMediaUrls(dto.photos);
+    const videos = normalizeStoredMediaUrls(dto.videos);
     const row = this.postRepository.create({
       userId: authorId,
       type: dto.type,
       content: dto.content?.trim() || null,
       diveLogId: dto.diveLogId ?? null,
       photos,
+      videos,
     });
     const saved = await this.postRepository.save(row);
     const post = await this.postRepository.findOne({

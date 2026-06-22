@@ -40,6 +40,9 @@ export class FeedPost {
   @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
   photos: string[];
 
+  @Column({ type: 'jsonb', default: () => "'[]'::jsonb" })
+  videos: string[];
+
   @Column({
     type: 'varchar',
     length: 32,

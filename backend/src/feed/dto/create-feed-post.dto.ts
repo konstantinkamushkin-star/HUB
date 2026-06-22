@@ -1,7 +1,7 @@
 import { IsArray, IsIn, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class CreateFeedPostDto {
-  @IsIn(['dive', 'text', 'photo'])
+  @IsIn(['dive', 'text', 'photo', 'video'])
   type: string;
 
   @IsOptional()
@@ -16,4 +16,9 @@ export class CreateFeedPostDto {
   @IsArray()
   @IsString({ each: true })
   photos?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  videos?: string[];
 }

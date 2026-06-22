@@ -73,6 +73,7 @@ const MIGRATION_FILES = [
   '036_add_certificate_number.sql',
   '037_user_locations_and_privacy.sql',
   '038_group_trips_and_chat_trip.sql',
+  '039_feed_post_videos.sql',
 ];
 
 function pick(envFile, key, fallback) {
