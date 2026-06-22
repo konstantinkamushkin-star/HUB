@@ -53,6 +53,7 @@ fun LoginRoute(nav: NavHostController, graph: AppGraph) {
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }) {
         var email by remember { mutableStateOf("") }
         var password by remember { mutableStateOf("") }
+        var showGoogleConsent by remember { mutableStateOf(false) }
         val webClientId = stringResource(R.string.google_oauth_web_client_id)
         val startGoogleSignIn = rememberGoogleSignInStarter(webClientId = webClientId) { result ->
             result
@@ -90,12 +91,17 @@ fun LoginRoute(nav: NavHostController, graph: AppGraph) {
             subtitle = stringResource(R.string.auth_login_subtitle),
         ) {
             TextButton(
-                onClick = { startGoogleSignIn() },
+                onClick = { showGoogleConsent = true },
                 enabled = !state.loading,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 GoogleSignInBrandButtonLabel(title = stringResource(R.string.auth_continue_google))
             }
+            OAuthPersonalDataConsentSheet(
+                visible = showGoogleConsent,
+                onAccept = { startGoogleSignIn() },
+                onDismiss = { showGoogleConsent = false },
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

@@ -123,9 +123,12 @@ data class CreateTripUiState(
     val tripLoadError: String? = null,
     val usesPersonalOrganizer: Boolean = false,
     val selectedCenterId: String? = null,
+    val tripName: String = "",
     val tripTypeDaily: Boolean = true,
     val hotelLabel: String = "",
+    val hotelUrl: String = "",
     val yachtLabel: String = "",
+    val yachtUrl: String = "",
     val country: String = "",
     val region: String = "",
     val startDate: String = "",
@@ -243,6 +246,7 @@ class CreateTripViewModel(
                 centers = list,
                 selectedCenterId = orgId,
                 editingTripId = editId,
+                tripName = t.name.orEmpty(),
                 tripTypeDaily = (t.tripType == "daily"),
                 hotelLabel = t.hotelLabel.orEmpty(),
                 yachtLabel = t.yachtLabel.orEmpty(),
@@ -358,12 +362,24 @@ class CreateTripViewModel(
         _state.update { it.copy(tripTypeDaily = daily) }
     }
 
+    fun setTripName(v: String) {
+        _state.update { it.copy(tripName = v) }
+    }
+
     fun setHotelLabel(v: String) {
         _state.update { it.copy(hotelLabel = v) }
     }
 
+    fun setHotelUrl(v: String) {
+        _state.update { it.copy(hotelUrl = v) }
+    }
+
     fun setYachtLabel(v: String) {
         _state.update { it.copy(yachtLabel = v) }
+    }
+
+    fun setYachtUrl(v: String) {
+        _state.update { it.copy(yachtUrl = v) }
     }
 
     fun setCountry(v: String) {
@@ -902,6 +918,10 @@ class CreateTripViewModel(
             _state.update { it.copy(saveError = "no_center") }
             return
         }
+        if (s.tripName.trim().length < 2) {
+            _state.update { it.copy(saveError = "name") }
+            return
+        }
         if (s.country.trim().length < 2) {
             _state.update { it.copy(saveError = "country") }
             return
@@ -936,6 +956,7 @@ class CreateTripViewModel(
         val spots = s.totalSpots.trim().toIntOrNull()?.coerceIn(1, 500) ?: 10
         val editId = s.editingTripId
         val isDaily = s.tripTypeDaily
+        val tripDescription = tripDescriptionForSave(s, isDaily)
         val photoUrls = s.photoUrlsText.lines().map { it.trim() }.filter { it.isNotEmpty() }
         val priceObj = buildPriceDetails(s)
         viewModelScope.launch {
@@ -944,11 +965,12 @@ class CreateTripViewModel(
                 val body = CreateTripRequestDto(
                     diveCenterId = if (s.usesPersonalOrganizer) null else centerId,
                     tripType = if (isDaily) "daily" else "safari",
+                    name = s.tripName.trim(),
                     country = s.country.trim(),
                     region = s.region.trim(),
                     startDate = s.startDate.trim(),
                     endDate = s.endDate.trim(),
-                    description = s.description.trim(),
+                    description = tripDescription,
                     totalSpots = spots,
                     minimumCertificationLevel = s.minimumCertificationLevel.trim().ifBlank { null },
                     minimumDives = minDives,
@@ -975,11 +997,12 @@ class CreateTripViewModel(
             } else {
                 val patch = UpdateTripRequestDto(
                     tripType = if (isDaily) "daily" else "safari",
+                    name = s.tripName.trim(),
                     country = s.country.trim(),
                     region = s.region.trim(),
                     startDate = s.startDate.trim(),
                     endDate = s.endDate.trim(),
-                    description = s.description.trim(),
+                    description = tripDescription,
                     totalSpots = spots,
                     minimumCertificationLevel = s.minimumCertificationLevel.trim().ifBlank { null },
                     minimumDives = minDives,
@@ -1013,6 +1036,21 @@ class CreateTripViewModel(
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 return CreateTripViewModel(graph, TripsRepository(graph), editingTripId) as T
             }
+        }
+    }
+}
+
+private fun tripDescriptionForSave(s: CreateTripUiState, isDaily: Boolean): String {
+    val base = s.description.trim()
+    return buildString {
+        append(base)
+        if (isDaily && s.hotelUrl.trim().isNotBlank()) {
+            if (isNotEmpty()) append("\n\n")
+            append("Hotel link: ").append(s.hotelUrl.trim())
+        }
+        if (!isDaily && s.yachtUrl.trim().isNotBlank()) {
+            if (isNotEmpty()) append("\n\n")
+            append("Yacht link: ").append(s.yachtUrl.trim())
         }
     }
 }
@@ -1477,6 +1515,14 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                         label = { Text(stringResource(R.string.trip_create_type_safari)) },
                     )
                 }
+                OutlinedTextField(
+                    value = state.tripName,
+                    onValueChange = vm::setTripName,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(stringResource(R.string.trip_create_name)) },
+                    placeholder = { Text(stringResource(R.string.trip_create_name_hint)) },
+                    singleLine = true,
+                )
                 if (state.tripTypeDaily) {
                     OutlinedTextField(
                         value = state.hotelLabel,
@@ -1485,11 +1531,25 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
+                    OutlinedTextField(
+                        value = state.hotelUrl,
+                        onValueChange = vm::setHotelUrl,
+                        label = { Text(stringResource(R.string.trip_create_hotel_url)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 } else {
                     OutlinedTextField(
                         value = state.yachtLabel,
                         onValueChange = vm::setYachtLabel,
                         label = { Text(stringResource(R.string.trip_create_yacht_label)) },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    OutlinedTextField(
+                        value = state.yachtUrl,
+                        onValueChange = vm::setYachtUrl,
+                        label = { Text(stringResource(R.string.trip_create_yacht_url)) },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth(),
                     )
@@ -1954,6 +2014,7 @@ fun CreateTripRoute(graph: AppGraph, innerNav: NavController, editingTripId: Str
                 state.saveError?.let { key ->
                     val msg = when (key) {
                         "no_center" -> stringResource(R.string.trip_create_err_no_center)
+                        "name" -> stringResource(R.string.trip_create_err_name)
                         "country" -> stringResource(R.string.trip_create_err_country)
                         "region" -> stringResource(R.string.trip_create_err_region)
                         "dates_format" -> stringResource(R.string.trip_create_err_dates_format)

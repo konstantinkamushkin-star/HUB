@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,8 +38,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.ScubaDiving
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -141,11 +148,15 @@ fun StatisticsRoute(graph: AppGraph, innerNav: NavController) {
                             modifier = Modifier.weight(1f),
                             title = stringResource(R.string.stats_card_total_dives),
                             value = s.totalDives.toString(),
+                            icon = Icons.Default.ScubaDiving,
+                            tint = MaterialTheme.colorScheme.primary,
                         )
                         StatCard(
                             modifier = Modifier.weight(1f),
                             title = stringResource(R.string.stats_card_bottom_time),
                             value = formatHoursMinutes(s.totalBottomTimeMinutes),
+                            icon = Icons.Default.Timer,
+                            tint = Color(0xFF0A84A6),
                         )
                     }
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -153,11 +164,15 @@ fun StatisticsRoute(graph: AppGraph, innerNav: NavController) {
                             modifier = Modifier.weight(1f),
                             title = stringResource(R.string.stats_card_deepest),
                             value = stringResource(R.string.stats_depth_m_format, s.deepestDiveMeters.toInt()),
+                            icon = Icons.Default.ArrowDownward,
+                            tint = Color(0xFF5856D6),
                         )
                         StatCard(
                             modifier = Modifier.weight(1f),
                             title = stringResource(R.string.stats_card_longest),
                             value = stringResource(R.string.stats_minutes_format, s.longestDiveMinutes),
+                            icon = Icons.Default.Schedule,
+                            tint = Color(0xFFFF9500),
                         )
                     }
                     s.averageDepthMeters?.let { avg ->
@@ -214,12 +229,20 @@ private fun formatHoursMinutes(totalMinutes: Int): String {
 }
 
 @Composable
-private fun StatCard(modifier: Modifier = Modifier, title: String, value: String) {
+private fun StatCard(
+    modifier: Modifier = Modifier,
+    title: String,
+    value: String,
+    icon: ImageVector,
+    tint: Color,
+) {
     Card(
         modifier = modifier,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(Modifier.padding(14.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(28.dp))
+            Spacer(Modifier.height(6.dp))
             Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Text(title, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

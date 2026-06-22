@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -27,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -35,11 +37,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.AuthRepository
+import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.ui.main.SessionViewModel
 import kotlinx.coroutines.launch
 
@@ -64,6 +68,17 @@ fun EditProfileRoute(
     var language by remember { mutableStateOf("en") }
     var avatarUrl by remember { mutableStateOf("") }
 
+    var displayName by remember { mutableStateOf("") }
+    var username by remember { mutableStateOf("") }
+    var countryCode by remember { mutableStateOf("") }
+    var city by remember { mutableStateOf("") }
+    var certLevel by remember { mutableStateOf("") }
+    var divesRange by remember { mutableStateOf("") }
+    var selectedAgencies by remember { mutableStateOf(setOf<String>()) }
+    var selectedInterests by remember { mutableStateOf(setOf<String>()) }
+    var selectedEquipment by remember { mutableStateOf(setOf<String>()) }
+    val privacy = remember { mutableStateMapOf<String, Boolean>() }
+
     LaunchedEffect(user) {
         val u = user ?: return@LaunchedEffect
         first = u.firstName.orEmpty()
@@ -72,6 +87,23 @@ fun EditProfileRoute(
         bio = u.bio.orEmpty()
         language = u.language?.trim()?.ifBlank { null } ?: "en"
         avatarUrl = u.avatarUrl.orEmpty()
+        val dp = u.diverProfile
+        displayName = (dp?.get("displayName") as? String)?.trim().orEmpty()
+        username = (dp?.get("username") as? String)?.trim().orEmpty()
+        countryCode = u.countryCode?.trim().orEmpty()
+            .ifBlank { (dp?.get("countryCode") as? String).orEmpty() }
+        city = (dp?.get("city") as? String)?.trim().orEmpty()
+        certLevel = (dp?.get("certificationLevel") as? String)?.trim().orEmpty()
+        divesRange = (dp?.get("totalDivesRange") as? String)?.trim().orEmpty()
+        selectedAgencies = ((dp?.get("certifyingAgencies") as? List<*>)?.mapNotNull { it as? String }?.toSet()
+            ?: (dp?.get("certifyingAgency") as? String)?.split(",")?.map { it.trim() }?.filter { it.isNotEmpty() }?.toSet()
+            ?: emptySet())
+        selectedInterests = ((dp?.get("diveInterests") as? List<*>)?.mapNotNull { it as? String }?.toSet() ?: emptySet())
+        selectedEquipment = ((dp?.get("ownEquipment") as? List<*>)?.mapNotNull { it as? String }?.toSet() ?: emptySet())
+        @Suppress("UNCHECKED_CAST")
+        val priv = dp?.get("privacy") as? Map<String, Boolean>
+        privacy.clear()
+        priv?.forEach { (k, v) -> privacy[k] = v }
     }
 
     Scaffold(
@@ -88,10 +120,7 @@ fun EditProfileRoute(
         },
     ) { padding ->
         if (user == null) {
-            Column(
-                Modifier.fillMaxSize().padding(padding),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
+            Column(Modifier.fillMaxSize().padding(padding), horizontalAlignment = Alignment.CenterHorizontally) {
                 Spacer(Modifier.height(48.dp))
                 CircularProgressIndicator()
             }
@@ -105,65 +134,76 @@ fun EditProfileRoute(
                 .verticalScroll(rememberScrollState())
                 .padding(20.dp),
         ) {
-            OutlinedTextField(
-                value = first,
-                onValueChange = { first = it },
-                label = { Text(stringResource(R.string.profile_edit_first_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Text(stringResource(R.string.onboarding_step_basics), fontWeight = FontWeight.SemiBold)
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(value = first, onValueChange = { first = it }, label = { Text(stringResource(R.string.profile_edit_first_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = last,
-                onValueChange = { last = it },
-                label = { Text(stringResource(R.string.profile_edit_last_name)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            OutlinedTextField(value = last, onValueChange = { last = it }, label = { Text(stringResource(R.string.profile_edit_last_name)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = phone,
-                onValueChange = { phone = it },
-                label = { Text(stringResource(R.string.profile_edit_phone)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            OutlinedTextField(value = phone, onValueChange = { phone = it }, label = { Text(stringResource(R.string.profile_edit_phone)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = bio,
-                onValueChange = { bio = it },
-                label = { Text(stringResource(R.string.profile_edit_bio)) },
-                minLines = 3,
-                modifier = Modifier.fillMaxWidth(),
-            )
+            OutlinedTextField(value = bio, onValueChange = { bio = it }, label = { Text(stringResource(R.string.profile_edit_bio)) }, minLines = 2, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = language,
-                onValueChange = { language = it },
-                label = { Text(stringResource(R.string.profile_edit_language)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
+            OutlinedTextField(value = avatarUrl, onValueChange = { avatarUrl = it }, label = { Text(stringResource(R.string.profile_edit_avatar_url)) }, singleLine = true, modifier = Modifier.fillMaxWidth())
+
+            HorizontalDivider(Modifier.padding(vertical = 16.dp))
+            UnifiedDiverProfileSection(
+                displayName = displayName,
+                onDisplayNameChange = { displayName = it },
+                username = username,
+                onUsernameChange = { username = it },
+                countryCode = countryCode,
+                onCountryCodeChange = { countryCode = it },
+                city = city,
+                onCityChange = { city = it },
+                certLevel = certLevel,
+                onCertLevelChange = { certLevel = it },
+                divesRange = divesRange,
+                onDivesRangeChange = { divesRange = it },
+                selectedAgencies = selectedAgencies,
+                onToggleAgency = { a ->
+                    selectedAgencies = if (selectedAgencies.contains(a)) selectedAgencies - a else selectedAgencies + a
+                },
+                selectedInterests = selectedInterests,
+                onToggleInterest = { k ->
+                    selectedInterests = if (selectedInterests.contains(k)) selectedInterests - k else selectedInterests + k
+                },
+                selectedEquipment = selectedEquipment,
+                onToggleEquipment = { k ->
+                    selectedEquipment = if (selectedEquipment.contains(k)) selectedEquipment - k else selectedEquipment + k
+                },
+                privacy = privacy,
+                onPrivacyChange = { k, v -> privacy[k] = v },
             )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = avatarUrl,
-                onValueChange = { avatarUrl = it },
-                label = { Text(stringResource(R.string.profile_edit_avatar_url)) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(24.dp))
+
             Button(
                 onClick = {
                     if (first.isBlank() || last.isBlank()) {
-                        scope.launch {
-                            snackbar.showSnackbar(ctx.getString(R.string.profile_edit_names_required))
-                        }
+                        scope.launch { snackbar.showSnackbar(ctx.getString(R.string.profile_edit_names_required)) }
                         return@Button
                     }
                     scope.launch {
                         saving = true
                         try {
+                            val noneOnly = selectedAgencies == setOf("NONE_YET")
+                            val realAgencies = selectedAgencies.filter { it != "NONE_YET" }.sorted()
+                            val legacyAgency = when {
+                                noneOnly -> "NONE_YET"
+                                realAgencies.isEmpty() -> null
+                                else -> realAgencies.joinToString(",")
+                            }
+                            val existing = user?.diverProfile?.toMutableMap() ?: linkedMapOf()
+                            existing["displayName"] = displayName.trim().ifBlank { "$first $last".trim() }
+                            existing["username"] = username.trim()
+                            existing["city"] = city.trim().takeIf { it.isNotEmpty() }
+                            existing["certificationLevel"] = certLevel.takeIf { it.isNotBlank() }
+                            existing["certifyingAgency"] = legacyAgency
+                            existing["certifyingAgencies"] = selectedAgencies.sorted().takeIf { it.isNotEmpty() }
+                            existing["noCertYet"] = noneOnly
+                            existing["totalDivesRange"] = divesRange.takeIf { it.isNotBlank() }
+                            existing["diveInterests"] = selectedInterests.sorted().takeIf { it.isNotEmpty() }
+                            existing["ownEquipment"] = selectedEquipment.sorted().takeIf { it.isNotEmpty() }
+                            existing["privacy"] = privacy.toMap()
                             runCatching {
                                 repo.updateProfile(
                                     firstName = first,
@@ -172,16 +212,16 @@ fun EditProfileRoute(
                                     bio = bio.ifBlank { null },
                                     language = language.ifBlank { "en" },
                                     avatarUrl = avatarUrl.ifBlank { null },
+                                    countryCode = countryCode.ifBlank { null },
+                                    diverProfile = existing,
                                 )
+                            }.onSuccess { updated ->
+                                sessionVm.onUserUpdated(updated)
+                                snackbar.showSnackbar(ctx.getString(R.string.profile_edit_saved))
+                                innerNav.popBackStack()
+                            }.onFailure { e ->
+                                snackbar.showSnackbar(repo.parseErrorMessage(e))
                             }
-                                .onSuccess { updated ->
-                                    sessionVm.onUserUpdated(updated)
-                                    snackbar.showSnackbar(ctx.getString(R.string.profile_edit_saved))
-                                    innerNav.popBackStack()
-                                }
-                                .onFailure { e ->
-                                    snackbar.showSnackbar(repo.parseErrorMessage(e))
-                                }
                         } finally {
                             saving = false
                         }
@@ -191,11 +231,7 @@ fun EditProfileRoute(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 if (saving) {
-                    CircularProgressIndicator(
-                        Modifier.size(22.dp),
-                        strokeWidth = 2.dp,
-                        color = MaterialTheme.colorScheme.onPrimary,
-                    )
+                    CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                 } else {
                     Text(stringResource(R.string.profile_edit_save))
                 }

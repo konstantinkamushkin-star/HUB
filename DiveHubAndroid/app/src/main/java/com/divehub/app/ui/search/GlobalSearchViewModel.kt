@@ -15,8 +15,17 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.Locale
 
+enum class SearchCategory {
+    ALL,
+    SITES,
+    CENTERS,
+    SHOPS,
+    USERS,
+}
+
 data class GlobalSearchUiState(
     val query: String = "",
+    val category: SearchCategory = SearchCategory.ALL,
     val loading: Boolean = false,
     val sites: List<ExploreDiveSite> = emptyList(),
     val users: List<UserDto> = emptyList(),
@@ -35,6 +44,10 @@ class GlobalSearchViewModel(
 
     fun setQuery(q: String) {
         _state.value = _state.value.copy(query = q)
+    }
+
+    fun setCategory(category: SearchCategory) {
+        _state.value = _state.value.copy(category = category)
     }
 
     fun search() {

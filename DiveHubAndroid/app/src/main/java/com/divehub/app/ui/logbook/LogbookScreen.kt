@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -12,6 +13,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -30,91 +34,250 @@ import com.divehub.app.util.absoluteMediaUrl
 import com.divehub.app.data.remote.dto.DiveLogDto
 import com.divehub.app.ui.theme.IosDesign
 import java.time.LocalDate
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LogbookRoute(graph: AppGraph) {
+fun LogbookRoute(graph: AppGraph, innerNav: androidx.navigation.NavController? = null) {
     val vm: LogbookViewModel = viewModel(factory = LogbookViewModel.factory(graph))
     val state by vm.state.collectAsState()
-    var selectedLog by remember { mutableStateOf<DiveLogDto?>(null) }
     var showAdd by remember { mutableStateOf(false) }
+    var shareLog by remember { mutableStateOf<DiveLogDto?>(null) }
+    var deleteLog by remember { mutableStateOf<DiveLogDto?>(null) }
+    val snack = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    var sortMenuExpanded by remember { mutableStateOf(false) }
 
     Scaffold(
-        floatingActionButton = {
-            FloatingActionButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, null) }
-        },
-    ) { padding ->
-        when {
-            state.loading && state.logs.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator()
-            }
-            state.error != null && state.logs.isEmpty() && !state.loading -> Box(
-                Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    Text(
-                        state.error ?: stringResource(R.string.common_error),
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    TextButton(onClick = { vm.refresh() }) {
-                        Text(stringResource(R.string.common_retry))
+        topBar = {
+            TopAppBar(
+                title = { Text(stringResource(R.string.nav_logbook)) },
+                actions = {
+                    IconButton(onClick = { sortMenuExpanded = true }) {
+                        Icon(Icons.Default.Sort, contentDescription = stringResource(R.string.logbook_sort_menu))
                     }
-                }
-            }
-            state.logs.isEmpty() -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(stringResource(R.string.logbook_no_dives_title), style = MaterialTheme.typography.titleLarge)
-                    Text(stringResource(R.string.logbook_no_dives_subtitle), style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-            else -> PullToRefreshBox(
-                isRefreshing = state.loading && state.logs.isNotEmpty(),
-                onRefresh = { vm.refresh() },
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-            ) {
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(IosDesign.ScreenPadding),
-                    verticalArrangement = Arrangement.spacedBy(IosDesign.SectionSpacing),
-                ) {
-                    if (state.error != null) {
-                        item {
-                            Text(
-                                state.error ?: "",
-                                color = MaterialTheme.colorScheme.error,
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(bottom = 8.dp),
+                    DropdownMenu(expanded = sortMenuExpanded, onDismissRequest = { sortMenuExpanded = false }) {
+                        LogbookSortOption.entries.forEach { opt ->
+                            DropdownMenuItem(
+                                text = { Text(logbookSortLabel(opt)) },
+                                onClick = {
+                                    vm.setSortOption(opt)
+                                    sortMenuExpanded = false
+                                },
                             )
                         }
                     }
-                    item { StatsCard(state.stats) }
-                    items(state.logs, key = { it.id }) { log ->
-                        LogRow(log = log, onTap = { selectedLog = log })
+                },
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = { showAdd = true }) { Icon(Icons.Default.Add, null) }
+        },
+        snackbarHost = { SnackbarHost(snack) },
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            OutlinedTextField(
+                value = state.searchText,
+                onValueChange = vm::setSearchText,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = IosDesign.ScreenPadding, vertical = 8.dp),
+                placeholder = { Text(stringResource(R.string.logbook_search_placeholder)) },
+                singleLine = true,
+            )
+            when {
+                state.loading && state.logs.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+                state.error != null && state.logs.isEmpty() && !state.loading -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text(
+                            state.error ?: stringResource(R.string.common_error),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        TextButton(onClick = { vm.refresh() }) {
+                            Text(stringResource(R.string.common_retry))
+                        }
+                    }
+                }
+                state.displayedLogs.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.logbook_no_dives_title), style = MaterialTheme.typography.titleLarge)
+                        Text(stringResource(R.string.logbook_no_dives_subtitle), style = MaterialTheme.typography.bodyMedium)
+                    }
+                }
+                else -> PullToRefreshBox(
+                    isRefreshing = state.loading && state.logs.isNotEmpty(),
+                    onRefresh = { vm.refresh() },
+                    modifier = Modifier.fillMaxSize(),
+                ) {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(IosDesign.ScreenPadding),
+                        verticalArrangement = Arrangement.spacedBy(IosDesign.SectionSpacing),
+                    ) {
+                        if (state.error != null) {
+                            item {
+                                Text(
+                                    state.error ?: "",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(bottom = 8.dp),
+                                )
+                            }
+                        }
+                        item { StatsCard(state.stats) }
+                        items(state.displayedLogs, key = { it.id }) { log ->
+                            val dismissState = rememberSwipeToDismissBoxState(
+                                confirmValueChange = { value ->
+                                    when (value) {
+                                        SwipeToDismissBoxValue.EndToStart -> {
+                                            deleteLog = log
+                                            false
+                                        }
+                                        SwipeToDismissBoxValue.StartToEnd -> {
+                                            shareLog = log
+                                            false
+                                        }
+                                        else -> false
+                                    }
+                                },
+                            )
+                            SwipeToDismissBox(
+                                state = dismissState,
+                                backgroundContent = {
+                                    val direction = dismissState.dismissDirection
+                                    val color = when (direction) {
+                                        SwipeToDismissBoxValue.StartToEnd -> MaterialTheme.colorScheme.primary
+                                        SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
+                                        else -> MaterialTheme.colorScheme.surface
+                                    }
+                                    Box(
+                                        Modifier
+                                            .fillMaxSize()
+                                            .background(color)
+                                            .padding(horizontal = 20.dp),
+                                        contentAlignment = when (direction) {
+                                            SwipeToDismissBoxValue.StartToEnd -> Alignment.CenterStart
+                                            SwipeToDismissBoxValue.EndToStart -> Alignment.CenterEnd
+                                            else -> Alignment.Center
+                                        },
+                                    ) {
+                                        Icon(
+                                            imageVector = when (direction) {
+                                                SwipeToDismissBoxValue.StartToEnd -> Icons.Default.Share
+                                                SwipeToDismissBoxValue.EndToStart -> Icons.Default.Delete
+                                                else -> Icons.Default.Share
+                                            },
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.onPrimary,
+                                        )
+                                    }
+                                },
+                                enableDismissFromStartToEnd = true,
+                                enableDismissFromEndToStart = true,
+                            ) {
+                                LogRow(
+                                    log = log,
+                                    title = vm.displayTitle(log),
+                                    onTap = {
+                                        innerNav?.navigate(
+                                            com.divehub.app.ui.navigation.InnerRoutes.diveLogDetail(log.id),
+                                        )
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
             }
         }
     }
 
-    if (selectedLog != null) {
-        ModalBottomSheet(onDismissRequest = { selectedLog = null }) {
-            DiveLogDetailSheet(
-                log = selectedLog!!,
-                imageApiRoot = state.imageApiRoot,
-                onClose = { selectedLog = null },
-            )
-        }
-    }
     if (showAdd) {
         AddDiveLogSheet(vm = vm, onDismiss = { showAdd = false })
     }
+
+    shareLog?.let { log ->
+        ShareDiveDialog(
+            log = log,
+            displayTitle = vm.displayTitle(log),
+            onDismiss = { shareLog = null },
+            onShare = { text ->
+                vm.shareDiveToFeed(
+                    log = log,
+                    shareText = text,
+                    onSuccess = { shareLog = null },
+                    onError = { msg -> scope.launch { snack.showSnackbar(msg) } },
+                )
+            },
+        )
+    }
+
+    deleteLog?.let { log ->
+        AlertDialog(
+            onDismissRequest = { deleteLog = null },
+            title = { Text(stringResource(R.string.logbook_delete_dive)) },
+            text = { Text(stringResource(R.string.logbook_delete_confirm)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.deleteLog(log.id)
+                    deleteLog = null
+                }) { Text(stringResource(R.string.common_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { deleteLog = null }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
+    }
+}
+
+@Composable
+private fun logbookSortLabel(option: LogbookSortOption): String = when (option) {
+    LogbookSortOption.NEWEST_FIRST -> stringResource(R.string.logbook_sort_newest_first)
+    LogbookSortOption.OLDEST_FIRST -> stringResource(R.string.logbook_sort_oldest_first)
+    LogbookSortOption.DEPTH -> stringResource(R.string.logbook_sort_by_depth)
+    LogbookSortOption.DURATION -> stringResource(R.string.logbook_sort_by_duration)
+    LogbookSortOption.ALPHABET -> stringResource(R.string.logbook_sort_alphabetical)
+}
+
+@Composable
+private fun ShareDiveDialog(
+    log: DiveLogDto,
+    displayTitle: String,
+    onDismiss: () -> Unit,
+    onShare: (String) -> Unit,
+) {
+    var text by remember(log.id) {
+        mutableStateOf("$displayTitle - ${log.maxDepth.toInt()}m, ${log.duration} min")
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.logbook_share_dive)) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.fillMaxWidth(),
+                minLines = 3,
+            )
+        },
+        confirmButton = {
+            Button(onClick = { onShare(text) }, enabled = text.isNotBlank()) {
+                Text(stringResource(R.string.common_share))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_cancel)) }
+        },
+    )
 }
 
 @Composable
@@ -141,7 +304,7 @@ private fun StatCell(title: String, value: String) {
 }
 
 @Composable
-private fun LogRow(log: DiveLogDto, onTap: () -> Unit) {
+private fun LogRow(log: DiveLogDto, title: String, onTap: () -> Unit) {
     Card(
         onClick = onTap,
         shape = IosDesign.CardCorner,
@@ -150,7 +313,7 @@ private fun LogRow(log: DiveLogDto, onTap: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(IosDesign.ScreenPadding), horizontalArrangement = Arrangement.SpaceBetween) {
             Column {
                 Text(log.date, fontWeight = FontWeight.SemiBold)
-                Text(log.notes ?: stringResource(R.string.logbook_dive_log_fallback), style = MaterialTheme.typography.bodySmall, maxLines = 2)
+                Text(title, style = MaterialTheme.typography.bodySmall, maxLines = 2)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text("${log.maxDepth.toInt()}m", fontWeight = FontWeight.Bold)

@@ -97,7 +97,7 @@ fun AppSupportTopicRoute(
                         }.onSuccess { conv ->
                             graph.setPendingChatConversationJson(graph.gson.toJson(conv))
                             innerNav.popBackStack()
-                            ctx.diveHubApp().emitDiverTab(4)
+                            ctx.diveHubApp().emitDiverTab(com.divehub.app.ui.main.DiverTabIndices.CHAT)
                         }.onFailure { e ->
                             error = e.message ?: ctx.getString(R.string.chat_error_generic)
                         }

@@ -109,17 +109,14 @@ fun SubscriptionRoute(
             when {
                 current == null -> Text(stringResource(R.string.profile_loading))
                 current.isDiverBasic() -> {
-                    Text(stringResource(R.string.subscription_upgrade_title), style = MaterialTheme.typography.titleMedium)
-                    val tierLabel = current.subscriptionTier?.trim()?.takeIf { it.isNotEmpty() }
-                        ?: current.role?.trim()?.takeIf { it.isNotEmpty() }
-                        ?: "—"
                     Text(
-                        stringResource(R.string.subscription_tier_current, tierLabel),
+                        stringResource(R.string.pro_welcome_trial_body),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(stringResource(R.string.subscription_upgrade_title), style = MaterialTheme.typography.titleMedium)
                     Text(
-                        stringResource(R.string.subscription_explanation_body),
+                        stringResource(R.string.pro_subscription_details_body),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Button(
@@ -129,24 +126,33 @@ fun SubscriptionRoute(
                     ) {
                         Text(stringResource(R.string.subscription_sync_account))
                     }
-                    Text(stringResource(R.string.subscription_pro_features), style = MaterialTheme.typography.titleSmall)
-                    ProBullet(stringResource(R.string.subscription_bullet_logbook))
-                    ProBullet(stringResource(R.string.subscription_bullet_social))
-                    ProBullet(stringResource(R.string.subscription_bullet_chats))
-                    ProBullet(stringResource(R.string.subscription_bullet_gear))
                 }
                 current.hasProEntitlement() -> {
-                    Text(stringResource(R.string.subscription_active_title), color = MaterialTheme.colorScheme.primary)
+                    Text(
+                        stringResource(R.string.subscription_active_title),
+                        color = MaterialTheme.colorScheme.primary,
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     current.subscriptionExpiresAt?.takeIf { it.isNotBlank() }?.let {
                         Text(
-                            stringResource(R.string.subscription_expires, it),
+                            stringResource(R.string.subscription_expires_on, it),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
                     Text(
-                        stringResource(R.string.subscription_pro_manage_note),
+                        stringResource(R.string.pro_welcome_trial_body),
                         style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        stringResource(R.string.pro_subscription_details_body),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        stringResource(R.string.subscription_pro_manage_note),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Button(
                         onClick = { syncFromServer() },
@@ -160,9 +166,4 @@ fun SubscriptionRoute(
             }
         }
     }
-}
-
-@Composable
-private fun ProBullet(text: String) {
-    Text("• $text", style = MaterialTheme.typography.bodyMedium)
 }

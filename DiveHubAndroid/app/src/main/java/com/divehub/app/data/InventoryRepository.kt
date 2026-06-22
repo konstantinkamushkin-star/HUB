@@ -78,6 +78,7 @@ class InventoryRepository(private val graph: AppGraph) {
             checkoutNotes = null,
             checkoutHandedOffBy = null,
             checkoutHandedOffAt = null,
+            checkoutSignatureBase64 = null,
         )
         upsertItemRemote(centerId, cleared)
     }
@@ -94,6 +95,7 @@ class InventoryRepository(private val graph: AppGraph) {
                     checkoutNotes = null,
                     checkoutHandedOffBy = null,
                     checkoutHandedOffAt = null,
+                    checkoutSignatureBase64 = null,
                 )
             }
         }

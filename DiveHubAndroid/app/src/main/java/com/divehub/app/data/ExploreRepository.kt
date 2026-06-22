@@ -15,6 +15,30 @@ class ExploreRepository(private val graph: AppGraph) {
             .map { it.toExploreDiveSite() }
     }
 
+    suspend fun getDiveSitesExplore(
+        language: String,
+        page: Int = 1,
+        limit: Int = 80,
+        q: String? = null,
+        sort: String? = null,
+    ): List<ExploreDiveSite> {
+        val api = graph.exploreApi()
+        return api.diveSitesExplore(
+            language = language,
+            page = page,
+            limit = limit,
+            q = q?.trim()?.takeIf { it.isNotEmpty() },
+            sort = sort,
+        ).map { it.toExploreDiveSite() }
+    }
+
+    suspend fun findNearestDiveSiteToCoordinates(lat: Double, lng: Double): ExploreDiveSite? {
+        val api = graph.exploreApi()
+        return api.diveSitesSearch(lat = lat, lng = lng, limit = 1)
+            .firstOrNull()
+            ?.toExploreDiveSite()
+    }
+
     suspend fun getDiveCenters(limit: Int = 80): List<ExploreDiveSite> {
         val api = graph.exploreApi()
         return api.diveCenters(limit = limit).data.map { it.toExploreDiveSite() }
@@ -35,8 +59,40 @@ class ExploreRepository(private val graph: AppGraph) {
 
     suspend fun getCountries(): List<String> {
         val api = graph.exploreApi()
-        val res = api.countries()
-        return if (res.success) res.data.map { it.trim() }.filter { it.isNotEmpty() } else emptyList()
+        val fromSites = runCatching { api.countries() }.getOrNull()
+            ?.takeIf { it.success }
+            ?.data
+            .orEmpty()
+        val fromCenters = runCatching { api.diveCenterCountries() }.getOrNull()
+            ?.takeIf { it.success }
+            ?.data
+            .orEmpty()
+        return (fromSites + fromCenters)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .distinct()
+            .sorted()
+    }
+
+    suspend fun getRegions(country: String): List<String> {
+        val trimmed = country.trim()
+        if (trimmed.isEmpty()) return emptyList()
+        val fromApi = runCatching {
+            val res = graph.exploreApi().regions(trimmed)
+            if (res.success) {
+                res.data.map { it.trim() }.filter { it.isNotEmpty() }
+            } else {
+                emptyList()
+            }
+        }.getOrElse { emptyList() }
+        if (fromApi.isNotEmpty()) return fromApi.sorted()
+        return runCatching {
+            graph.exploreApi()
+                .diveSitesExplore(country = trimmed, limit = 400)
+                .mapNotNull { it.region?.trim()?.takeIf { r -> r.isNotEmpty() } }
+                .distinct()
+                .sorted()
+        }.getOrElse { emptyList() }
     }
 
     suspend fun listMyDiveSiteContributions(limit: Int = 30): List<DiveSiteContributionMineDto> {

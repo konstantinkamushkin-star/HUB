@@ -15,8 +15,11 @@ import com.divehub.app.data.remote.FeedApi
 import com.divehub.app.data.remote.NotificationsApi
 import com.divehub.app.data.remote.PartnerAdminApi
 import com.divehub.app.data.remote.PartnerRegistrationApi
+import com.divehub.app.data.remote.LocalizationApi
 import com.divehub.app.data.remote.ReviewsApi
 import com.divehub.app.data.remote.ShopsApi
+import com.divehub.app.data.remote.GroupTripsApi
+import com.divehub.app.data.remote.LocationApi
 import com.divehub.app.data.remote.SocialApi
 import com.divehub.app.data.remote.SupportApi
 import com.divehub.app.data.remote.TripsApi
@@ -30,6 +33,9 @@ class AppGraph(application: Application) {
     val application: Application = application
     val tokenStore = TokenStore(application)
     val gson: Gson = Gson()
+    val localizationRepository = com.divehub.app.data.LocalizationRepository(this)
+    val diveEditorRecentStore = com.divehub.app.data.local.DiveEditorRecentStore(application, gson)
+    val photoEnhancementJobStore = com.divehub.app.data.local.PhotoEnhancementJobStore(application, gson)
 
     private val factory = ApiClientFactory(tokenStore, gson)
     /** Same OkHttp as Retrofit (auth + refresh); use for Coil so media loads like API calls. */
@@ -64,6 +70,14 @@ class AppGraph(application: Application) {
 
     suspend fun socialApi(): SocialApi {
         return api(SocialApi::class.java)
+    }
+
+    suspend fun groupTripsApi(): GroupTripsApi {
+        return api(GroupTripsApi::class.java)
+    }
+
+    suspend fun locationApi(): LocationApi {
+        return api(LocationApi::class.java)
     }
 
     suspend fun chatApi(): ChatApi {
@@ -108,6 +122,10 @@ class AppGraph(application: Application) {
 
     suspend fun partnerRegistrationApi(): PartnerRegistrationApi {
         return api(PartnerRegistrationApi::class.java)
+    }
+
+    suspend fun localizationApi(): LocalizationApi {
+        return api(LocalizationApi::class.java)
     }
 
     private suspend fun <T> api(clazz: Class<T>): T {
@@ -160,6 +178,32 @@ class AppGraph(application: Application) {
         synchronized(pendingSearchLock) {
             val v = pendingGlobalSearchQuery
             pendingGlobalSearchQuery = null
+            return v
+        }
+    }
+
+    /** Post-booking confirmation screen payload (iOS `BookingConfirmationView`). */
+    data class PendingBookingConfirmation(
+        val summary: com.divehub.app.ui.booking.BookingConfirmationSummary,
+        val chatConversationId: String?,
+    )
+
+    private val pendingBookingLock = Any()
+    private var pendingBookingConfirmation: PendingBookingConfirmation? = null
+
+    fun setPendingBookingConfirmation(
+        summary: com.divehub.app.ui.booking.BookingConfirmationSummary,
+        chatConversationId: String?,
+    ) {
+        synchronized(pendingBookingLock) {
+            pendingBookingConfirmation = PendingBookingConfirmation(summary, chatConversationId)
+        }
+    }
+
+    fun consumePendingBookingConfirmation(): PendingBookingConfirmation? {
+        synchronized(pendingBookingLock) {
+            val v = pendingBookingConfirmation
+            pendingBookingConfirmation = null
             return v
         }
     }

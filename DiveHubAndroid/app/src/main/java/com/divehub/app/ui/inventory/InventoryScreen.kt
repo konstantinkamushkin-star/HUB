@@ -35,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.Scaffold
@@ -68,6 +69,7 @@ import com.divehub.app.R
 import com.divehub.app.data.AuthRepository
 import com.divehub.app.data.InventoryRepository
 import com.divehub.app.data.remote.dto.InventoryItemLocal
+import com.divehub.app.ui.components.SignaturePadSheet
 import com.divehub.app.data.remote.dto.MaintenanceTicketEventLocal
 import com.divehub.app.data.remote.dto.MaintenanceTicketLocal
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -97,6 +99,7 @@ private data class CheckoutDraft(
     val dueAt: String = "",
     val notes: String = "",
     val handedOffBy: String = "",
+    val signatureBase64: String = "",
 )
 
 private data class InspectionDraft(
@@ -229,6 +232,7 @@ class InventoryViewModel(
         dueAt: String?,
         notes: String?,
         handedOffBy: String,
+        signatureBase64: String?,
     ) {
         val assignee = issuedToName.trim()
         val staff = handedOffBy.trim()
@@ -244,6 +248,7 @@ class InventoryViewModel(
                 checkoutNotes = notes?.trim()?.takeIf { v -> v.isNotEmpty() },
                 checkoutHandedOffBy = staff,
                 checkoutHandedOffAt = now,
+                checkoutSignatureBase64 = signatureBase64?.trim()?.takeIf { it.isNotEmpty() },
             )
             if (c.isNotBlank()) {
                 runCatching { repo.upsertItemRemote(c, updated) }
@@ -573,6 +578,7 @@ fun InventoryRoute(graph: AppGraph, innerNav: NavController) {
                     dueAt = d.dueAt,
                     notes = d.notes,
                     handedOffBy = d.handedOffBy,
+                    signatureBase64 = d.signatureBase64.ifBlank { null },
                 )
                 checkoutDraft = null
             },
@@ -1761,6 +1767,14 @@ private fun CheckoutSheet(
     var dueAt by remember(initial.itemId) { mutableStateOf(initial.dueAt) }
     var notes by remember(initial.itemId) { mutableStateOf(initial.notes) }
     var handedOffBy by remember(initial.itemId) { mutableStateOf(initial.handedOffBy) }
+    var signatureBase64 by remember(initial.itemId) { mutableStateOf(initial.signatureBase64) }
+    var showSignaturePad by remember { mutableStateOf(false) }
+
+    SignaturePadSheet(
+        visible = showSignaturePad,
+        onDismiss = { showSignaturePad = false },
+        onConfirm = { signatureBase64 = it },
+    )
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -1802,6 +1816,18 @@ private fun CheckoutSheet(
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
+            OutlinedButton(
+                onClick = { showSignaturePad = true },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    if (signatureBase64.isNotBlank()) {
+                        stringResource(R.string.inventory_signature_added)
+                    } else {
+                        stringResource(R.string.inventory_signature_add)
+                    },
+                )
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.End,
@@ -1815,10 +1841,13 @@ private fun CheckoutSheet(
                                 dueAt = dueAt,
                                 notes = notes,
                                 handedOffBy = handedOffBy,
+                                signatureBase64 = signatureBase64,
                             ),
                         )
                     },
-                    enabled = issuedTo.trim().isNotEmpty() && handedOffBy.trim().isNotEmpty(),
+                    enabled = issuedTo.trim().isNotEmpty() &&
+                        handedOffBy.trim().isNotEmpty() &&
+                        signatureBase64.isNotBlank(),
                 ) {
                     Text(stringResource(R.string.inventory_action_checkout))
                 }

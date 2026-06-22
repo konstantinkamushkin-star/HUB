@@ -1,6 +1,7 @@
 package com.divehub.app.data.remote
 
 import com.divehub.app.data.remote.dto.CountriesEnvelopeDto
+import com.divehub.app.data.remote.dto.RegionsEnvelopeDto
 import com.divehub.app.data.remote.dto.DiveSiteDto
 import com.divehub.app.data.remote.dto.DiveCenterInstructorDto
 import com.divehub.app.data.remote.dto.DiveCenterPublicEnvelopeDto
@@ -18,11 +19,34 @@ interface ExploreApi {
     @GET("v1/dive-sites/countries")
     suspend fun countries(): CountriesEnvelopeDto
 
+    @GET("v1/dive-sites/regions")
+    suspend fun regions(@Query("country") country: String): RegionsEnvelopeDto
+
+    @GET("v1/dive-centers/countries")
+    suspend fun diveCenterCountries(): CountriesEnvelopeDto
+
     @GET("dive-sites")
     suspend fun diveSites(
         @Query("language") language: String = "en",
         @Query("page") page: Int = 1,
         @Query("limit") limit: Int = 80,
+    ): List<DiveSiteDto>
+
+    @GET("v1/dive-sites/explore")
+    suspend fun diveSitesExplore(
+        @Query("language") language: String = "en",
+        @Query("page") page: Int = 1,
+        @Query("limit") limit: Int = 80,
+        @Query("q") q: String? = null,
+        @Query("sort") sort: String? = null,
+        @Query("country") country: String? = null,
+    ): List<DiveSiteDto>
+
+    @GET("v1/dive-sites/search")
+    suspend fun diveSitesSearch(
+        @Query("lat") lat: Double,
+        @Query("lng") lng: Double,
+        @Query("limit") limit: Int = 20,
     ): List<DiveSiteDto>
 
     /** Same as iOS: list without user location uses popular, not /search (which requires lat/lng). */

@@ -1,6 +1,9 @@
 package com.divehub.app.ui.profile
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import com.divehub.app.ui.theme.iosChromePageBackground
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -70,6 +73,8 @@ fun ProfileScreen(
 
     Column(
         modifier = Modifier
+            .fillMaxSize()
+            .background(iosChromePageBackground())
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
             .padding(20.dp),
@@ -116,35 +121,6 @@ fun ProfileScreen(
                 }
                 if (profileEntity is ProfileEntity.Diver) {
                     TextButton(
-                        onClick = { innerNav.navigate(InnerRoutes.Subscription) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.screen_subscription))
-                    }
-                }
-                if (profileEntity is ProfileEntity.Diver) {
-                    TextButton(
-                        onClick = { innerNav.navigate(InnerRoutes.Certifications) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.screen_certifications))
-                    }
-                    TextButton(
-                        onClick = { innerNav.navigate(InnerRoutes.GearProfiles) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.screen_gear_profiles))
-                    }
-                }
-
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.Trips) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.nav_trips))
-                }
-                if (profileEntity is ProfileEntity.Diver) {
-                    TextButton(
                         onClick = { innerNav.navigate(InnerRoutes.MyBookings) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -152,54 +128,10 @@ fun ProfileScreen(
                     }
                 }
                 TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.Notifications) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_notifications))
-                }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.NotificationSettings) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_notification_settings))
-                }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.PrivacySettings) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_privacy_settings))
-                }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.MeasurementUnits) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_measurement_units))
-                }
-                TextButton(
                     onClick = { innerNav.navigate(InnerRoutes.Settings) },
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(stringResource(R.string.screen_settings))
-                }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.Statistics) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_statistics))
-                }
-                if (profileEntity is ProfileEntity.Diver) {
-                    TextButton(
-                        onClick = { innerNav.navigate(InnerRoutes.Achievements) },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(stringResource(R.string.screen_achievements))
-                    }
-                }
-                TextButton(
-                    onClick = { innerNav.navigate(InnerRoutes.Help) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(stringResource(R.string.screen_help))
                 }
                 if (profileEntity is ProfileEntity.Diver) {
                     TextButton(

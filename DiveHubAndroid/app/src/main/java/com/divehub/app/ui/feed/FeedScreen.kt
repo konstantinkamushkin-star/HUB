@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.ScubaDiving
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -44,12 +45,14 @@ import com.divehub.app.R
 import com.divehub.app.util.absoluteMediaUrl
 import com.divehub.app.data.remote.dto.DiveLogLiteDto
 import com.divehub.app.data.remote.dto.FeedPostDto
+import com.divehub.app.ui.main.DiverTabIndices
 import com.divehub.app.ui.theme.IosDesign
+import com.divehub.app.ui.theme.iosChromePageBackground
 import coil.compose.AsyncImage
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FeedRoute(graph: AppGraph) {
+fun FeedRoute(graph: AppGraph, innerNav: androidx.navigation.NavController? = null) {
     val vm: FeedViewModel = viewModel(factory = FeedViewModel.factory(graph))
     val state by vm.state.collectAsState()
     var showCreate by remember { mutableStateOf(false) }
@@ -61,6 +64,7 @@ fun FeedRoute(graph: AppGraph) {
     }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreate = true }) {
                 Icon(Icons.Default.Add, null)
@@ -114,6 +118,9 @@ fun FeedRoute(graph: AppGraph) {
                                 onLike = { vm.toggleLike(post.id) },
                                 onComments = { commentsFor = post },
                                 onOpenDiveLog = { diveDetail = it },
+                                onHashtagClick = { tag ->
+                                    innerNav?.navigate(com.divehub.app.ui.navigation.InnerRoutes.hashtagFeed(tag))
+                                },
                             )
                             if (idx >= state.posts.size - 2) vm.loadMore()
                         }
@@ -142,8 +149,8 @@ fun FeedRoute(graph: AppGraph) {
                 CreatePostFullscreen(
                     vm = vm,
                     onClose = { showCreate = false },
-                    onPost = { context, text, photos, diveLogId ->
-                        vm.createPost(context, text, photos, diveLogId) { showCreate = false }
+                    onPost = { context, text, photos, videos, diveLogId ->
+                        vm.createPost(context, text, photos, videos, diveLogId) { showCreate = false }
                     },
                 )
             }
@@ -190,12 +197,13 @@ private fun FeedPostPhoto(model: String) {
 }
 
 @Composable
-private fun FeedCard(
+internal fun FeedCard(
     post: FeedPostDto,
     imageApiRoot: String,
     onLike: () -> Unit,
     onComments: () -> Unit,
     onOpenDiveLog: (DiveLogLiteDto) -> Unit,
+    onHashtagClick: ((String) -> Unit)? = null,
 ) {
     Card(
         shape = IosDesign.CardCorner,
@@ -208,7 +216,13 @@ private fun FeedCard(
             Spacer(Modifier.height(4.dp))
             Text(post.createdAt ?: "", style = MaterialTheme.typography.bodySmall)
             Spacer(Modifier.height(8.dp))
-            if (!post.content.isNullOrBlank()) Text(post.content)
+            if (!post.content.isNullOrBlank()) {
+                if (onHashtagClick != null) {
+                    FeedHashtagText(content = post.content!!, onHashtagClick = onHashtagClick)
+                } else {
+                    Text(post.content)
+                }
+            }
             if (post.photos.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -218,6 +232,18 @@ private fun FeedCard(
                         val model = absoluteMediaUrl(imageApiRoot, url)
                         if (model.isBlank()) return@forEach
                         FeedPostPhoto(model = model)
+                    }
+                }
+            }
+            if (post.videos.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    post.videos.forEach { raw ->
+                        val url = raw.trim()
+                        if (url.isEmpty()) return@forEach
+                        val model = absoluteMediaUrl(imageApiRoot, url)
+                        if (model.isBlank()) return@forEach
+                        FeedVideoPlayer(videoUrl = model)
                     }
                 }
             }
@@ -361,7 +387,7 @@ private fun EmptyFeed() {
 private fun CreatePostFullscreen(
     vm: FeedViewModel,
     onClose: () -> Unit,
-    onPost: (android.content.Context, String, List<Uri>, String?) -> Unit,
+    onPost: (android.content.Context, String, List<Uri>, List<Uri>, String?) -> Unit,
 ) {
     val context = LocalContext.current
     val diveLogs by vm.diveLogs.collectAsState()
@@ -373,12 +399,17 @@ private fun CreatePostFullscreen(
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
     var selectedPhotos by remember { mutableStateOf<List<Uri>>(emptyList()) }
+    var selectedVideos by remember { mutableStateOf<List<Uri>>(emptyList()) }
     var selectedDiveLogId by remember { mutableStateOf<String?>(null) }
     val quickTags = listOf("#wreck", "#reef", "#nightdive", "#deep")
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10),
     ) { uris -> selectedPhotos = uris }
+
+    val videoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null) selectedVideos = listOf(uri) }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
@@ -435,6 +466,13 @@ private fun CreatePostFullscreen(
                     Icon(Icons.Default.PhotoLibrary, null)
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(R.string.feed_add_photo))
+                }
+                OutlinedButton(onClick = {
+                    videoPicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
+                }) {
+                    Icon(Icons.Default.Videocam, null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(R.string.feed_add_video))
                 }
                 OutlinedButton(
                     onClick = {
@@ -506,6 +544,16 @@ private fun CreatePostFullscreen(
                     }
                 }
             }
+            if (selectedVideos.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.feed_video_attached),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                TextButton(onClick = { selectedVideos = emptyList() }) {
+                    Text(stringResource(R.string.feed_remove))
+                }
+            }
             if (!selectedDiveLogId.isNullOrBlank()) {
                 Spacer(Modifier.height(6.dp))
                 val dive = diveLogs.firstOrNull { it.id == selectedDiveLogId }
@@ -530,9 +578,9 @@ private fun CreatePostFullscreen(
             }
             Spacer(Modifier.height(16.dp))
             Button(
-                onClick = { onPost(context, text, selectedPhotos, selectedDiveLogId) },
+                onClick = { onPost(context, text, selectedPhotos, selectedVideos, selectedDiveLogId) },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = text.isNotBlank() || selectedPhotos.isNotEmpty() || selectedDiveLogId != null,
+                enabled = text.isNotBlank() || selectedPhotos.isNotEmpty() || selectedVideos.isNotEmpty() || selectedDiveLogId != null,
             ) { Text(stringResource(R.string.feed_post)) }
             }
         }
@@ -547,7 +595,7 @@ private fun CreatePostFullscreen(
                 TextButton(
                     onClick = {
                         showEmptyDivesDialog = false
-                        context.diveHubApp().emitDiverTab(2)
+                        context.diveHubApp().emitDiverTab(DiverTabIndices.LOGBOOK)
                         onClose()
                     },
                 ) { Text(stringResource(R.string.feed_go_to_logbook)) }

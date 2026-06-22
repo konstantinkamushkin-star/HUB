@@ -50,6 +50,7 @@ import com.divehub.app.data.PartnerCoursesRepository
 import com.divehub.app.data.remote.dto.AdminCourseLocal
 import com.divehub.app.data.remote.dto.CourseWriteRequestDto
 import com.divehub.app.data.repository.TripsRepository
+import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.theme.IosDesign
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -63,7 +64,7 @@ private enum class CourseFilter(val value: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PartnerCoursesTab(graph: AppGraph) {
+fun PartnerCoursesTab(graph: AppGraph, innerNav: androidx.navigation.NavController) {
     val remoteRepo = remember { TripsRepository(graph) }
     val localRepo = remember { PartnerCoursesRepository(graph) }
     val scope = rememberCoroutineScope()
@@ -166,7 +167,7 @@ fun PartnerCoursesTab(graph: AppGraph) {
             IconButton(onClick = { refresh() }) {
                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.common_refresh))
             }
-            IconButton(onClick = { showCreateSheet = true }, enabled = centerId != null) {
+            IconButton(onClick = { innerNav.navigate(InnerRoutes.partnerCourseEditor()) }, enabled = centerId != null) {
                 Icon(Icons.Default.Add, contentDescription = stringResource(R.string.partner_courses_create))
             }
         }
@@ -256,7 +257,7 @@ fun PartnerCoursesTab(graph: AppGraph) {
                             }
                             Spacer(Modifier.height(8.dp))
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                OutlinedButton(onClick = { editor = c }) {
+                                OutlinedButton(onClick = { innerNav.navigate(InnerRoutes.partnerCourseEditor(c.id)) }) {
                                     Icon(Icons.Default.Edit, contentDescription = null)
                                     Text(stringResource(R.string.common_edit), modifier = Modifier.padding(start = 6.dp))
                                 }

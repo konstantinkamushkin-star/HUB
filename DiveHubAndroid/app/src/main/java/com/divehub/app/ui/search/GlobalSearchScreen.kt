@@ -1,6 +1,8 @@
 package com.divehub.app.ui.search
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,6 +13,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -28,6 +31,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
@@ -44,6 +48,15 @@ fun GlobalSearchRoute(graph: AppGraph, innerNav: NavController) {
     LaunchedEffect(Unit) {
         graph.consumePendingGlobalSearchQuery()?.let { q ->
             vm.setQuery(q)
+            vm.search()
+        }
+    }
+
+    LaunchedEffect(state.query) {
+        val q = state.query.trim()
+        if (q.length < 2) return@LaunchedEffect
+        delay(400)
+        if (vm.state.value.query.trim() == q) {
             vm.search()
         }
     }
@@ -86,6 +99,21 @@ fun GlobalSearchRoute(graph: AppGraph, innerNav: NavController) {
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                SearchCategory.entries.forEach { cat ->
+                    FilterChip(
+                        selected = state.category == cat,
+                        onClick = { vm.setCategory(cat) },
+                        label = { Text(searchCategoryLabel(cat)) },
+                    )
+                }
+            }
+            Spacer(Modifier.height(4.dp))
             TextButton(
                 onClick = { vm.search() },
                 enabled = !state.loading,
@@ -138,7 +166,7 @@ fun GlobalSearchRoute(graph: AppGraph, innerNav: NavController) {
                             )
                         }
                     }
-                    if (state.users.isNotEmpty()) {
+                    if (state.users.isNotEmpty() && (state.category == SearchCategory.ALL || state.category == SearchCategory.USERS)) {
                         item {
                             Text(stringResource(R.string.search_section_users), style = MaterialTheme.typography.titleSmall)
                         }
@@ -163,12 +191,21 @@ fun GlobalSearchRoute(graph: AppGraph, innerNav: NavController) {
                             }
                         }
                     }
-                    if (state.sites.isNotEmpty()) {
+                    val filteredSites = state.sites.filter { site ->
+                        when (state.category) {
+                            SearchCategory.ALL -> true
+                            SearchCategory.SITES -> site.kind == ExploreItemKind.DIVE_SITE
+                            SearchCategory.CENTERS -> site.kind == ExploreItemKind.DIVE_CENTER
+                            SearchCategory.SHOPS -> site.kind == ExploreItemKind.SHOP
+                            SearchCategory.USERS -> false
+                        }
+                    }
+                    if (filteredSites.isNotEmpty()) {
                         item {
                             Spacer(Modifier.height(8.dp))
                             Text(stringResource(R.string.search_section_places), style = MaterialTheme.typography.titleSmall)
                         }
-                        items(state.sites, key = { "${it.kind.name}_${it.id}" }) { s ->
+                        items(filteredSites, key = { "${it.kind.name}_${it.id}" }) { s ->
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -209,7 +246,7 @@ fun GlobalSearchRoute(graph: AppGraph, innerNav: NavController) {
                             }
                         }
                     }
-                    if (state.hasSearched && !state.loading && state.users.isEmpty() && state.sites.isEmpty() && state.query.trim().length >= 2) {
+                    if (state.hasSearched && !state.loading && state.users.isEmpty() && filteredSites.isEmpty() && state.query.trim().length >= 2) {
                         item {
                             Text(stringResource(R.string.search_no_results), style = MaterialTheme.typography.bodyLarge)
                         }
@@ -219,4 +256,13 @@ fun GlobalSearchRoute(graph: AppGraph, innerNav: NavController) {
             }
         }
     }
+}
+
+@Composable
+private fun searchCategoryLabel(category: SearchCategory): String = when (category) {
+    SearchCategory.ALL -> stringResource(R.string.search_category_all)
+    SearchCategory.SITES -> stringResource(R.string.search_category_sites)
+    SearchCategory.CENTERS -> stringResource(R.string.search_category_centers)
+    SearchCategory.SHOPS -> stringResource(R.string.search_category_shops)
+    SearchCategory.USERS -> stringResource(R.string.search_category_users)
 }

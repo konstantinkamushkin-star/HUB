@@ -26,6 +26,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -52,6 +53,7 @@ import com.divehub.app.R
 import com.divehub.app.data.AuthRepository
 import com.divehub.app.ui.main.SessionViewModel
 import com.divehub.app.ui.navigation.InnerRoutes
+import com.divehub.app.ui.theme.iosChromePageBackground
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -61,7 +63,37 @@ fun HelpRoute(
     onPartnerApplication: () -> Unit = {},
 ) {
     val ctx = LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
+    val query = searchQuery.trim().lowercase()
+    val faqItems = listOf(
+        stringResource(R.string.help_faq_q1) to stringResource(R.string.help_faq_a1),
+        stringResource(R.string.help_faq_q2) to stringResource(R.string.help_faq_a2),
+        stringResource(R.string.help_faq_q3) to stringResource(R.string.help_faq_a3),
+        stringResource(R.string.help_faq_q4) to stringResource(R.string.help_faq_a4),
+    )
+    val filteredFaq = if (query.isEmpty()) {
+        faqItems
+    } else {
+        faqItems.filter { (q, a) ->
+            q.lowercase().contains(query) || a.lowercase().contains(query)
+        }
+    }
+    val helpSections = listOf(
+        stringResource(R.string.help_section_explore_title) to stringResource(R.string.help_section_explore_body),
+        stringResource(R.string.help_section_logbook_title) to stringResource(R.string.help_section_logbook_body),
+        stringResource(R.string.help_section_trips_title) to stringResource(R.string.help_section_trips_body),
+        stringResource(R.string.help_section_account_title) to stringResource(R.string.help_section_account_body),
+        stringResource(R.string.help_section_partners_title) to stringResource(R.string.help_section_partners_body),
+    )
+    val filteredSections = if (query.isEmpty()) {
+        helpSections
+    } else {
+        helpSections.filter { (title, body) ->
+            title.lowercase().contains(query) || body.lowercase().contains(query)
+        }
+    }
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_help)) },
@@ -82,27 +114,28 @@ fun HelpRoute(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(stringResource(R.string.help_intro), style = MaterialTheme.typography.bodyLarge)
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                label = { Text(stringResource(R.string.help_search_topics_ios)) },
+            )
             Text(
                 stringResource(R.string.help_section_faq_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
             )
-            HelpFaqItem(
-                question = stringResource(R.string.help_faq_q1),
-                answer = stringResource(R.string.help_faq_a1),
-            )
-            HelpFaqItem(
-                question = stringResource(R.string.help_faq_q2),
-                answer = stringResource(R.string.help_faq_a2),
-            )
-            HelpFaqItem(
-                question = stringResource(R.string.help_faq_q3),
-                answer = stringResource(R.string.help_faq_a3),
-            )
-            HelpFaqItem(
-                question = stringResource(R.string.help_faq_q4),
-                answer = stringResource(R.string.help_faq_a4),
-            )
+            if (filteredFaq.isEmpty() && query.isNotEmpty()) {
+                Text(
+                    stringResource(R.string.help_no_search_results),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            filteredFaq.forEach { (question, answer) ->
+                HelpFaqItem(question = question, answer = answer)
+            }
             HorizontalDivider()
             Text(
                 stringResource(R.string.help_section_contact_title),
@@ -181,26 +214,9 @@ fun HelpRoute(
                 Text(stringResource(R.string.help_link_privacy))
             }
             HorizontalDivider()
-            HelpSection(
-                title = stringResource(R.string.help_section_explore_title),
-                body = stringResource(R.string.help_section_explore_body),
-            )
-            HelpSection(
-                title = stringResource(R.string.help_section_logbook_title),
-                body = stringResource(R.string.help_section_logbook_body),
-            )
-            HelpSection(
-                title = stringResource(R.string.help_section_trips_title),
-                body = stringResource(R.string.help_section_trips_body),
-            )
-            HelpSection(
-                title = stringResource(R.string.help_section_account_title),
-                body = stringResource(R.string.help_section_account_body),
-            )
-            HelpSection(
-                title = stringResource(R.string.help_section_partners_title),
-                body = stringResource(R.string.help_section_partners_body),
-            )
+            filteredSections.forEach { (title, body) ->
+                HelpSection(title = title, body = body)
+            }
             OutlinedButton(
                 onClick = onPartnerApplication,
                 modifier = Modifier.fillMaxWidth(),
@@ -275,13 +291,13 @@ fun SettingsRoute(
     fun applyAppLanguage(tag: String?) {
         scope.launch {
             graph.tokenStore.setAppLanguageTag(tag)
+            val syncLang = tag?.trim()?.ifBlank { null } ?: "ru"
+            graph.localizationRepository.sync(syncLang)
             when (tag) {
                 null -> AppCompatDelegate.setApplicationLocales(LocaleListCompat.getEmptyLocaleList())
-                "en" -> AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("en"))
-                "ru" -> AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ru"))
-                else -> Unit
+                else -> AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
             }
-            if (user != null && (tag == "en" || tag == "ru")) {
+            if (user != null && !tag.isNullOrBlank()) {
                 runCatching { authRepo.updateProfile(language = tag) }
                     .onSuccess { sessionVm.onUserUpdated(it) }
             }
@@ -289,6 +305,7 @@ fun SettingsRoute(
     }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.screen_settings)) },
@@ -324,9 +341,12 @@ fun SettingsRoute(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    u.certificationLevel?.let {
+                    u.certificationLevel?.let { code ->
                         Text(
-                            stringResource(R.string.settings_cert_level, it),
+                            stringResource(
+                                R.string.settings_cert_level,
+                                DiveProfileCatalogLabels.certificationLevelLabel(code),
+                            ),
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
@@ -380,12 +400,6 @@ fun SettingsRoute(
                 Text(stringResource(R.string.screen_notifications))
             }
             TextButton(
-                onClick = { innerNav.navigate(InnerRoutes.Trips) },
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(stringResource(R.string.nav_trips))
-            }
-            TextButton(
                 onClick = { innerNav.navigate(InnerRoutes.Statistics) },
                 modifier = Modifier.fillMaxWidth(),
             ) {
@@ -428,6 +442,20 @@ fun SettingsRoute(
             ) {
                 Text(stringResource(R.string.settings_language_ru))
             }
+            listOf(
+                "de" to R.string.settings_language_de,
+                "es" to R.string.settings_language_es,
+                "fr" to R.string.settings_language_fr,
+                "zh" to R.string.settings_language_zh,
+                "ar" to R.string.settings_language_ar,
+            ).forEach { (tag, labelRes) ->
+                TextButton(
+                    onClick = { applyAppLanguage(tag) },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(labelRes))
+                }
+            }
             Text(
                 stringResource(R.string.settings_appearance_section),
                 style = MaterialTheme.typography.labelLarge,
@@ -451,6 +479,31 @@ fun SettingsRoute(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(stringResource(R.string.settings_theme_dark))
+            }
+            Text(
+                stringResource(R.string.settings_interface_scale),
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            )
+            Text(
+                stringResource(R.string.settings_interface_scale_footer),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+            listOf(
+                "compact" to R.string.settings_interface_scale_compact,
+                "standard" to R.string.settings_interface_scale_standard,
+                "comfortable" to R.string.settings_interface_scale_comfortable,
+                "large" to R.string.settings_interface_scale_large,
+            ).forEach { (preset, labelRes) ->
+                TextButton(
+                    onClick = { scope.launch { graph.tokenStore.setInterfaceScalePreset(preset) } },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(stringResource(labelRes))
+                }
             }
             Text(
                 stringResource(R.string.settings_preferences_section),

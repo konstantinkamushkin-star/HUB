@@ -105,6 +105,16 @@ fun UserBookingDto.toAdminBookingLocal(): AdminBookingLocal =
         createdAt = createdAt,
     )
 
+data class BookingInstructorPreferencesDto(
+    @SerializedName("language") val language: String? = null,
+    @SerializedName("notes") val notes: String? = null,
+)
+
+data class BookingEquipmentRentalRequestDto(
+    @SerializedName("required") val required: Boolean,
+    @SerializedName("items") val items: List<Any>? = null,
+)
+
 /** Request body aligned with iOS `Booking` + `NetworkService.createBooking`. */
 data class BookingCreateDto(
     @SerializedName("id") val id: String,
@@ -122,4 +132,11 @@ data class BookingCreateDto(
     @SerializedName("notes") val notes: String? = null,
     @SerializedName("createdAt") val createdAt: String,
     @SerializedName("updatedAt") val updatedAt: String,
+    @SerializedName("bookingType") val bookingType: String? = null,
+    @SerializedName("requestMode") val requestMode: String? = null,
+    @SerializedName("dateEnd") val dateEnd: String? = null,
+    @SerializedName("sessionId") val sessionId: String? = null,
+    @SerializedName("participantsCount") val participantsCount: Int? = null,
+    @SerializedName("instructorPreferences") val instructorPreferences: BookingInstructorPreferencesDto? = null,
+    @SerializedName("equipmentRental") val equipmentRental: BookingEquipmentRentalRequestDto? = null,
 )

@@ -5,14 +5,26 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.divehub.app.AppGraph
 import com.divehub.app.data.SocialRepository
+import com.divehub.app.data.remote.dto.CreateGroupTripBody
+import com.divehub.app.data.remote.dto.DiscoverNearbyDto
+import com.divehub.app.data.remote.dto.FriendLocationDto
 import com.divehub.app.data.remote.dto.FriendRequestDto
+import com.divehub.app.data.remote.dto.GroupTripDto
 import com.divehub.app.data.remote.dto.UserDto
+import com.divehub.app.data.ProfilePreferencesRepository
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+
+private data class SocialRefreshBundle(
+    val friends: List<UserDto>,
+    val received: List<FriendRequestDto>,
+    val sent: List<FriendRequestDto>,
+    val trips: List<GroupTripDto>,
+)
 
 data class SocialUiState(
     val loading: Boolean = true,
@@ -26,6 +38,11 @@ data class SocialUiState(
     val searching: Boolean = false,
     val searchError: String? = null,
     val searchResults: List<UserDto> = emptyList(),
+    val friendLocations: List<FriendLocationDto> = emptyList(),
+    val discoverNearby: List<DiscoverNearbyDto> = emptyList(),
+    val trackingMode: Int = 0,
+    val groupTrips: List<GroupTripDto> = emptyList(),
+    val groupTripsLoading: Boolean = false,
 )
 
 class SocialViewModel(
@@ -45,19 +62,90 @@ class SocialViewModel(
             val imgRoot = graph.tokenStore.getRootBaseUrl()
             _state.value = _state.value.copy(loading = true, error = null, imageApiRoot = imgRoot)
             runCatching {
-                val friends = repo.friends()
-                val received = repo.receivedRequests()
-                val sent = repo.sentRequests()
-                Triple(friends, received, sent)
-            }.onSuccess { (friends, received, sent) ->
+                SocialRefreshBundle(
+                    friends = repo.friends(),
+                    received = repo.receivedRequests(),
+                    sent = repo.sentRequests(),
+                    trips = repo.groupTrips(),
+                )
+            }.onSuccess { bundle ->
+                val friends = bundle.friends
+                val received = bundle.received
+                val sent = bundle.sent
+                val trips = bundle.trips
                 _state.value = _state.value.copy(
                     loading = false,
                     friends = friends,
                     received = received,
                     sent = sent,
+                    groupTrips = trips,
                 )
             }.onFailure { e ->
                 _state.value = _state.value.copy(loading = false, error = e.message ?: "Load error")
+            }
+        }
+    }
+
+    fun loadFriendLocations(lat: Double?, lng: Double?) {
+        viewModelScope.launch {
+            val prefs = ProfilePreferencesRepository(graph).loadPrivacyPrefs()
+            if (prefs.shareLocation && lat != null && lng != null) {
+                runCatching { repo.reportLocation(lat, lng, null) }
+            }
+            runCatching { repo.friendLocations(lat, lng) }
+                .onSuccess { locs ->
+                    _state.value = _state.value.copy(friendLocations = locs)
+                }
+        }
+    }
+
+    fun loadDiversNearby(lat: Double, lng: Double) {
+        viewModelScope.launch {
+            runCatching { repo.discoverNearby(lat, lng) }
+                .onSuccess { users ->
+                    val friendIds = _state.value.friends.map { it.id }.toSet()
+                    _state.value = _state.value.copy(
+                        discoverNearby = users.filter { it.userId !in friendIds },
+                    )
+                }
+        }
+    }
+
+    /** @deprecated Use [loadFriendLocations] or [loadDiversNearby]. */
+    fun loadTrackingData(lat: Double?, lng: Double?) {
+        loadFriendLocations(lat, lng)
+    }
+
+    fun createGroupTrip(
+        name: String,
+        description: String?,
+        destination: String?,
+        startDate: String,
+        memberIds: List<String>,
+        onSuccess: (GroupTripDto) -> Unit,
+        onFailure: ((Throwable) -> Unit)? = null,
+    ) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(groupTripsLoading = true)
+            runCatching {
+                repo.createGroupTrip(
+                    CreateGroupTripBody(
+                        name = name,
+                        description = description,
+                        destination = destination,
+                        startDate = startDate,
+                        memberUserIds = memberIds,
+                    ),
+                )
+            }.onSuccess { trip ->
+                _state.value = _state.value.copy(
+                    groupTrips = listOf(trip) + _state.value.groupTrips,
+                    groupTripsLoading = false,
+                )
+                onSuccess(trip)
+            }.onFailure { error ->
+                _state.value = _state.value.copy(groupTripsLoading = false)
+                onFailure?.invoke(error)
             }
         }
     }
@@ -116,6 +204,7 @@ class SocialViewModel(
                 .onSuccess {
                     _state.value = _state.value.copy(
                         searchResults = _state.value.searchResults.filterNot { it.id == userId },
+                        discoverNearby = _state.value.discoverNearby.filterNot { it.userId == userId },
                         searchError = null,
                     )
                     refresh()

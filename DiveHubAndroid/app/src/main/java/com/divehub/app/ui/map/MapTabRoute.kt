@@ -67,6 +67,7 @@ import com.divehub.app.ui.explore.DiveSiteContributionSheetContent
 import com.divehub.app.ui.explore.ExploreMapActions
 import com.divehub.app.ui.explore.ExploreMapOsm
 import com.divehub.app.ui.components.DiveCenterPromoCard
+import com.divehub.app.ui.main.DiverTabIndices
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.theme.IosDesign
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -214,7 +215,7 @@ fun MapTabRoute(graph: AppGraph, innerNav: NavController) {
                             )
                         }
                     },
-                    onAddDiveLog = { context.diveHubApp().emitDiverTab(3) },
+                    onAddDiveLog = { context.diveHubApp().emitDiverTab(DiverTabIndices.LOGBOOK) },
                 )
             }
         }

@@ -54,8 +54,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
+import com.divehub.app.ui.admin.AdminWebPanelRoute
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -92,7 +91,12 @@ import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.data.remote.dto.ShopV1DetailDto
 import com.divehub.app.data.repository.ShopRepository
 import com.divehub.app.data.repository.TripsRepository
-import com.divehub.app.ui.admin.AdminWebPanelRoute
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import com.divehub.app.ui.admin.CenterServicesTabRoute
+import com.divehub.app.ui.explore.ExploreRoute
+import com.divehub.app.ui.feed.FeedRoute
 import com.divehub.app.ui.chat.ChatRoute
 import com.divehub.app.ui.navigation.AppShellKind
 import com.divehub.app.ui.navigation.InnerRoutes
@@ -131,10 +135,34 @@ fun PartnerAppShell(
     val isSuperAdmin = kind == AppShellKind.ADMIN && user?.role?.uppercase(Locale.ROOT) == "SUPER_ADMIN"
     val showCreateTripFab = kind == AppShellKind.ADMIN || kind == AppShellKind.INSTRUCTOR
 
-    LaunchedEffect(isSuperAdmin) {
-        if (isSuperAdmin && tab !in 0..1) tab = 0
-        if (!isSuperAdmin && tab !in 0..5) tab = 0
+    @Suppress("UNCHECKED_CAST")
+    val adminLayoutMap: Map<String, Any?>? =
+        (user?.diverProfile?.get("adminDashboardLayout") as? Map<*, *>)
+            ?.mapNotNull { (k, v) -> (k as? String)?.let { it to v } }
+            ?.toMap()
+
+    val diveCenterTabKeys = remember(adminLayoutMap) {
+        PartnerShellTab.visibleKeys(adminLayoutMap)
     }
+
+    LaunchedEffect(isSuperAdmin, diveCenterTabKeys.size) {
+        when {
+            isSuperAdmin && tab !in 0..1 -> tab = 0
+            kind == AppShellKind.ADMIN && !isSuperAdmin && tab >= diveCenterTabKeys.size -> {
+                tab = (diveCenterTabKeys.size - 1).coerceAtLeast(0)
+            }
+            kind == AppShellKind.INSTRUCTOR && tab !in 0..3 -> tab = 0
+            kind == AppShellKind.SHOP && tab !in 0..5 -> tab = 0
+        }
+    }
+
+    fun navigateAdminTabKey(key: String) {
+        if (kind != AppShellKind.ADMIN || isSuperAdmin) return
+        val idx = diveCenterTabKeys.indexOf(key.lowercase(Locale.ROOT))
+        if (idx >= 0) tab = idx
+    }
+
+    val bottomInset = diveHubIosScrollTabBarBottomInset()
 
     val app = LocalContext.current.diveHubApp()
     LaunchedEffect(Unit) {
@@ -145,141 +173,27 @@ fun PartnerAppShell(
         }
     }
 
-    Scaffold(
-        containerColor = IosScreenBg,
-        contentColor = Color.Black,
-        bottomBar = {
-            if (kind != AppShellKind.DIVER) {
-                NavigationBar {
-                when (kind) {
-                    AppShellKind.ADMIN -> {
-                        if (isSuperAdmin) {
-                            NavigationBarItem(
-                                selected = tab == 0,
-                                onClick = { tab = 0 },
-                                icon = { Icon(Icons.Default.Language, contentDescription = null) },
-                                label = { Text(stringResource(R.string.partner_tab_web_panel)) },
-                            )
-                            NavigationBarItem(
-                                selected = tab == 1,
-                                onClick = { tab = 1 },
-                                icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
-                                label = { Text(stringResource(R.string.profile_title)) },
-                            )
-                        } else {
-                            NavigationBarItem(
-                                selected = tab == 0,
-                                onClick = { tab = 0 },
-                                icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                                label = { Text(stringResource(R.string.partner_tab_home)) },
-                            )
-                            NavigationBarItem(
-                                selected = tab == 1,
-                                onClick = { tab = 1 },
-                                icon = { Icon(Icons.AutoMirrored.Filled.MenuBook, contentDescription = null) },
-                                label = { Text(stringResource(R.string.partner_tab_courses)) },
-                            )
-                            NavigationBarItem(
-                                selected = tab == 2,
-                                onClick = { tab = 2 },
-                                icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                                label = { Text(stringResource(R.string.partner_tab_trips)) },
-                            )
-                            NavigationBarItem(
-                                selected = tab == 3,
-                                onClick = { tab = 3 },
-                                icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
-                                label = { Text(stringResource(R.string.partner_tab_analytics)) },
-                            )
-                            NavigationBarItem(
-                                selected = tab == 4,
-                                onClick = { tab = 4 },
-                                icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null) },
-                                label = { Text(stringResource(R.string.partner_tab_chats)) },
-                            )
-                            NavigationBarItem(
-                                selected = tab == 5,
-                                onClick = { tab = 5 },
-                                icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
-                                label = { Text(stringResource(R.string.partner_tab_more)) },
-                            )
-                        }
-                    }
-                    AppShellKind.INSTRUCTOR -> {
-                        NavigationBarItem(
-                            selected = tab == 0,
-                            onClick = { tab = 0 },
-                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                            label = { Text(stringResource(R.string.partner_tab_home)) },
-                        )
-                        NavigationBarItem(
-                            selected = tab == 1,
-                            onClick = { tab = 1 },
-                            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                            label = { Text(stringResource(R.string.partner_tab_schedule)) },
-                        )
-                        NavigationBarItem(
-                            selected = tab == 2,
-                            onClick = { tab = 2 },
-                            icon = { Icon(Icons.Default.PhotoLibrary, contentDescription = null) },
-                            label = { Text(stringResource(R.string.partner_tab_photo)) },
-                        )
-                        NavigationBarItem(
-                            selected = tab == 3,
-                            onClick = { tab = 3 },
-                            icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
-                            label = { Text(stringResource(R.string.partner_tab_more)) },
-                        )
-                    }
-                    AppShellKind.SHOP -> {
-                        NavigationBarItem(
-                            selected = tab == 0,
-                            onClick = { tab = 0 },
-                            icon = { Icon(Icons.Default.Home, contentDescription = null) },
-                            label = { Text(stringResource(R.string.partner_tab_home)) },
-                        )
-                        NavigationBarItem(
-                            selected = tab == 1,
-                            onClick = { tab = 1 },
-                            icon = { Icon(Icons.Default.Store, contentDescription = null) },
-                            label = { Text(stringResource(R.string.shop_tab_store)) },
-                        )
-                        NavigationBarItem(
-                            selected = tab == 2,
-                            onClick = { tab = 2 },
-                            icon = { Icon(Icons.Default.DateRange, contentDescription = null) },
-                            label = { Text(stringResource(R.string.shop_tab_sell)) },
-                        )
-                        NavigationBarItem(
-                            selected = tab == 3,
-                            onClick = { tab = 3 },
-                            icon = { Icon(Icons.Default.BarChart, contentDescription = null) },
-                            label = { Text(stringResource(R.string.partner_tab_analytics)) },
-                        )
-                        NavigationBarItem(
-                            selected = tab == 4,
-                            onClick = { tab = 4 },
-                            icon = { Icon(Icons.Default.MoreHoriz, contentDescription = null) },
-                            label = { Text(stringResource(R.string.partner_tab_more)) },
-                        )
-                    }
-                    else -> Unit
-                }
-                }
-            }
-        },
-    ) { padding ->
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(IosScreenBg),
+    ) {
         Box(
             Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(bottom = if (kind != AppShellKind.DIVER) bottomInset else 0.dp),
         ) {
             when (kind) {
                 AppShellKind.ADMIN -> {
                     if (isSuperAdmin) {
                         when (tab) {
-                            0 -> AdminWebPanelRoute(graph = graph, innerNav = innerNav, user = user)
-                            1 -> ProfileScreen(
+                            SuperAdminShellTab.WEB_PANEL -> AdminWebPanelRoute(
+                                graph = graph,
+                                innerNav = innerNav,
+                                user = user,
+                                embeddedInTab = true,
+                            )
+                            SuperAdminShellTab.PROFILE -> ProfileScreen(
                                 graph = graph,
                                 sessionVm = sessionVm,
                                 user = user,
@@ -289,93 +203,161 @@ fun PartnerAppShell(
                             )
                         }
                     } else {
-                        when (tab) {
-                            0 -> AdminHomeTab(
-                                graph = graph,
-                                sessionVm = sessionVm,
-                                portalTitle = title,
-                                user = user,
-                                onOpenTrips = { tab = 2 },
-                                onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
-                                onOpenBookings = { innerNav.navigate(InnerRoutes.AdminBookingManagement) },
-                                onOpenCalendar = { innerNav.navigate(InnerRoutes.AdminBookingCalendar) },
-                                onOpenInventory = { innerNav.navigate(InnerRoutes.Inventory) },
-                                onOpenCenterInstructors = { c ->
-                                    innerNav.navigate(InnerRoutes.centerInstructors(c.id))
-                                },
-                                onOpenCenterTrips = { c ->
-                                    innerNav.navigate(InnerRoutes.centerTrips(c.id))
-                                },
-                            )
-                            1 -> PartnerCoursesTab(graph = graph)
-                            2 -> TripsListTabContent(
-                                graph = graph,
-                                innerNav = innerNav,
-                                showCreateFab = showCreateTripFab,
-                                onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
-                            )
-                            3 -> PartnerAnalyticsTab(graph = graph)
-                            4 -> ChatRoute(graph = graph)
-                            5 -> PartnerMoreTab(
-                                kind = kind,
-                                graph = graph,
-                                innerNav = innerNav,
-                                rootNav = rootNav,
-                                sessionVm = sessionVm,
-                                onLoggedOut = onLoggedOut,
-                            )
-                        }
+                        val key = diveCenterTabKeys.getOrNull(tab) ?: PartnerShellTab.DASHBOARD
+                        AdminDiveCenterTabPage(
+                            tabKey = key,
+                            graph = graph,
+                            sessionVm = sessionVm,
+                            innerNav = innerNav,
+                            rootNav = rootNav,
+                            portalTitle = title,
+                            user = user,
+                            showCreateTripFab = showCreateTripFab,
+                            onLoggedOut = onLoggedOut,
+                            onNavigateToTabKey = ::navigateAdminTabKey,
+                        )
                     }
                 }
                 AppShellKind.INSTRUCTOR -> when (tab) {
-                    0 -> InstructorHomeTab(
+                    InstructorShellTab.DASHBOARD -> InstructorHomeTab(
                         graph = graph,
                         innerNav = innerNav,
                         portalTitle = title,
                         user = user,
-                        onOpenSchedule = { tab = 1 },
-                        onOpenPhoto = { tab = 2 },
+                        onOpenSchedule = { tab = InstructorShellTab.SCHEDULE },
+                        onOpenPhoto = { tab = InstructorShellTab.PHOTO },
                     )
-                    1 -> InstructorScheduleTab(graph = graph)
-                    2 -> InstructorPhotoTab(innerNav = innerNav)
-                    3 -> PartnerMoreTab(
-                        kind = kind,
+                    InstructorShellTab.SCHEDULE -> InstructorScheduleTab(graph = graph)
+                    InstructorShellTab.PHOTO -> InstructorPhotoTab(innerNav = innerNav)
+                    InstructorShellTab.PROFILE -> ProfileScreen(
                         graph = graph,
+                        sessionVm = sessionVm,
+                        user = user,
                         innerNav = innerNav,
                         rootNav = rootNav,
-                        sessionVm = sessionVm,
                         onLoggedOut = onLoggedOut,
                     )
                 }
                 AppShellKind.SHOP -> when (tab) {
-                    0 -> ShopHomeTab(
+                    ShopShellTab.DASHBOARD -> ShopHomeTab(
                         graph = graph,
                         shopId = user?.shopId,
                         portalTitle = title,
                         user = user,
-                        onOpenTrips = { tab = 2 },
+                        onOpenTrips = { tab = ShopShellTab.PRODUCTS },
                     )
-                    1 -> ShopHomeTab(
+                    ShopShellTab.MY_SHOP -> ShopHomeTab(
                         graph = graph,
                         shopId = user?.shopId,
                         portalTitle = stringResource(R.string.shop_tab_store_title),
                         user = user,
-                        onOpenTrips = { tab = 2 },
+                        onOpenTrips = { tab = ShopShellTab.PRODUCTS },
                     )
-                    2 -> ShopSellTab(graph = graph, innerNav = innerNav)
-                    3 -> PartnerAnalyticsTab(graph = graph)
-                    4 -> PartnerMoreTab(
-                        kind = kind,
+                    ShopShellTab.PRODUCTS -> ShopSellTab(graph = graph, innerNav = innerNav, fixedSegment = 0)
+                    ShopShellTab.ORDERS -> ShopSellTab(graph = graph, innerNav = innerNav, fixedSegment = 1)
+                    ShopShellTab.ANALYTICS -> PartnerAnalyticsTab(graph = graph)
+                    ShopShellTab.PROFILE -> ProfileScreen(
                         graph = graph,
+                        sessionVm = sessionVm,
+                        user = user,
                         innerNav = innerNav,
                         rootNav = rootNav,
-                        sessionVm = sessionVm,
                         onLoggedOut = onLoggedOut,
                     )
                 }
                 AppShellKind.DIVER -> PartnerDashboardTab(portalTitle = title, user = user)
             }
         }
+
+        if (kind != AppShellKind.DIVER) {
+            val barItems = when (kind) {
+                AppShellKind.ADMIN -> if (isSuperAdmin) {
+                    SuperAdminShellTab.scrollTabItems()
+                } else {
+                    PartnerShellTab.scrollTabItems(diveCenterTabKeys)
+                }
+                AppShellKind.INSTRUCTOR -> InstructorShellTab.scrollTabItems()
+                AppShellKind.SHOP -> ShopShellTab.scrollTabItems()
+                AppShellKind.DIVER -> emptyList()
+            }
+            DiveHubIosScrollTabBar(
+                items = barItems,
+                selectedIndex = tab,
+                onSelectIndex = { tab = it },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
+        }
+    }
+}
+
+@Composable
+private fun AdminDiveCenterTabPage(
+    tabKey: String,
+    graph: AppGraph,
+    sessionVm: SessionViewModel,
+    innerNav: NavController,
+    rootNav: NavController,
+    portalTitle: String,
+    user: UserDto?,
+    showCreateTripFab: Boolean,
+    onLoggedOut: () -> Unit,
+    onNavigateToTabKey: (String) -> Unit,
+) {
+    when (tabKey.lowercase(Locale.ROOT)) {
+        PartnerShellTab.DASHBOARD -> AdminHomeTab(
+            graph = graph,
+            sessionVm = sessionVm,
+            portalTitle = portalTitle,
+            user = user,
+            onOpenTrips = { onNavigateToTabKey(PartnerShellTab.TRIPS) },
+            onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
+            onOpenBookings = { innerNav.navigate(InnerRoutes.AdminBookingManagement) },
+            onOpenCalendar = { innerNav.navigate(InnerRoutes.AdminBookingCalendar) },
+            onOpenInventory = { innerNav.navigate(InnerRoutes.Inventory) },
+            onOpenCenterInstructors = { c ->
+                innerNav.navigate(InnerRoutes.centerInstructors(c.id))
+            },
+            onOpenCenterTrips = { c ->
+                innerNav.navigate(InnerRoutes.centerTrips(c.id))
+            },
+        )
+        PartnerShellTab.EXPLORE -> ExploreRoute(graph = graph, innerNav = innerNav)
+        PartnerShellTab.FEED -> FeedRoute(graph = graph)
+        PartnerShellTab.COURSES -> PartnerCoursesTab(graph = graph, innerNav = innerNav)
+        PartnerShellTab.TRIPS -> TripsListTabContent(
+            graph = graph,
+            innerNav = innerNav,
+            showCreateFab = showCreateTripFab,
+            onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
+        )
+        PartnerShellTab.PHOTO -> InstructorPhotoTab(innerNav = innerNav)
+        PartnerShellTab.SERVICES -> CenterServicesTabRoute(graph = graph, sessionVm = sessionVm)
+        PartnerShellTab.CHATS -> ChatRoute(graph = graph)
+        PartnerShellTab.PROFILE -> ProfileScreen(
+            graph = graph,
+            sessionVm = sessionVm,
+            user = user,
+            innerNav = innerNav,
+            rootNav = rootNav,
+            onLoggedOut = onLoggedOut,
+        )
+        else -> AdminHomeTab(
+            graph = graph,
+            sessionVm = sessionVm,
+            portalTitle = portalTitle,
+            user = user,
+            onOpenTrips = { onNavigateToTabKey(PartnerShellTab.TRIPS) },
+            onCreateTrip = { innerNav.navigate(InnerRoutes.TripCreate) },
+            onOpenBookings = { innerNav.navigate(InnerRoutes.AdminBookingManagement) },
+            onOpenCalendar = { innerNav.navigate(InnerRoutes.AdminBookingCalendar) },
+            onOpenInventory = { innerNav.navigate(InnerRoutes.Inventory) },
+            onOpenCenterInstructors = { c ->
+                innerNav.navigate(InnerRoutes.centerInstructors(c.id))
+            },
+            onOpenCenterTrips = { c ->
+                innerNav.navigate(InnerRoutes.centerTrips(c.id))
+            },
+        )
     }
 }
 

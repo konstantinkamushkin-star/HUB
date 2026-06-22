@@ -1,0 +1,17 @@
+# Google Play — full description (≤ 4000 chars)
+
+DiveHub is the app for divers and dive centers — Android v1.2 parity with iOS.
+
+• Map and catalog of dive sites, centers, and shops
+• Logbook with search, sort, dive detail, and share to feed
+• Social feed with photos, video posts, and clickable hashtags
+• Friends, messaging, and global search with category filters
+• Dive and course booking with full-screen confirmation
+• Unified profile edit, subscription / PRO trial info, 7 languages
+• Underwater photo & video editor with cloud AI (UVM)
+• Statistics with icons and achievements from your logbook
+• Help with searchable FAQ
+
+For partners: dive center, instructor, and shop dashboards — courses editor with modules, trips, bookings calendar, inventory with digital checkout signature, gear, analytics, and admin web panel.
+
+Privacy policy: https://dive-hub.ru/privacy

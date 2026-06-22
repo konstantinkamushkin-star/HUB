@@ -53,6 +53,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.ui.theme.iosChromePageBackground
 import com.divehub.app.data.AdminAffiliatedSitesRepository
 import com.divehub.app.data.ExploreRepository
 import com.divehub.app.data.repository.TripsRepository
@@ -170,6 +171,7 @@ fun AdminAffiliatedSitesRoute(graph: AppGraph, innerNav: NavController) {
     }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.admin_affiliated_sites_title)) },

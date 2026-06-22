@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -170,7 +171,14 @@ private fun AchievementCell(a: AchievementUi) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(0.85f),
+            .aspectRatio(0.85f)
+            .then(
+                if (a.unlocked) {
+                    Modifier.border(2.dp, UnlockedTint, RoundedCornerShape(12.dp))
+                } else {
+                    Modifier
+                },
+            ),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = bg),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),

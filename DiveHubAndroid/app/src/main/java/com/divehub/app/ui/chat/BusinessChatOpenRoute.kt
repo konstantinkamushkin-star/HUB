@@ -27,6 +27,7 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.ChatRepository
 import com.divehub.app.diveHubApp
+import com.divehub.app.ui.main.DiverTabIndices
 
 /**
  * iOS `BusinessChatLaunchView`: open or create chat with dive center / shop, then switch to Messages tab.
@@ -50,7 +51,7 @@ fun BusinessChatOpenRoute(
             graph.setPendingChatConversationJson(graph.gson.toJson(conv))
             finished = true
             innerNav.popBackStack()
-            ctx.diveHubApp().emitDiverTab(4)
+            ctx.diveHubApp().emitDiverTab(DiverTabIndices.CHAT)
         }.onFailure { e ->
             error = e.message ?: ctx.getString(R.string.chat_error_generic)
         }

@@ -94,22 +94,26 @@ class FeedViewModel(
         context: Context,
         text: String,
         photoUris: List<Uri>,
+        videoUris: List<Uri> = emptyList(),
         diveLogId: String?,
         onDone: () -> Unit,
     ) {
-        if (text.isBlank() && photoUris.isEmpty() && diveLogId.isNullOrBlank()) return
+        if (text.isBlank() && photoUris.isEmpty() && videoUris.isEmpty() && diveLogId.isNullOrBlank()) return
         viewModelScope.launch {
             runCatching {
-                val uploaded = photoUris.map { repo.uploadMedia(context, it) }
+                val uploadedPhotos = photoUris.map { repo.uploadMedia(context, it) }
+                val uploadedVideos = videoUris.map { repo.uploadMedia(context, it) }
                 val type = when {
                     diveLogId != null -> "dive"
-                    uploaded.isNotEmpty() -> "photo"
+                    uploadedVideos.isNotEmpty() -> "video"
+                    uploadedPhotos.isNotEmpty() -> "photo"
                     else -> "text"
                 }
                 repo.create(
                     content = text.trim().ifBlank { null },
                     type = type,
-                    photos = uploaded,
+                    photos = uploadedPhotos,
+                    videos = uploadedVideos,
                     diveLogId = diveLogId,
                 )
             }

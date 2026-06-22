@@ -82,7 +82,7 @@ fun SplashRoute(nav: NavHostController, graph: AppGraph) {
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(
-                painter = painterResource(R.mipmap.ic_launcher),
+                painter = painterResource(R.drawable.brand_logo_mask),
                 contentDescription = stringResource(R.string.splash_logo_accessibility),
                 modifier = Modifier
                     .size(120.dp)

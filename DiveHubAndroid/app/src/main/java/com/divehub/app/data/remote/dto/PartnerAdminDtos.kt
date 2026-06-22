@@ -12,6 +12,7 @@ data class DiveCenterBriefDto(
 data class CreateTripRequestDto(
     @SerializedName("diveCenterId") val diveCenterId: String? = null,
     @SerializedName("tripType") val tripType: String,
+    @SerializedName("name") val name: String,
     @SerializedName("country") val country: String,
     @SerializedName("region") val region: String? = null,
     @SerializedName("startDate") val startDate: String,
@@ -37,6 +38,7 @@ data class CreateTripRequestDto(
 /** PATCH /trips/:id — same fields as create without diveCenterId. */
 data class UpdateTripRequestDto(
     @SerializedName("tripType") val tripType: String,
+    @SerializedName("name") val name: String,
     @SerializedName("country") val country: String,
     @SerializedName("region") val region: String? = null,
     @SerializedName("startDate") val startDate: String,

@@ -20,6 +20,7 @@ interface FeedApi {
     suspend fun listPosts(
         @Query("limit") limit: Int = 20,
         @Query("cursor") cursor: String? = null,
+        @Query("hashtag") hashtag: String? = null,
     ): FeedListResponse
 
     @POST("feed/posts")

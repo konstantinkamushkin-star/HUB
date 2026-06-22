@@ -2,14 +2,21 @@ package com.divehub.app.data.remote.dto
 
 import com.google.gson.annotations.SerializedName
 
+data class ChatAttachmentDto(
+    @SerializedName("url") val url: String,
+    @SerializedName("type") val type: String? = null,
+)
+
 data class ChatMessageDto(
     @SerializedName("id") val id: String,
     @SerializedName("conversationId") val conversationId: String,
     @SerializedName("senderType") val senderType: String? = null,
     @SerializedName("senderId") val senderId: String? = null,
     @SerializedName("senderName") val senderName: String? = null,
+    @SerializedName("senderAvatarUrl") val senderAvatarUrl: String? = null,
     @SerializedName("content") val content: String? = null,
     @SerializedName("messageType") val messageType: String? = null,
+    @SerializedName("attachments") val attachments: List<ChatAttachmentDto>? = null,
     @SerializedName("createdAt") val createdAt: String? = null,
     val localSending: Boolean = false,
     val localFailed: Boolean = false,
@@ -24,6 +31,10 @@ data class ChatConversationDto(
     @SerializedName("createdAt") val createdAt: String? = null,
     @SerializedName("updatedAt") val updatedAt: String? = null,
     @SerializedName("topicId") val topicId: String? = null,
+    @SerializedName("kind") val kind: String? = null,
+    @SerializedName("tripId") val tripId: String? = null,
+    @SerializedName("title") val title: String? = null,
+    @SerializedName("participantCount") val participantCount: Int? = null,
 )
 
 data class OpenAppSupportTopicRequest(

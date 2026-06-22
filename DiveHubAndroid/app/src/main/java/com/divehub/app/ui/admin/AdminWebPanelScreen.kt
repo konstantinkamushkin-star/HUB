@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.ui.theme.iosChromePageBackground
 import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.util.mediaOriginBaseUrl
 import org.json.JSONObject
@@ -48,6 +49,7 @@ fun AdminWebPanelRoute(
     graph: AppGraph,
     innerNav: NavController,
     user: UserDto?,
+    embeddedInTab: Boolean = false,
 ) {
     var reloadTick by remember { mutableIntStateOf(0) }
     var lastError by remember { mutableStateOf<String?>(null) }
@@ -65,18 +67,23 @@ fun AdminWebPanelRoute(
     val adminWebBase = remember(apiBase) {
         deriveAdminWebBaseUrl(apiBase.orEmpty())
     }
-    val dashboardUrl = remember(adminWebBase) { "$adminWebBase/dashboard" }
+    val dashboardUrl = remember(adminWebBase, reloadTick) {
+        "$adminWebBase/dashboard?_cb=$reloadTick"
+    }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.admin_web_panel_title)) },
                 navigationIcon = {
-                    IconButton(onClick = { innerNav.popBackStack() }) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.common_back),
-                        )
+                    if (!embeddedInTab) {
+                        IconButton(onClick = { innerNav.popBackStack() }) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.common_back),
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -110,7 +117,7 @@ fun AdminWebPanelRoute(
             return@Scaffold
         }
 
-        val payloadB64 = remember(token, refreshToken, user, dashboardUrl) {
+        val payloadB64 = remember(token, refreshToken, user, dashboardUrl, reloadTick) {
             sessionBridgePayloadBase64(
                 accessToken = token,
                 refreshToken = refreshToken?.trim().orEmpty().takeIf { it.isNotBlank() },

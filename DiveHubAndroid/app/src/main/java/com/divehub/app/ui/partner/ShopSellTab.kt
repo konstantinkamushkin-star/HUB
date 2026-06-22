@@ -80,6 +80,8 @@ private enum class ShopOrdersFilter(val value: String) {
 fun ShopSellTab(
     graph: AppGraph,
     innerNav: NavController,
+    /** When set, shows only products (0), orders (1), or trips (2) without segment tabs. */
+    fixedSegment: Int? = null,
 ) {
     val repo = remember { ShopSellRepository(graph) }
     val scope = rememberCoroutineScope()
@@ -122,31 +124,35 @@ fun ShopSellTab(
 
     LaunchedEffect(Unit) { refresh() }
 
+    val segmentIndex = fixedSegment ?: segment
+
     Column(Modifier.fillMaxSize()) {
-        Text(
-            stringResource(R.string.shop_sell_local_ledger_subtitle),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-        )
-        PrimaryTabRow(selectedTabIndex = segment) {
-            Tab(
-                selected = segment == 0,
-                onClick = { segment = 0 },
-                text = { Text(stringResource(R.string.shop_tab_products)) },
+        if (fixedSegment == null) {
+            Text(
+                stringResource(R.string.shop_sell_local_ledger_subtitle),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
             )
-            Tab(
-                selected = segment == 1,
-                onClick = { segment = 1 },
-                text = { Text(stringResource(R.string.shop_tab_orders)) },
-            )
-            Tab(
-                selected = segment == 2,
-                onClick = { segment = 2 },
-                text = { Text(stringResource(R.string.shop_tab_trips)) },
-            )
+            PrimaryTabRow(selectedTabIndex = segment) {
+                Tab(
+                    selected = segment == 0,
+                    onClick = { segment = 0 },
+                    text = { Text(stringResource(R.string.shop_tab_products)) },
+                )
+                Tab(
+                    selected = segment == 1,
+                    onClick = { segment = 1 },
+                    text = { Text(stringResource(R.string.shop_tab_orders)) },
+                )
+                Tab(
+                    selected = segment == 2,
+                    onClick = { segment = 2 },
+                    text = { Text(stringResource(R.string.shop_tab_trips)) },
+                )
+            }
         }
-        when (segment) {
+        when (segmentIndex) {
             0 -> ShopProductsPanel(
                 products = products,
                 query = productQ,

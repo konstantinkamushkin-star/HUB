@@ -17,6 +17,9 @@ interface CoursesApi {
         @Query("diveCenterId") diveCenterId: String? = null,
     ): List<CourseListItemDto>
 
+    @GET("courses/{id}")
+    suspend fun getCourse(@Path("id") id: String): CourseRemoteDto
+
     @POST("courses")
     suspend fun createCourse(@Body body: CourseWriteRequestDto): CourseRemoteDto
 

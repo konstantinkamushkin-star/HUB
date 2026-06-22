@@ -1,6 +1,8 @@
 package com.divehub.app.data.remote
 
+import com.divehub.app.data.remote.dto.DiscoverNearbyDto
 import com.divehub.app.data.remote.dto.EmptyOkResponse
+import com.divehub.app.data.remote.dto.FriendLocationDto
 import com.divehub.app.data.remote.dto.FriendRequestDto
 import com.divehub.app.data.remote.dto.SendFriendRequestBody
 import com.divehub.app.data.remote.dto.UserDto
@@ -32,4 +34,10 @@ interface SocialApi {
 
     @DELETE("friends/requests/{friendshipId}")
     suspend fun declineRequest(@Path("friendshipId") friendshipId: String): EmptyOkResponse
+
+    @GET("friends/locations")
+    suspend fun friendLocations(
+        @Query("lat") lat: Double? = null,
+        @Query("lng") lng: Double? = null,
+    ): List<FriendLocationDto>
 }

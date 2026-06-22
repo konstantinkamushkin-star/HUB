@@ -1,5 +1,7 @@
 package com.divehub.app.data
 
+import android.content.Context
+import android.net.Uri
 import com.divehub.app.AppGraph
 import com.divehub.app.data.remote.dto.AppleAuthRequest
 import com.divehub.app.data.remote.dto.GoogleAuthRequest
@@ -22,6 +24,10 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.util.Locale
 import retrofit2.HttpException
+import java.io.File
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.asRequestBody
 
 class AuthRepository(private val graph: AppGraph) {
 
@@ -114,6 +120,7 @@ class AuthRepository(private val graph: AppGraph) {
             res.refreshToken,
             graph.gson.toJson(res.user),
         )
+        graph.tokenStore.setPendingPostRegistrationProWelcome(true)
     }
 
     suspend fun requestPasswordReset(email: String) {
@@ -160,6 +167,19 @@ class AuthRepository(private val graph: AppGraph) {
         return updateProfile(diverProfile = dp)
     }
 
+    /** Mutate raw `adminDashboardLayout` map (iOS bottom bar / quick actions). */
+    suspend fun patchAdminDashboardMap(mutator: (MutableMap<String, Any?>) -> Unit): UserDto {
+        val u = cachedUser() ?: throw IllegalStateException("not_signed_in")
+        @Suppress("UNCHECKED_CAST")
+        val inner = (u.diverProfile?.get("adminDashboardLayout") as? Map<String, Any?>)?.toMutableMap()
+            ?: linkedMapOf<String, Any?>()
+        mutator(inner)
+        val dp = LinkedHashMap<String, Any?>()
+        u.diverProfile?.let { dp.putAll(it) }
+        dp["adminDashboardLayout"] = inner
+        return updateProfile(diverProfile = dp)
+    }
+
     suspend fun resetAdminDashboardLayout(): UserDto {
         val u = cachedUser() ?: throw IllegalStateException("not_signed_in")
         val dp = LinkedHashMap<String, Any?>()
@@ -193,6 +213,17 @@ class AuthRepository(private val graph: AppGraph) {
         )
         graph.tokenStore.updateUserJson(graph.gson.toJson(user))
         return user
+    }
+
+    suspend fun uploadAvatar(context: Context, uri: Uri): String {
+        val input = context.contentResolver.openInputStream(uri) ?: error("Cannot read image")
+        val temp = File.createTempFile("avatar_", ".jpg", context.cacheDir)
+        temp.outputStream().use { out -> input.use { it.copyTo(out) } }
+        val body = temp.asRequestBody("image/*".toMediaType())
+        val part = MultipartBody.Part.createFormData("file", temp.name, body)
+        val res = graph.feedApi().uploadMedia(part)
+        temp.delete()
+        return res.path ?: res.url ?: error("Upload failed")
     }
 
     suspend fun changePassword(currentPassword: String, newPassword: String): UserDto {

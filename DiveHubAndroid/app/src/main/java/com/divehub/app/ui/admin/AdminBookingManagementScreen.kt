@@ -54,6 +54,7 @@ import com.divehub.app.R
 import com.divehub.app.data.AdminBookingsRepository
 import com.divehub.app.data.remote.dto.AdminBookingLocal
 import com.divehub.app.ui.navigation.InnerRoutes
+import com.divehub.app.ui.theme.iosChromePageBackground
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -143,6 +144,7 @@ fun AdminBookingManagementRoute(graph: AppGraph, innerNav: NavController) {
     val revenue = visible.filter { it.status.equals("completed", ignoreCase = true) }.sumOf { it.amount }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.admin_bookings_title)) },

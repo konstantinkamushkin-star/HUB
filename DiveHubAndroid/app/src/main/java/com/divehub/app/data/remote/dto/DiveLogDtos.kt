@@ -15,6 +15,15 @@ data class DiveLogDto(
     @SerializedName("notes") val notes: String? = null,
     /** Backend JSONB may be null; Gson would fail if this were non-null with default. */
     @SerializedName("photoUrls") val photoUrls: List<String>? = null,
+    @SerializedName("videoUrls") val videoUrls: List<String>? = null,
+    @SerializedName("fishSpecies") val fishSpecies: List<String>? = null,
+    @SerializedName("diveSiteId") val diveSiteId: String? = null,
+    @SerializedName("diveCenterId") val diveCenterId: String? = null,
+    @SerializedName("buddy") val buddy: String? = null,
+    @SerializedName("startTime") val startTime: String? = null,
+    @SerializedName("conditions") val conditions: String? = null,
+    @SerializedName("locationName") val locationName: String? = null,
+    @SerializedName("isPublished") val isPublished: Boolean? = null,
     @SerializedName("createdAt") val createdAt: String? = null,
 )
 
@@ -29,5 +38,13 @@ data class CreateDiveLogRequest(
     @SerializedName("diveType") val diveType: String? = null,
     @SerializedName("notes") val notes: String? = null,
     @SerializedName("photoUrls") val photoUrls: List<String>? = null,
+    @SerializedName("videoUrls") val videoUrls: List<String>? = null,
+    @SerializedName("fishSpecies") val fishSpecies: List<String>? = null,
+    @SerializedName("diveSiteId") val diveSiteId: String? = null,
+    @SerializedName("diveCenterId") val diveCenterId: String? = null,
+    @SerializedName("buddy") val buddy: String? = null,
+    @SerializedName("startTime") val startTime: String? = null,
+    @SerializedName("conditions") val conditions: String? = null,
+    @SerializedName("locationName") val locationName: String? = null,
     @SerializedName("isPublished") val isPublished: Boolean = false,
 )

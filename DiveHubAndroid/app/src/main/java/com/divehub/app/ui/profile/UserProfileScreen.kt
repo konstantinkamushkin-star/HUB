@@ -1,16 +1,21 @@
 package com.divehub.app.ui.profile
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,7 +46,9 @@ import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.UsersRepository
+import com.divehub.app.data.remote.dto.CertificationDto
 import com.divehub.app.data.remote.dto.UserDto
+import com.divehub.app.data.remote.dto.UserProfileSummaryDto
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -52,6 +59,8 @@ fun UserProfileRoute(
 ) {
     val repo = remember { UsersRepository(graph) }
     var user by remember { mutableStateOf<UserDto?>(null) }
+    var summary by remember { mutableStateOf<UserProfileSummaryDto?>(null) }
+    var certs by remember { mutableStateOf<List<CertificationDto>>(emptyList()) }
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var apiRoot by remember { mutableStateOf("") }
@@ -66,6 +75,14 @@ fun UserProfileRoute(
         runCatching { repo.getUser(userId) }
             .onSuccess { user = it }
             .onFailure { e -> error = e.message ?: "Error" }
+        runCatching { repo.getUserSummary(userId) }
+            .onSuccess { s ->
+                summary = s
+                if (s.certificationLevel != null) {
+                    runCatching { repo.listCertifications(userId) }
+                        .onSuccess { certs = it }
+                }
+            }
         loading = false
     }
 
@@ -106,6 +123,7 @@ fun UserProfileRoute(
                     Modifier
                         .fillMaxSize()
                         .padding(padding)
+                        .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
@@ -115,9 +133,7 @@ fun UserProfileRoute(
                         AsyncImage(
                             model = avatarUrl,
                             contentDescription = null,
-                            modifier = Modifier
-                                .size(88.dp)
-                                .clip(CircleShape),
+                            modifier = Modifier.size(88.dp).clip(CircleShape),
                             contentScale = ContentScale.Crop,
                         )
                     } else {
@@ -137,20 +153,68 @@ fun UserProfileRoute(
                         }
                     }
                     Text(u.displayName(), style = MaterialTheme.typography.headlineSmall)
-                    Text(u.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    u.role?.let {
-                        Text(stringResource(R.string.profile_role, it), style = MaterialTheme.typography.bodySmall)
+                    summary?.city?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    u.totalDives?.takeIf { it >= 0 }?.let {
+                    u.bio?.takeIf { it.isNotBlank() }?.let {
+                        Spacer(Modifier.height(8.dp))
+                        Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth())
+                    }
+
+                    summary?.let { s ->
+                        Spacer(Modifier.height(16.dp))
+                        Text(stringResource(R.string.screen_statistics), style = MaterialTheme.typography.titleMedium)
+                        s.certificationLevel?.let {
+                            Text(it, fontWeight = FontWeight.SemiBold)
+                        }
+                        s.certifyingAgencies?.takeIf { it.isNotEmpty() }?.let {
+                            Text(it.joinToString(", "), style = MaterialTheme.typography.bodySmall)
+                        }
+                        s.totalDives?.let {
+                            Text(stringResource(R.string.user_profile_total_dives, it))
+                        }
+                        s.deepestDiveMeters?.let {
+                            Text(stringResource(R.string.user_profile_max_depth, it))
+                        }
+                        s.uniqueDiveSitesCount?.let {
+                            Text(stringResource(R.string.user_profile_unique_sites, it))
+                        }
+                        s.countriesDived?.takeIf { it.isNotEmpty() }?.let { countries ->
+                            Spacer(Modifier.height(8.dp))
+                            Text(stringResource(R.string.user_profile_countries))
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(rememberScrollState()),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                countries.forEach { code ->
+                                    Text(
+                                        code,
+                                        modifier = Modifier
+                                            .background(
+                                                MaterialTheme.colorScheme.surfaceVariant,
+                                                RoundedCornerShape(16.dp),
+                                            )
+                                            .padding(horizontal = 12.dp, vertical = 6.dp),
+                                        style = MaterialTheme.typography.labelMedium,
+                                    )
+                                }
+                            }
+                        }
+                        if (certs.isNotEmpty()) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(stringResource(R.string.screen_certifications))
+                            certs.forEach { c ->
+                                Text("${c.agency} — ${c.level}", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    } ?: u.totalDives?.takeIf { it >= 0 }?.let {
                         Text(
                             stringResource(R.string.user_profile_total_dives, it),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    }
-                    u.bio?.takeIf { it.isNotBlank() }?.let {
-                        Spacer(Modifier.height(12.dp))
-                        Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.fillMaxWidth())
                     }
                 }
             }

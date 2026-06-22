@@ -139,8 +139,8 @@ fun DiverAppShell(
                 DiverTabIndices.EXPLORE -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
                     ExploreRoute(graph = graph, innerNav = innerNav)
                 }
-                DiverTabIndices.FEED -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { FeedRoute(graph) }
-                DiverTabIndices.LOGBOOK -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { LogbookRoute(graph) }
+                DiverTabIndices.FEED -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { FeedRoute(graph, innerNav) }
+                DiverTabIndices.LOGBOOK -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) { LogbookRoute(graph, innerNav) }
                 DiverTabIndices.TRIPS -> Box(Modifier.fillMaxSize().padding(bottom = bottomInset)) {
                     TripsTabRoute(graph = graph, innerNav = innerNav, currentUser = user)
                 }

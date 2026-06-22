@@ -97,6 +97,7 @@ data class DeleteMyAccountRequest(
 data class UserDto(
     @SerializedName("id") val id: String,
     @SerializedName("email") val email: String,
+    @SerializedName("username") val username: String? = null,
     @SerializedName("phone") val phone: String? = null,
     @SerializedName("firstName") val firstName: String? = null,
     @SerializedName("lastName") val lastName: String? = null,
@@ -128,4 +129,10 @@ data class UserDto(
             else -> email.substringBefore('@')
         }
     }
+}
+
+fun UserDto.isPostRegistrationProWelcomeEligible(): Boolean {
+    val tier = subscriptionTier?.lowercase().orEmpty()
+    val status = subscriptionStatus?.lowercase().orEmpty()
+    return tier.contains("pro") || status.contains("trial") || status.contains("pro")
 }

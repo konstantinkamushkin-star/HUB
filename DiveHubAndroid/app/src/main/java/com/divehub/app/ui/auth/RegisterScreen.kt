@@ -71,6 +71,7 @@ fun RegisterRoute(nav: NavHostController, graph: AppGraph) {
         var password by remember { mutableStateOf("") }
         var showPassword by remember { mutableStateOf(false) }
         var consentAccepted by remember { mutableStateOf(false) }
+        var showGoogleConsent by remember { mutableStateOf(false) }
         var emailError by remember { mutableStateOf<String?>(null) }
         var passwordError by remember { mutableStateOf<String?>(null) }
 
@@ -142,7 +143,7 @@ fun RegisterRoute(nav: NavHostController, graph: AppGraph) {
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 TextButton(
-                    onClick = { startGoogleSignIn() },
+                    onClick = { showGoogleConsent = true },
                     enabled = !state.loading,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
@@ -151,6 +152,11 @@ fun RegisterRoute(nav: NavHostController, graph: AppGraph) {
                         modifier = Modifier.fillMaxWidth(),
                     )
                 }
+                OAuthPersonalDataConsentSheet(
+                    visible = showGoogleConsent,
+                    onAccept = { startGoogleSignIn() },
+                    onDismiss = { showGoogleConsent = false },
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

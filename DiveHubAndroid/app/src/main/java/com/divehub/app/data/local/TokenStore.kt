@@ -49,6 +49,10 @@ class TokenStore(private val context: Context) {
         val SHOP_ORDERS_JSON = stringPreferencesKey("shop_orders_json")
         val ADMIN_SHOP_DRAFTS_JSON = stringPreferencesKey("admin_shop_drafts_json")
         val ADMIN_CENTER_INSTRUCTORS_JSON = stringPreferencesKey("admin_center_instructors_json")
+        val PENDING_POST_REG_PRO_WELCOME = booleanPreferencesKey("pending_post_reg_pro_welcome")
+        val POST_REG_PRO_DISMISSED_PREFIX = "post_reg_pro_dismissed_"
+        val INTERFACE_SCALE = stringPreferencesKey("interface_scale")
+        val SERVER_LOCALIZATION_JSON = stringPreferencesKey("server_localization_json")
     }
 
     val accessToken: Flow<String?> = store.data.map { it[Keys.ACCESS] }
@@ -149,6 +153,11 @@ class TokenStore(private val context: Context) {
     /** Emits "", "light", or "dark" (empty = match system). */
     val appThemeFlow: Flow<String> = store.data.map { prefs ->
         (prefs[Keys.APP_THEME]?.trim()?.lowercase(Locale.ROOT)).orEmpty()
+    }
+
+    /** `compact` | `standard` | `comfortable` | `large` — iOS interface scale presets. */
+    val interfaceScaleFlow: Flow<String> = store.data.map { prefs ->
+        prefs[Keys.INTERFACE_SCALE]?.trim()?.lowercase(Locale.ROOT) ?: "standard"
     }
 
     suspend fun setAppTheme(mode: String?) {
@@ -320,6 +329,51 @@ class TokenStore(private val context: Context) {
         store.edit { prefs ->
             if (json.isNullOrBlank()) prefs.remove(Keys.ADMIN_CENTER_INSTRUCTORS_JSON)
             else prefs[Keys.ADMIN_CENTER_INSTRUCTORS_JSON] = json
+        }
+    }
+
+    suspend fun getPendingPostRegistrationProWelcome(): Boolean =
+        store.data.map { it[Keys.PENDING_POST_REG_PRO_WELCOME] ?: false }.first()
+
+    suspend fun setPendingPostRegistrationProWelcome(value: Boolean) {
+        store.edit { prefs ->
+            if (value) prefs[Keys.PENDING_POST_REG_PRO_WELCOME] = true
+            else prefs.remove(Keys.PENDING_POST_REG_PRO_WELCOME)
+        }
+    }
+
+    suspend fun isPostRegistrationProWelcomeDismissedForUser(userId: String): Boolean {
+        val key = stringPreferencesKey("${Keys.POST_REG_PRO_DISMISSED_PREFIX}$userId")
+        return store.data.map { it[key] == "1" }.first()
+    }
+
+    suspend fun recordPostRegistrationProWelcomeDismissed(userId: String) {
+        val key = stringPreferencesKey("${Keys.POST_REG_PRO_DISMISSED_PREFIX}$userId")
+        store.edit { prefs -> prefs[key] = "1" }
+    }
+
+    suspend fun getInterfaceScalePreset(): String =
+        store.data.map { it[Keys.INTERFACE_SCALE] ?: "standard" }.first()
+
+    suspend fun setInterfaceScalePreset(preset: String) {
+        store.edit { prefs -> prefs[Keys.INTERFACE_SCALE] = preset }
+    }
+
+    suspend fun getServerLocalizationJson(): String? =
+        store.data.map { it[Keys.SERVER_LOCALIZATION_JSON] }.first()
+
+    suspend fun setServerLocalizationJson(json: String?) {
+        store.edit { prefs ->
+            if (json.isNullOrBlank()) prefs.remove(Keys.SERVER_LOCALIZATION_JSON)
+            else prefs[Keys.SERVER_LOCALIZATION_JSON] = json
+        }
+    }
+
+    /** Default RU on first launch — iOS parity. */
+    suspend fun ensureDefaultLanguageRuIfUnset() {
+        val current = store.data.map { it[Keys.APP_LANGUAGE] }.first()
+        if (current.isNullOrBlank()) {
+            store.edit { prefs -> prefs[Keys.APP_LANGUAGE] = "ru" }
         }
     }
 }

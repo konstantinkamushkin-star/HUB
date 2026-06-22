@@ -83,6 +83,15 @@ data class AdminDashboardLayout(
 
         val DEFAULT_SECTION_ORDER = listOf(KEY_MANAGED, KEY_KPI, KEY_BOOKINGS, KEY_INVENTORY, KEY_TRIPS)
 
+        /** iOS admin home blocks (`quick`, `cal`) — see [mergeUnifiedSectionOrder]. */
+        val IOS_BLOCK_KEYS = listOf("quick", "cal")
+
+        fun mergeUnifiedSectionOrder(iosBlockOrder: List<String>, layout: AdminDashboardLayout): List<String> {
+            val iosOnly = iosBlockOrder.filter { it in IOS_BLOCK_KEYS.toSet() }.distinct()
+            val androidBlocks = layout.normalizedSectionOrder()
+            return (iosOnly + androidBlocks).distinct()
+        }
+
         val Default = AdminDashboardLayout()
 
         fun fromJson(raw: String?): AdminDashboardLayout {

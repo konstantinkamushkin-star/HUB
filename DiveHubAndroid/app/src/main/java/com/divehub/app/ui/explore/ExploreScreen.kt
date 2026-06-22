@@ -966,7 +966,7 @@ private fun SiteCard(site: ExploreDiveSite, userLatLng: Pair<Double, Double>?, o
                 Column(modifier = Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(site.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        if (site.rating >= 4.5) {
+                        if (site.rating >= 4.5 && site.reviewCount >= 5) {
                             Spacer(Modifier.width(8.dp))
                             Badge(containerColor = Color(0xFFE8F4FF), contentColor = Color(0xFF0A84A6)) {
                                 Text(stringResource(R.string.explore_recommended))
@@ -974,12 +974,22 @@ private fun SiteCard(site: ExploreDiveSite, userLatLng: Pair<Double, Double>?, o
                         }
                     }
                     Spacer(Modifier.height(4.dp))
+                    val subtitle = when (site.kind) {
+                        ExploreItemKind.DIVE_SITE ->
+                            if (site.depthMax > 0) "${site.diveType} \u2022 ${site.depthMax.toInt()}m" else site.diveType
+                        ExploreItemKind.DIVE_CENTER -> {
+                            val loc = listOfNotNull(site.region.takeIf { it.isNotBlank() }, site.country.takeIf { it.isNotBlank() })
+                                .joinToString(", ")
+                            if (loc.isNotBlank()) loc else site.diveType
+                        }
+                        ExploreItemKind.SHOP -> {
+                            val loc = listOfNotNull(site.region.takeIf { it.isNotBlank() }, site.country.takeIf { it.isNotBlank() })
+                                .joinToString(", ")
+                            if (loc.isNotBlank()) "$loc \u2022 ${site.diveType}" else site.diveType
+                        }
+                    }
                     Text(
-                        if (site.kind == ExploreItemKind.DIVE_SITE) {
-                            "${site.diveType} \u2022 ${site.depthMax.toInt()}m"
-                        } else {
-                            site.diveType
-                        },
+                        subtitle,
                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 16.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -1022,6 +1032,13 @@ private fun SiteCard(site: ExploreDiveSite, userLatLng: Pair<Double, Double>?, o
                     label = { Text(site.difficulty) },
                     leadingIcon = { DiveHubLogoMark(modifier = Modifier.size(16.dp)) },
                 )
+                if (site.kind == ExploreItemKind.DIVE_CENTER && site.difficulty.equals("Nitrox", ignoreCase = true)) {
+                    AssistChip(
+                        onClick = {},
+                        enabled = false,
+                        label = { Text("Nitrox") },
+                    )
+                }
                 AssistChip(
                     onClick = {},
                     enabled = false,

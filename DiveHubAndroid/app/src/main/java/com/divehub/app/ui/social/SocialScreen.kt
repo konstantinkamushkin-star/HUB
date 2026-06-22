@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.shape.CircleShape
@@ -30,11 +32,20 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -53,8 +64,11 @@ import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.ui.navigation.InnerRoutes
+import com.divehub.app.data.remote.dto.FriendLocationDto
 import com.divehub.app.data.remote.dto.FriendRequestDto
+import com.divehub.app.data.remote.dto.GroupTripDto
 import com.divehub.app.data.remote.dto.UserDto
+import com.divehub.app.ui.explore.rememberUserLatLngForMap
 import com.divehub.app.ui.theme.IosDesign
 
 @Composable
@@ -65,7 +79,64 @@ fun SocialRoute(
 ) {
     val vm: SocialViewModel = viewModel(factory = SocialViewModel.factory(graph))
     val state by vm.state.collectAsState()
-    var requestsTab by remember { mutableIntStateOf(0) } // 0 = received, 1 = sent
+    var mainTab by remember { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = 0) { 2 }
+
+    LaunchedEffect(mainTab) {
+        if (pagerState.currentPage != mainTab) {
+            pagerState.animateScrollToPage(mainTab)
+        }
+    }
+    LaunchedEffect(pagerState.currentPage) {
+        if (mainTab != pagerState.currentPage) {
+            mainTab = pagerState.currentPage
+        }
+    }
+
+    Column(Modifier.fillMaxSize()) {
+        TabRow(selectedTabIndex = mainTab) {
+            Tab(
+                selected = mainTab == 0,
+                onClick = { mainTab = 0 },
+                text = { Text(stringResource(R.string.social_friends)) },
+            )
+            Tab(
+                selected = mainTab == 1,
+                onClick = { mainTab = 1 },
+                text = { Text(stringResource(R.string.social_tab_tracking)) },
+            )
+        }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            userScrollEnabled = true,
+        ) { page ->
+            when (page) {
+                0 -> FriendsTabContent(
+                    state = state,
+                    vm = vm,
+                    innerNav = innerNav,
+                    onOpenChat = onOpenChat,
+                )
+                1 -> TrackingTabContent(state = state, vm = vm, onOpenChat = onOpenChat, innerNav = innerNav)
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendsTabContent(
+    state: SocialUiState,
+    vm: SocialViewModel,
+    innerNav: NavController,
+    onOpenChat: (String) -> Unit,
+) {
+    var requestsTab by remember { mutableIntStateOf(0) }
+    val userLatLng = rememberUserLatLngForMap()
+    LaunchedEffect(userLatLng) {
+        val (lat, lng) = userLatLng ?: return@LaunchedEffect
+        vm.loadDiversNearby(lat, lng)
+    }
 
     when {
         state.loading -> Column(
@@ -73,7 +144,9 @@ fun SocialRoute(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) { CircularProgressIndicator() }
-        state.error != null -> Column(Modifier.fillMaxSize().padding(16.dp)) { Text(state.error ?: stringResource(R.string.social_error_generic)) }
+        state.error != null -> Column(Modifier.fillMaxSize().padding(16.dp)) {
+            Text(state.error ?: stringResource(R.string.social_error_generic))
+        }
         else -> LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(IosDesign.ScreenPadding),
@@ -127,6 +200,69 @@ fun SocialRoute(
                     onAdd = { vm.sendRequest(user.id) },
                     onOpenProfile = { innerNav.navigate(InnerRoutes.userProfile(user.id)) },
                 )
+            }
+            item {
+                Spacer(Modifier.height(4.dp))
+                Text(stringResource(R.string.social_divers_nearby), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(6.dp))
+                if (userLatLng == null) {
+                    Text(
+                        stringResource(R.string.social_location_permission_for_map),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                } else {
+                    val discoverMapPins = remember(state.discoverNearby, userLatLng) {
+                        val (lat, lng) = userLatLng!!
+                        discoverPinsForMap(state.discoverNearby).toMutableList().apply {
+                            add(
+                                SocialMapPin(
+                                    id = "self",
+                                    latitude = lat,
+                                    longitude = lng,
+                                    title = "You",
+                                    kind = SocialMapPinKind.Self,
+                                ),
+                            )
+                        }
+                    }
+                    SocialFriendMapOsm(
+                        pins = discoverMapPins,
+                        mapHeight = 320.dp,
+                        onPinTap = { pin ->
+                            pin.userId?.let { innerNav.navigate(InnerRoutes.userProfile(it)) }
+                        },
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    if (state.discoverNearby.isEmpty()) {
+                        Text(
+                            stringResource(R.string.social_discover_empty_hint),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+            }
+            items(state.discoverNearby, key = { it.userId }) { user ->
+                Card(Modifier.fillMaxWidth()) {
+                    Row(
+                        Modifier.fillMaxWidth().padding(IosDesign.ScreenPadding),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(
+                            Modifier
+                                .weight(1f)
+                                .clickable { innerNav.navigate(InnerRoutes.userProfile(user.userId)) },
+                        ) {
+                            Text(user.displayName(), fontWeight = FontWeight.SemiBold)
+                            Text("%.1f km".format(user.distanceKm), style = MaterialTheme.typography.bodySmall)
+                        }
+                        OutlinedButton(onClick = { vm.sendRequest(user.userId) }) {
+                            Text(stringResource(R.string.social_add_friend))
+                        }
+                    }
+                }
             }
             item { HorizontalDivider() }
             item {
@@ -182,6 +318,311 @@ fun SocialRoute(
                     onOpenProfile = { innerNav.navigate(InnerRoutes.userProfile(friend.id)) },
                     onOpenChat = { onOpenChat(friend.id) },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun GroupTripsTabContent(
+    state: SocialUiState,
+    vm: SocialViewModel,
+    innerNav: NavController,
+    onOpenChat: (String) -> Unit,
+) {
+    var showCreateTrip by remember { mutableStateOf(false) }
+
+    if (showCreateTrip) {
+        CreateGroupTripSheet(
+            state = state,
+            vm = vm,
+            onDismiss = { showCreateTrip = false },
+            onCreated = { trip ->
+                showCreateTrip = false
+                innerNav.navigate(InnerRoutes.tripGroupChatOpen(trip.chatId))
+            },
+        )
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(IosDesign.ScreenPadding),
+        verticalArrangement = Arrangement.spacedBy(IosDesign.SectionSpacing),
+    ) {
+        OutlinedButton(
+            onClick = { showCreateTrip = true },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !state.groupTripsLoading,
+        ) {
+            Text(stringResource(R.string.social_create_trip))
+        }
+        if (state.groupTrips.isEmpty()) {
+            Text(
+                stringResource(R.string.social_no_group_trips),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            state.groupTrips.forEach { trip ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = IosDesign.CardCorner,
+                ) {
+                    Column(Modifier.padding(IosDesign.ScreenPadding)) {
+                        Text(trip.name, fontWeight = FontWeight.SemiBold)
+                        trip.description?.let {
+                            Text(it, style = MaterialTheme.typography.bodySmall)
+                        }
+                        Text(
+                            "${trip.participants.size} members",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedButton(
+                            onClick = { innerNav.navigate(InnerRoutes.tripGroupChatOpen(trip.chatId)) },
+                            modifier = Modifier.padding(top = 8.dp),
+                        ) {
+                            Text(stringResource(R.string.social_open_group_chat))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun CreateGroupTripSheet(
+    state: SocialUiState,
+    vm: SocialViewModel,
+    onDismiss: () -> Unit,
+    onCreated: (GroupTripDto) -> Unit,
+) {
+    var tripName by remember { mutableStateOf("") }
+    var tripDescription by remember { mutableStateOf("") }
+    var destination by remember { mutableStateOf("") }
+    var startDate by remember { mutableStateOf(java.time.LocalDate.now().toString()) }
+    var selectedFriendIds by remember { mutableStateOf(setOf<String>()) }
+    var saveError by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(Unit) {
+        vm.refresh()
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = IosDesign.ScreenPadding)
+                .padding(bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                stringResource(R.string.social_create_trip),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            OutlinedTextField(
+                value = tripName,
+                onValueChange = { tripName = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.social_trip_name)) },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = tripDescription,
+                onValueChange = { tripDescription = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.social_trip_description)) },
+                minLines = 2,
+            )
+            OutlinedTextField(
+                value = destination,
+                onValueChange = { destination = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.social_trip_destination)) },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                value = startDate,
+                onValueChange = { startDate = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(stringResource(R.string.social_trip_start_date)) },
+                singleLine = true,
+                placeholder = { Text("YYYY-MM-DD") },
+            )
+            Text(
+                stringResource(R.string.social_friends),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            if (state.friends.isEmpty()) {
+                Text(
+                    stringResource(R.string.social_no_friends),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                state.friends.forEach { friend ->
+                    val selected = selectedFriendIds.contains(friend.id)
+                    FilterChip(
+                        selected = selected,
+                        onClick = {
+                            selectedFriendIds = if (selected) {
+                                selectedFriendIds - friend.id
+                            } else {
+                                selectedFriendIds + friend.id
+                            }
+                        },
+                        label = { Text(friend.displayName()) },
+                    )
+                }
+            }
+            saveError?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+            }
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+                Button(
+                    onClick = {
+                        saveError = null
+                        if (tripName.isBlank()) {
+                            saveError = "Name required"
+                            return@Button
+                        }
+                        vm.createGroupTrip(
+                            name = tripName.trim(),
+                            description = tripDescription.trim().ifBlank { null },
+                            destination = destination.trim().ifBlank { null },
+                            startDate = startDate.trim().ifBlank { null } ?: java.time.LocalDate.now().toString(),
+                            memberIds = selectedFriendIds.toList(),
+                            onSuccess = onCreated,
+                            onFailure = { saveError = it.message ?: "Error" },
+                        )
+                    },
+                    modifier = Modifier.weight(1f),
+                    enabled = tripName.isNotBlank() && !state.groupTripsLoading,
+                ) {
+                    Text(stringResource(R.string.common_save))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrackingTabContent(
+    state: SocialUiState,
+    vm: SocialViewModel,
+    innerNav: NavController,
+    onOpenChat: (String) -> Unit,
+) {
+    val userLatLng = rememberUserLatLngForMap()
+    LaunchedEffect(userLatLng) {
+        val (lat, lng) = userLatLng ?: return@LaunchedEffect
+        vm.loadFriendLocations(lat, lng)
+    }
+
+    if (state.loading) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
+
+    val mapPins = remember(state.friendLocations, userLatLng) {
+        val pins = friendPinsForMap(state.friendLocations).toMutableList()
+        userLatLng?.let { (lat, lng) ->
+            pins.add(
+                SocialMapPin(
+                    id = "self",
+                    latitude = lat,
+                    longitude = lng,
+                    title = "You",
+                    kind = SocialMapPinKind.Self,
+                ),
+            )
+        }
+        pins
+    }
+
+    Column(Modifier.fillMaxSize().padding(IosDesign.ScreenPadding)) {
+        Spacer(Modifier.height(8.dp))
+        if (userLatLng == null) {
+            Text(
+                stringResource(R.string.social_location_permission_for_map),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+        } else {
+            SocialFriendMapOsm(
+                pins = mapPins,
+                onPinTap = { pin ->
+                    pin.userId?.let { innerNav.navigate(InnerRoutes.userProfile(it)) }
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+        LazyColumn(
+            verticalArrangement = Arrangement.spacedBy(IosDesign.SectionSpacing),
+        ) {
+            if (userLatLng == null) {
+                item {
+                    Text(
+                        stringResource(R.string.social_enable_location_access),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else if (state.friendLocations.isEmpty()) {
+                item {
+                    Text(
+                        stringResource(R.string.social_no_friend_locations),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                items(state.friendLocations, key = { it.userId }) { pin ->
+                    FriendLocationCard(pin, state.imageApiRoot) {
+                        innerNav.navigate(InnerRoutes.userProfile(pin.userId))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FriendLocationCard(
+    pin: FriendLocationDto,
+    apiRoot: String,
+    onOpenProfile: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenProfile),
+        shape = IosDesign.CardCorner,
+    ) {
+        Row(
+            Modifier.fillMaxWidth().padding(IosDesign.ScreenPadding),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            UserAvatar(
+                displayName = pin.displayName(),
+                avatarUrl = pin.avatarUrl,
+                apiRoot = apiRoot,
+                size = IosDesign.AvatarSizeSmall,
+            )
+            Spacer(Modifier.size(8.dp))
+            Column {
+                Text(pin.displayName(), fontWeight = FontWeight.SemiBold)
+                val dist = pin.distanceKm?.let { "%.1f km · ".format(it) }.orEmpty()
+                Text(dist + pin.updatedAt, style = MaterialTheme.typography.bodySmall)
             }
         }
     }

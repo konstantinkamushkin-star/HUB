@@ -56,6 +56,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.ui.theme.iosChromePageBackground
 import com.divehub.app.data.AdminGearRepository
 import com.divehub.app.data.AuthRepository
 import com.divehub.app.data.remote.dto.AdminGearItemLocal
@@ -184,6 +185,7 @@ fun AdminGearManagementRoute(graph: AppGraph, innerNav: NavController) {
     val kpiScrapped = visible.count { it.status == "scrapped" }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.admin_gear_title)) },

@@ -10,6 +10,7 @@ data class TripListItemDto(
     @SerializedName("organizerId") val organizerId: String? = null,
     @SerializedName("organizerType") val organizerType: String? = null,
     @SerializedName("tripType") val tripType: String? = null,
+    @SerializedName("name") val name: String? = null,
     @SerializedName("country") val country: String? = null,
     @SerializedName("region") val region: String? = null,
     @SerializedName("startDate") val startDate: String? = null,
@@ -60,6 +61,12 @@ fun TripListItemDto.participantUserRows(): List<Pair<String, String?>> {
         }
     }
     return out
+}
+
+fun TripListItemDto.listTitle(): String {
+    val trimmed = name?.trim().orEmpty()
+    if (trimmed.isNotEmpty()) return trimmed
+    return listOfNotNull(region, country).joinToString(", ").ifBlank { tripType ?: id }
 }
 
 data class TripJoinResponseDto(

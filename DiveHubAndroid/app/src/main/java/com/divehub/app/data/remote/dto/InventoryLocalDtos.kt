@@ -14,6 +14,7 @@ data class InventoryItemLocal(
     val checkoutNotes: String? = null,
     val checkoutHandedOffBy: String? = null,
     val checkoutHandedOffAt: String? = null,
+    val checkoutSignatureBase64: String? = null,
     val createdAt: String,
 )
 

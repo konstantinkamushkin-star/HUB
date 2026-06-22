@@ -67,6 +67,7 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.repository.TripsRepository
 import com.divehub.app.data.remote.dto.TripListItemDto
+import com.divehub.app.data.remote.dto.listTitle
 import com.divehub.app.data.remote.dto.UserDto
 import com.divehub.app.data.remote.dto.canCreateCatalogTrip
 import com.divehub.app.data.remote.dto.participantUserRows
@@ -557,7 +558,7 @@ fun TripListCard(trip: TripListItemDto, onClick: () -> Unit) {
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
     ) {
         Column(Modifier.padding(16.dp)) {
-            val title = listOfNotNull(trip.region, trip.country).joinToString(", ").ifBlank { trip.tripType ?: trip.id }
+            val title = trip.listTitle()
             Text(title, style = MaterialTheme.typography.titleMedium)
             trip.startDate?.let {
                 Spacer(Modifier.height(4.dp))
@@ -684,9 +685,17 @@ fun TripDetailRoute(graph: AppGraph, tripId: String, innerNav: NavController) {
                         .padding(20.dp),
                 ) {
                     Text(
-                        listOfNotNull(t.region, t.country).joinToString(", ").ifBlank { t.tripType ?: t.id },
+                        t.listTitle(),
                         style = MaterialTheme.typography.headlineSmall,
                     )
+                    listOfNotNull(t.region, t.country).joinToString(", ").takeIf { it.isNotBlank() }?.let { location ->
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            location,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Spacer(Modifier.height(8.dp))
                     t.hotelLabel?.takeIf { it.isNotBlank() }?.let { h ->
                         Text(

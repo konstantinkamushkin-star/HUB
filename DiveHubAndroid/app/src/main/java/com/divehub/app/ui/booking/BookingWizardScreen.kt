@@ -15,7 +15,6 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -59,7 +58,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.data.remote.dto.ExploreItemKind
+import com.divehub.app.ui.localization.localizedString
 import com.divehub.app.ui.theme.IosDesign
 import java.text.NumberFormat
 import java.time.Instant
@@ -70,6 +71,7 @@ import java.util.Locale
 
 private val ScreenBg = Color(0xFFF2F2F7)
 private val timeSlots = listOf("09:00", "11:00", "13:00", "15:00")
+private val poolTimeSlots = listOf("08:00", "10:00", "12:00", "14:00", "16:00", "18:00", "20:00")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -87,12 +89,16 @@ fun BookingWizardRoute(
     val state by vm.state.collectAsState()
     val snack = remember { SnackbarHostState() }
     var showDatePicker by remember { mutableStateOf(false) }
-    var showSuccessDialog by remember { mutableStateOf(false) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
     val dateState = rememberDatePickerState(initialDisplayMode = DisplayMode.Picker)
 
-    LaunchedEffect(state.submitSuccess) {
-        if (state.submitSuccess) {
-            showSuccessDialog = true
+    LaunchedEffect(state.submitSuccess, state.confirmationSummary) {
+        val summary = state.confirmationSummary
+        if (state.submitSuccess && summary != null) {
+            graph.setPendingBookingConfirmation(summary, state.chatConversationId)
+            vm.acknowledgeSubmitSuccess()
+            innerNav.popBackStack()
+            innerNav.navigate(InnerRoutes.BookingConfirmation)
         }
     }
 
@@ -107,7 +113,9 @@ fun BookingWizardRoute(
         snackbarHost = { SnackbarHost(snack) },
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.booking_title)) },
+                title = {
+                    Text(localizedString("booking", "ui_booking_n3412_n34212", R.string.booking_title))
+                },
                 navigationIcon = {
                     IconButton(onClick = { innerNav.popBackStack() }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
@@ -172,102 +180,26 @@ fun BookingWizardRoute(
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 when (state.step) {
-                    0 -> StepSelectCenter(state, vm)
-                    1 -> StepSelectService(state, vm)
-                    2 -> StepDateTime(state, vm) { showDatePicker = true }
-                    3 -> StepInstructor(state, vm)
-                    4 -> StepDiveSite(state, vm)
-                    5 -> StepGear(state, vm)
-                    6 -> StepParticipants(state, vm)
-                    7 -> StepPayment(state, vm)
+                    0 -> {
+                        StepSelectBookingType(state, vm)
+                        StepSelectCenter(state, vm)
+                        StepSelectService(state, vm)
+                    }
+                    1 -> {
+                        StepDateTime(state, vm, onPickDate = { showDatePicker = true }, onPickEndDate = { showEndDatePicker = true })
+                        StepBookingPreferences(state, vm)
+                        if (state.bookingType == BookingWizardType.OPEN_WATER) {
+                            StepInstructor(state, vm)
+                            StepDiveSite(state, vm)
+                        }
+                        StepGear(state, vm)
+                    }
+                    2 -> StepParticipants(state, vm)
+                    3 -> StepReview(state)
+                    4 -> StepPayment(state, vm)
                 }
             }
         }
-    }
-
-    if (showSuccessDialog) {
-        AlertDialog(
-            onDismissRequest = {
-                showSuccessDialog = false
-                vm.acknowledgeSubmitSuccess()
-                innerNav.popBackStack()
-            },
-            title = { Text(stringResource(R.string.booking_confirmed_title)) },
-            text = {
-                val summary = state.confirmationSummary
-                Column(
-                    Modifier
-                        .heightIn(max = 320.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Text(
-                        stringResource(R.string.booking_confirmed_body),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    if (summary != null) {
-                        val paymentLabel = stringResource(
-                            when (summary.paymentMethod) {
-                                "on_site" -> R.string.booking_pay_onsite
-                                "google_pay" -> R.string.booking_pay_google
-                                else -> R.string.booking_pay_online
-                            },
-                        )
-                        HorizontalDivider()
-                        Text(
-                            stringResource(R.string.booking_confirmed_booking_id, summary.bookingId),
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.SemiBold,
-                        )
-                        Text(
-                            stringResource(R.string.booking_confirmed_center, summary.centerName),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            stringResource(R.string.booking_confirmed_service, summary.serviceName),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            stringResource(R.string.booking_confirmed_when, summary.date, summary.time),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            stringResource(R.string.booking_confirmed_payment, paymentLabel),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        Text(
-                            stringResource(R.string.booking_confirmed_participants, summary.participantCount),
-                            style = MaterialTheme.typography.bodySmall,
-                        )
-                        summary.gearSummary?.let { gear ->
-                            Text(
-                                stringResource(R.string.booking_confirmed_gear, gear),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                        summary.notes?.let { n ->
-                            Text(
-                                stringResource(R.string.booking_confirmed_notes, n),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            )
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showSuccessDialog = false
-                        vm.acknowledgeSubmitSuccess()
-                        innerNav.popBackStack()
-                    },
-                ) {
-                    Text(stringResource(R.string.common_ok))
-                }
-            },
-        )
     }
 
     if (showDatePicker) {
@@ -289,6 +221,45 @@ fun BookingWizardRoute(
         ) {
             DatePicker(state = dateState)
         }
+    }
+
+    if (showEndDatePicker) {
+        val endDateState = rememberDatePickerState(initialDisplayMode = DisplayMode.Picker)
+        DatePickerDialog(
+            onDismissRequest = { showEndDatePicker = false },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        endDateState.selectedDateMillis?.let { vm.setEndDateMillis(it) }
+                        showEndDatePicker = false
+                    },
+                ) { Text(stringResource(R.string.common_ok)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEndDatePicker = false }) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        ) {
+            DatePicker(state = endDateState)
+        }
+    }
+}
+
+@Composable
+private fun StepSelectBookingType(state: BookingWizardUiState, vm: BookingWizardViewModel) {
+    Text(stringResource(R.string.booking_type_label), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 8.dp)) {
+        FilterChip(
+            selected = state.bookingType == BookingWizardType.OPEN_WATER,
+            onClick = { vm.setBookingType(BookingWizardType.OPEN_WATER) },
+            label = { Text(stringResource(R.string.booking_type_open_water)) },
+        )
+        FilterChip(
+            selected = state.bookingType == BookingWizardType.POOL,
+            onClick = { vm.setBookingType(BookingWizardType.POOL) },
+            label = { Text(stringResource(R.string.booking_type_pool)) },
+        )
     }
 }
 
@@ -369,22 +340,118 @@ private fun StepSelectService(state: BookingWizardUiState, vm: BookingWizardView
 }
 
 @Composable
-private fun StepDateTime(state: BookingWizardUiState, vm: BookingWizardViewModel, onPickDate: () -> Unit) {
+private fun StepBookingPreferences(state: BookingWizardUiState, vm: BookingWizardViewModel) {
+    Text(
+        stringResource(R.string.booking_step_preferences),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.booking_participants_count, state.participantsCount))
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(onClick = { vm.setParticipantsCount(state.participantsCount - 1) }) { Text("−") }
+            OutlinedButton(onClick = { vm.setParticipantsCount(state.participantsCount + 1) }) { Text("+") }
+        }
+    }
+    if (state.bookingType == BookingWizardType.OPEN_WATER) {
+        OutlinedTextField(
+            value = state.preferredInstructorLanguage,
+            onValueChange = vm::setPreferredInstructorLanguage,
+            label = { Text(stringResource(R.string.booking_instructor_language)) },
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = true,
+        )
+        OutlinedTextField(
+            value = state.instructorNotes,
+            onValueChange = vm::setInstructorNotes,
+            label = { Text(stringResource(R.string.booking_instructor_notes)) },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(stringResource(R.string.booking_needs_private_instructor))
+            Switch(checked = state.needsPrivateInstructor, onCheckedChange = vm::setNeedsPrivateInstructor)
+        }
+    } else {
+        OutlinedTextField(
+            value = state.poolPreferences,
+            onValueChange = vm::setPoolPreferences,
+            label = { Text(stringResource(R.string.booking_pool_preferences)) },
+            modifier = Modifier.fillMaxWidth(),
+            minLines = 2,
+        )
+    }
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(stringResource(R.string.booking_needs_equipment))
+        Switch(checked = state.needsEquipmentRental, onCheckedChange = vm::setNeedsEquipmentRental)
+    }
+    OutlinedTextField(
+        value = state.notes,
+        onValueChange = vm::setNotes,
+        label = { Text(stringResource(R.string.booking_general_notes)) },
+        modifier = Modifier.fillMaxWidth(),
+        minLines = 2,
+    )
+}
+
+@Composable
+private fun StepDateTime(
+    state: BookingWizardUiState,
+    vm: BookingWizardViewModel,
+    onPickDate: () -> Unit,
+    onPickEndDate: () -> Unit,
+) {
     Text(stringResource(R.string.booking_step_datetime), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
     val dateLabel = state.selectedDateMillis?.let {
         Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
     } ?: stringResource(R.string.booking_pick_date)
     TextButton(onClick = onPickDate) {
-        Text(stringResource(R.string.booking_selected_date, dateLabel))
+        Text(
+            if (state.bookingType == BookingWizardType.POOL) {
+                stringResource(R.string.booking_pool_date, dateLabel)
+            } else {
+                stringResource(R.string.booking_selected_date, dateLabel)
+            },
+        )
     }
-    Text(stringResource(R.string.booking_time_slots), style = MaterialTheme.typography.bodyMedium)
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-        timeSlots.forEach { t ->
-            FilterChip(
-                selected = state.selectedTime == t,
-                onClick = { vm.setTime(t) },
-                label = { Text(t) },
-            )
+    if (state.bookingType == BookingWizardType.OPEN_WATER) {
+        val endLabel = state.selectedEndDateMillis?.let {
+            Instant.ofEpochMilli(it).atZone(ZoneId.systemDefault()).toLocalDate().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        } ?: stringResource(R.string.booking_pick_date)
+        TextButton(onClick = onPickEndDate) {
+            Text(stringResource(R.string.booking_end_date, endLabel))
+        }
+        Text(stringResource(R.string.booking_time_slots), style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            timeSlots.forEach { t ->
+                FilterChip(
+                    selected = state.selectedTime == t,
+                    onClick = { vm.setTime(t) },
+                    label = { Text(t) },
+                )
+            }
+        }
+    } else {
+        Text(stringResource(R.string.booking_pool_time_slots), style = MaterialTheme.typography.bodyMedium)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            poolTimeSlots.forEach { t ->
+                FilterChip(
+                    selected = state.poolTime == t,
+                    onClick = { vm.setPoolTime(t) },
+                    label = { Text(t) },
+                )
+            }
         }
     }
 }
@@ -494,6 +561,35 @@ private fun StepParticipants(state: BookingWizardUiState, vm: BookingWizardViewM
             }
             TextButton(onClick = { vm.removeParticipant(p.id) }) {
                 Text(stringResource(R.string.common_delete))
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepReview(state: BookingWizardUiState) {
+    Text(
+        stringResource(R.string.booking_step_review),
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.SemiBold,
+    )
+    val center = state.centers.find { it.id == state.selectedCenterId }
+    val service = state.services.find { it.id == state.selectedServiceId }
+    val dateLabel = state.selectedDateMillis?.let { ms ->
+        Instant.ofEpochMilli(ms).atZone(ZoneId.systemDefault())
+            .format(DateTimeFormatter.ofPattern("dd MMM yyyy"))
+    } ?: "—"
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            center?.name?.let { Text(it, fontWeight = FontWeight.SemiBold) }
+            service?.name?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+            Text(stringResource(R.string.booking_confirmed_when, dateLabel, state.selectedTime))
+            Text(stringResource(R.string.booking_confirmed_participants, state.participants.size.coerceAtLeast(1)))
+            state.notes.takeIf { it.isNotBlank() }?.let { n ->
+                Text(stringResource(R.string.booking_confirmed_notes, n))
             }
         }
     }

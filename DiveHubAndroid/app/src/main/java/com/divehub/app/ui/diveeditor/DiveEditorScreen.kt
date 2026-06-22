@@ -12,6 +12,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,6 +53,18 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.collectAsState
+import androidx.core.content.FileProvider
+import com.divehub.app.data.diveeditor.DiveEditorPhotoRepository
+import com.divehub.app.services.PhotoEnhancementProcessor
+import com.divehub.app.services.VideoEnhancementProcessor
+import com.divehub.app.ui.components.VideoProcessProgressUi
+import com.divehub.app.ui.components.VideoUnderwaterProgressBanner
+import com.divehub.app.services.PhotoEnhancementJob
+import com.divehub.app.services.PhotoEnhancementQueue
+import com.divehub.app.ui.theme.IosDesign
+import com.divehub.app.ui.theme.iosChromePageBackground
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,10 +79,11 @@ import com.divehub.app.R
 import com.divehub.app.diveHubApp
 import com.divehub.app.data.LogbookRepository
 import com.divehub.app.util.absoluteMediaUrl
-import com.divehub.app.ui.theme.IosDesign
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.FileOutputStream
 import java.io.InputStream
 import java.net.URL
 
@@ -77,9 +92,16 @@ fun DiveEditorRoute() {
     val context = LocalContext.current
     val graph = context.diveHubApp().graph
     val scope = rememberCoroutineScope()
+    val enhancementJobs by graph.photoEnhancementJobStore.jobs.collectAsState(initial = emptyList())
+    val recentUris by graph.diveEditorRecentStore.recentUris.collectAsState(initial = emptyList())
+    val activeJobCount = enhancementJobs.count {
+        it.state == PhotoEnhancementJob.State.PENDING || it.state == PhotoEnhancementJob.State.RUNNING
+    }
     var compareMode by remember { mutableIntStateOf(0) } // 0 after, 1 before, 2 split
     var selectedImage by remember { mutableStateOf<Uri?>(null) }
     var showAppGallery by remember { mutableStateOf(false) }
+    var fullEditorJobId by remember { mutableStateOf<String?>(null) }
+    var fullEditorSourceUri by remember { mutableStateOf<Uri?>(null) }
     var brightness by remember { mutableFloatStateOf(0f) }
     var contrast by remember { mutableFloatStateOf(1f) }
     var saturation by remember { mutableFloatStateOf(1f) }
@@ -104,12 +126,28 @@ fun DiveEditorRoute() {
     val writeFileError = stringResource(R.string.dive_editor_error_write_file)
     val savedToGallery = stringResource(R.string.dive_editor_saved_to_gallery)
     val videoTeaserTitle = stringResource(R.string.dive_editor_video_coming_soon_title)
+    val backgroundEnqueuedMsg = stringResource(R.string.dive_editor_background_enqueue)
+    val cloudEnhanceLabel = stringResource(R.string.dive_editor_cloud_enhance)
+    val cloudProcessingMsg = stringResource(R.string.dive_editor_cloud_processing)
+    val cloudDoneMsg = stringResource(R.string.dive_editor_cloud_done)
     val videoTeaserBody = stringResource(R.string.dive_editor_video_coming_soon_body)
+
+    var cloudProcessing by remember { mutableStateOf(false) }
+    var selectedVideo by remember { mutableStateOf<Uri?>(null) }
+    var videoProcessing by remember { mutableStateOf(false) }
+    var videoProgress by remember { mutableFloatStateOf(0f) }
+    var videoEtaSec by remember { mutableIntStateOf(0) }
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri ->
         selectedImage = uri
+    }
+
+    val videoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri ->
+        selectedVideo = uri
     }
 
     val matrix = remember(brightness, contrast, saturation) {
@@ -130,9 +168,56 @@ fun DiveEditorRoute() {
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = IosDesign.ScreenPadding, vertical = IosDesign.SectionSpacing)
-            .background(MaterialTheme.colorScheme.background),
+            .background(iosChromePageBackground()),
     ) {
         Text(title, style = MaterialTheme.typography.headlineSmall)
+        if (activeJobCount > 0) {
+            Spacer(Modifier.height(8.dp))
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable {
+                        enhancementJobs.firstOrNull {
+                            it.state == PhotoEnhancementJob.State.PENDING ||
+                                it.state == PhotoEnhancementJob.State.RUNNING ||
+                                it.state == PhotoEnhancementJob.State.COMPLETED
+                        }?.let { job ->
+                            fullEditorJobId = job.id
+                            fullEditorSourceUri = Uri.parse(job.sourceUri)
+                        }
+                    },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)),
+            ) {
+                Text(
+                    stringResource(R.string.dive_editor_active_jobs, activeJobCount),
+                    modifier = Modifier.padding(12.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        if (recentUris.isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.dive_editor_recent_title), style = MaterialTheme.typography.titleSmall)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                recentUris.take(8).forEach { uriStr ->
+                    AsyncImage(
+                        model = Uri.parse(uriStr),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .height(72.dp)
+                            .width(72.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { selectedImage = Uri.parse(uriStr) },
+                    )
+                }
+            }
+        }
         Spacer(Modifier.height(8.dp))
         Card(
             modifier = Modifier.fillMaxWidth(),
@@ -140,23 +225,69 @@ fun DiveEditorRoute() {
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f)),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
         ) {
-            Row(
-                Modifier.padding(12.dp),
-                verticalAlignment = Alignment.Top,
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Icon(
-                    Icons.Default.Videocam,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                )
-                Column {
+            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(Icons.Default.Videocam, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Text(videoTeaserTitle, style = MaterialTheme.typography.titleSmall)
-                    Spacer(Modifier.height(4.dp))
+                }
+                Text(
+                    videoTeaserBody,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (videoProcessing) {
+                    VideoUnderwaterProgressBanner(
+                        progress = VideoProcessProgressUi(
+                            fraction01 = videoProgress,
+                            estimatedSecondsRemaining = videoEtaSec,
+                        ),
+                    )
+                }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = {
+                            videoPicker.launch(
+                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly),
+                            )
+                        },
+                        enabled = !videoProcessing,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(stringResource(R.string.dive_editor_open_video))
+                    }
+                    OutlinedButton(
+                        onClick = {
+                            val uri = selectedVideo ?: return@OutlinedButton
+                            scope.launch {
+                                videoProcessing = true
+                                videoProgress = 0.05f
+                                videoEtaSec = 120
+                                status = cloudProcessingMsg
+                                runCatching {
+                                    runCloudVideoEnhance(context, graph, uri) { p, eta ->
+                                        videoProgress = p
+                                        videoEtaSec = eta
+                                    }
+                                }.onSuccess { outUri ->
+                                    selectedVideo = outUri
+                                    status = cloudDoneMsg
+                                }.onFailure { e ->
+                                    status = e.message ?: openImageError
+                                }
+                                videoProcessing = false
+                            }
+                        },
+                        enabled = selectedVideo != null && !videoProcessing,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Text(cloudEnhanceLabel)
+                    }
+                }
+                if (selectedVideo != null) {
                     Text(
-                        videoTeaserBody,
+                        stringResource(R.string.dive_editor_video_selected),
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.primary,
                     )
                 }
             }
@@ -265,10 +396,34 @@ fun DiveEditorRoute() {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = {
+                            val uri = selectedImage ?: return@OutlinedButton
+                            scope.launch {
+                                cloudProcessing = true
+                                status = cloudProcessingMsg
+                                runCatching {
+                                    runCloudEnhance(context, graph, uri)
+                                }.onSuccess { resultUri ->
+                                    selectedImage = resultUri
+                                    brightness = 0f
+                                    contrast = 1f
+                                    saturation = 1f
+                                    status = cloudDoneMsg
+                                }.onFailure { e ->
+                                    status = e.message ?: openImageError
+                                }
+                                cloudProcessing = false
+                            }
+                        },
+                        enabled = selectedImage != null && !cloudProcessing,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(cloudEnhanceLabel) }
+                    OutlinedButton(
+                        onClick = {
                             brightness = 0.06f
                             contrast = 1.15f
                             saturation = 1.1f
                         },
+                        enabled = !cloudProcessing,
                         modifier = Modifier.weight(1f),
                     ) { Text("Auto") }
                     OutlinedButton(
@@ -298,6 +453,18 @@ fun DiveEditorRoute() {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(
                         onClick = {
+                            selectedImage?.let { uri ->
+                                val id = PhotoEnhancementQueue.enqueue(context, uri, graph.photoEnhancementJobStore)
+                                fullEditorJobId = id
+                                fullEditorSourceUri = uri
+                                status = backgroundEnqueuedMsg
+                            }
+                        },
+                        enabled = selectedImage != null && !cloudProcessing,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(R.string.dive_editor_background_enqueue)) }
+                    OutlinedButton(
+                        onClick = {
                             brightness = 0f
                             contrast = 1f
                             saturation = 1f
@@ -310,7 +477,7 @@ fun DiveEditorRoute() {
                                 status = run {
                                     val uri = selectedImage
                                     if (uri == null) selectPhotoFirst else {
-                                        saveEditedImage(
+                                        val msg = saveEditedImage(
                                             context = context,
                                             source = uri,
                                             matrix = matrix,
@@ -320,11 +487,13 @@ fun DiveEditorRoute() {
                                             writeFileError = writeFileError,
                                             savedToGallery = savedToGallery,
                                         )
+                                        graph.diveEditorRecentStore.prepend(uri.toString())
+                                        msg
                                     }
                                 }
                             }
                         },
-                        enabled = selectedImage != null,
+                        enabled = selectedImage != null && !cloudProcessing,
                         modifier = Modifier.weight(1f),
                     ) { Text(saveLabel) }
                 }
@@ -346,6 +515,75 @@ fun DiveEditorRoute() {
             onDismiss = { showAppGallery = false },
         )
     }
+
+    val editorJobId = fullEditorJobId
+    val editorSource = fullEditorSourceUri
+    if (editorJobId != null && editorSource != null) {
+        DiveEditorFullScreen(
+            graph = graph,
+            jobId = editorJobId,
+            sourceUri = editorSource,
+            onDismiss = {
+                fullEditorJobId = null
+                fullEditorSourceUri = null
+            },
+        )
+    }
+}
+
+private suspend fun runCloudVideoEnhance(
+    context: android.content.Context,
+    graph: com.divehub.app.AppGraph,
+    source: Uri,
+    onProgress: (Float, Int) -> Unit,
+): Uri = withContext(Dispatchers.IO) {
+    val input = context.contentResolver.openInputStream(source) ?: error("cannot open video")
+    val bytes = input.use { it.readBytes() }
+    onProgress(0.15f, 90)
+    val repo = DiveEditorPhotoRepository(
+        okHttpClient = graph.httpClient,
+        tokenStore = graph.tokenStore,
+        gson = graph.gson,
+    )
+    onProgress(0.35f, 75)
+    val enhanced = VideoEnhancementProcessor.process(bytes, repo)
+    onProgress(0.9f, 5)
+    val outDir = File(context.cacheDir, "dive_editor_video").apply { mkdirs() }
+    val outFile = File(outDir, "enhanced_${System.currentTimeMillis()}.mp4")
+    FileOutputStream(outFile).use { fos -> fos.write(enhanced) }
+    onProgress(1f, 0)
+    FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        outFile,
+    )
+}
+
+private suspend fun runCloudEnhance(
+    context: android.content.Context,
+    graph: com.divehub.app.AppGraph,
+    source: Uri,
+): Uri = withContext(Dispatchers.IO) {
+    val input: InputStream = when (source.scheme?.lowercase()) {
+        "http", "https" -> runCatching { URL(source.toString()).openStream() }.getOrNull()
+        else -> context.contentResolver.openInputStream(source)
+    } ?: error("cannot open image")
+    val bytes = input.use { it.readBytes() }
+    val jpeg = PhotoEnhancementProcessor.jpegData(bytes) ?: error("decode failed")
+    val repo = DiveEditorPhotoRepository(
+        okHttpClient = graph.httpClient,
+        tokenStore = graph.tokenStore,
+        gson = graph.gson,
+    )
+    val enhanced = PhotoEnhancementProcessor.process(jpeg, repo)
+    val outDir = File(context.cacheDir, "dive_editor_cloud").apply { mkdirs() }
+    val outFile = File(outDir, "enhanced_${System.currentTimeMillis()}.jpg")
+    FileOutputStream(outFile).use { fos -> fos.write(enhanced) }
+    FileProvider.getUriForFile(
+        context,
+        "${context.packageName}.fileprovider",
+        outFile,
+    )
 }
 
 private suspend fun saveEditedImage(

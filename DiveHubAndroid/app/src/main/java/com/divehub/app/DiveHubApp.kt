@@ -19,6 +19,7 @@ import kotlinx.coroutines.runBlocking
 import org.osmdroid.config.Configuration
 import java.util.Locale
 import com.divehub.app.ui.navigation.InnerRoutes
+import com.divehub.app.ui.main.DiverTabIndices
 
 class DiveHubApp : Application(), ImageLoaderFactory {
     lateinit var graph: AppGraph
@@ -91,16 +92,24 @@ class DiveHubApp : Application(), ImageLoaderFactory {
         super.onCreate()
         Configuration.getInstance().userAgentValue = packageName
         runBlocking {
-            val lang = graph.tokenStore.getAppLanguageTag()
+            graph.tokenStore.ensureDefaultLanguageRuIfUnset()
+            val lang = graph.tokenStore.getAppLanguageTag().ifBlank { "ru" }
             if (lang.isNotBlank()) {
                 AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(lang))
             }
+            graph.localizationRepository.sync(lang)
+        }
+        applicationWorkScope.launch {
+            com.divehub.app.services.PhotoEnhancementQueue.resumeIncompleteJobs(
+                this@DiveHubApp,
+                graph.photoEnhancementJobStore,
+            )
         }
     }
 
     /**
      * In-app `divehub://` links (notifications, share).
-     * Tabs: `social`, `chat`, `explore`/`home`, `map`, `feed`, `logbook`, `profile`.
+     * Tabs: `social`, `chat`, `explore`/`home`, `map` (opens Explore + fullscreen map), `feed`, `logbook`, `profile`.
      * Routes (first path segment or `?id=`): `trip`/`trips`, `dive_center`/`center`, `shop`/`shops`, `user`.
      * Search: `search?q=…` sets [AppGraph.setPendingGlobalSearchQuery] then opens Search.
      */
@@ -110,22 +119,31 @@ class DiveHubApp : Application(), ImageLoaderFactory {
         appScope.launch {
             val editorOn = graph.tokenStore.isDiveEditorEnabled()
             when (host) {
-                "social" -> emitDiverTab(4)
+                "social" -> emitDiverTab(DiverTabIndices.SOCIAL)
                 "chat" -> {
                     val peerId = uri.getQueryParameter("peerId")
                     val peerType = uri.getQueryParameter("peerType") ?: "user"
                     if (!peerId.isNullOrBlank()) {
                         requestBusinessChatOpen(peerType, peerId)
                     }
-                    emitDiverTab(5)
+                    emitDiverTab(DiverTabIndices.CHAT)
                 }
-                "explore", "home" -> emitDiverTab(0)
-                "map" -> emitDiverTab(1)
-                "feed" -> emitDiverTab(2)
-                "logbook" -> emitDiverTab(3)
-                "profile" -> emitDiverTab(if (editorOn) 7 else 6)
-                "trip", "trips" -> firstPathOrQueryId(uri)?.let { id ->
-                    requestInnerNavRoute(InnerRoutes.tripDetail(id))
+                "explore", "home" -> emitDiverTab(DiverTabIndices.EXPLORE)
+                "map" -> {
+                    emitDiverTab(DiverTabIndices.EXPLORE)
+                    requestInnerNavRoute(InnerRoutes.MapFullscreen)
+                }
+                "feed" -> emitDiverTab(DiverTabIndices.FEED)
+                "logbook" -> emitDiverTab(DiverTabIndices.LOGBOOK)
+                "profile" -> emitDiverTab(DiverTabIndices.profileTab(editorOn))
+                "trip", "trips" -> {
+                    val id = firstPathOrQueryId(uri)
+                    if (id != null) {
+                        emitDiverTab(DiverTabIndices.TRIPS)
+                        requestInnerNavRoute(InnerRoutes.tripDetail(id))
+                    } else {
+                        emitDiverTab(DiverTabIndices.TRIPS)
+                    }
                 }
                 "dive_center", "center" -> firstPathOrQueryId(uri)?.let { id ->
                     requestInnerNavRoute(InnerRoutes.diveCenterPublic(id))
@@ -146,7 +164,15 @@ class DiveHubApp : Application(), ImageLoaderFactory {
                     }
                     requestInnerNavRoute(InnerRoutes.Search)
                 }
-                else -> emitDiverTab(5)
+                "hashtag" -> {
+                    val tag = uri.pathSegments.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }
+                        ?: uri.lastPathSegment?.trim()?.takeIf { it.isNotEmpty() }
+                    if (tag != null) {
+                        emitDiverTab(DiverTabIndices.FEED)
+                        requestInnerNavRoute(InnerRoutes.hashtagFeed(tag))
+                    }
+                }
+                else -> emitDiverTab(DiverTabIndices.CHAT)
             }
         }
     }

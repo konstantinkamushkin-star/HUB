@@ -34,6 +34,9 @@ class TripsRepository(private val graph: AppGraph) {
     suspend fun listCoursesForCenter(diveCenterId: String): List<CourseListItemDto> =
         graph.coursesApi().listCourses(diveCenterId = diveCenterId)
 
+    suspend fun getCourse(id: String): CourseRemoteDto =
+        graph.coursesApi().getCourse(id)
+
     suspend fun createCourse(body: CourseWriteRequestDto): CourseRemoteDto =
         graph.coursesApi().createCourse(body)
 

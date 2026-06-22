@@ -61,6 +61,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.ui.theme.iosChromePageBackground
 import com.divehub.app.data.AdminBookingsRepository
 import com.divehub.app.data.remote.dto.AdminBookingLocal
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -142,6 +143,7 @@ fun AdminBookingCalendarRoute(graph: AppGraph, innerNav: NavController) {
     }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.admin_booking_calendar_title)) },

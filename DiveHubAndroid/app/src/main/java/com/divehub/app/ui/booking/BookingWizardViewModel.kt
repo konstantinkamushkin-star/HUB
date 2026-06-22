@@ -10,11 +10,15 @@ import com.divehub.app.data.BookingRepository
 import com.divehub.app.data.repository.TripsRepository
 import com.divehub.app.data.ExploreRepository
 import com.divehub.app.data.remote.dto.BookingCreateDto
+import com.divehub.app.data.remote.dto.BookingEquipmentRentalRequestDto
+import com.divehub.app.data.remote.dto.BookingInstructorPreferencesDto
 import com.divehub.app.data.remote.dto.BookingGearOption
 import com.divehub.app.data.remote.dto.BookingGearRentalDto
 import com.divehub.app.data.remote.dto.BookingParticipantDto
 import com.divehub.app.data.remote.dto.BookingPaymentDto
+import com.divehub.app.data.remote.dto.OpenConversationRequest
 import com.divehub.app.data.remote.dto.PaymentIntentRequestDto
+import com.divehub.app.data.remote.dto.SendMessageRequest
 import com.divehub.app.data.remote.dto.BookingServiceOption
 import com.divehub.app.data.remote.dto.ExploreDiveSite
 import com.divehub.app.data.remote.dto.toBookingServiceOption
@@ -28,8 +32,14 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 import java.util.UUID
 
+enum class BookingWizardType(val apiValue: String) {
+    OPEN_WATER("open_water"),
+    POOL("pool"),
+}
+
 data class BookingConfirmationSummary(
     val bookingId: String,
+    val centerId: String,
     val centerName: String,
     val serviceName: String,
     val date: String,
@@ -42,8 +52,9 @@ data class BookingConfirmationSummary(
 )
 
 data class BookingWizardUiState(
+    val bookingType: BookingWizardType = BookingWizardType.OPEN_WATER,
     val step: Int = 0,
-    val totalSteps: Int = 8,
+    val totalSteps: Int = 5,
     val centers: List<ExploreDiveSite> = emptyList(),
     val sites: List<ExploreDiveSite> = emptyList(),
     val centersLoading: Boolean = false,
@@ -53,7 +64,9 @@ data class BookingWizardUiState(
     val selectedCenterId: String? = null,
     val selectedServiceId: String? = null,
     val selectedDateMillis: Long? = null,
+    val selectedEndDateMillis: Long? = null,
     val selectedTime: String = "09:00",
+    val poolTime: String = "10:00",
     val selectedInstructorId: String? = null,
     val selectedDiveSiteId: String? = null,
     val services: List<BookingServiceOption> = emptyList(),
@@ -66,10 +79,18 @@ data class BookingWizardUiState(
     val submitError: String? = null,
     val submitSuccess: Boolean = false,
     val confirmationSummary: BookingConfirmationSummary? = null,
+    /** Conversation opened after booking — iOS post-booking chat sheet. */
+    val chatConversationId: String? = null,
     val participantDraftName: String = "",
     val participantDraftEmail: String = "",
     /** Optional message for the dive center (iOS booking / `CourseBookingView` notes). */
     val notes: String = "",
+    val participantsCount: Int = 1,
+    val preferredInstructorLanguage: String = "",
+    val instructorNotes: String = "",
+    val poolPreferences: String = "",
+    val needsPrivateInstructor: Boolean = false,
+    val needsEquipmentRental: Boolean = false,
     /** Set when opening the wizard from a dive center course sheet (iOS `CourseBookingView`). */
     val courseContextSummary: String? = null,
 )
@@ -213,12 +234,29 @@ class BookingWizardViewModel(
         _state.update { it.copy(selectedServiceId = id) }
     }
 
+    fun setBookingType(type: BookingWizardType) {
+        _state.update { it.copy(bookingType = type) }
+    }
+
     fun setDateMillis(ms: Long?) {
-        _state.update { it.copy(selectedDateMillis = ms) }
+        _state.update {
+            val end = it.selectedEndDateMillis ?: ms?.let { start ->
+                start + 3L * 24 * 60 * 60 * 1000
+            }
+            it.copy(selectedDateMillis = ms, selectedEndDateMillis = end)
+        }
+    }
+
+    fun setEndDateMillis(ms: Long?) {
+        _state.update { it.copy(selectedEndDateMillis = ms) }
     }
 
     fun setTime(t: String) {
         _state.update { it.copy(selectedTime = t) }
+    }
+
+    fun setPoolTime(t: String) {
+        _state.update { it.copy(poolTime = t) }
     }
 
     fun selectInstructor(id: String?) {
@@ -280,14 +318,50 @@ class BookingWizardViewModel(
         _state.update { it.copy(notes = text) }
     }
 
+    fun setParticipantsCount(count: Int) {
+        _state.update { it.copy(participantsCount = count.coerceIn(1, 20)) }
+    }
+
+    fun setPreferredInstructorLanguage(lang: String) {
+        _state.update { it.copy(preferredInstructorLanguage = lang) }
+    }
+
+    fun setInstructorNotes(text: String) {
+        _state.update { it.copy(instructorNotes = text) }
+    }
+
+    fun setNeedsEquipmentRental(needs: Boolean) {
+        _state.update { it.copy(needsEquipmentRental = needs) }
+    }
+
+    fun setPoolPreferences(text: String) {
+        _state.update { it.copy(poolPreferences = text) }
+    }
+
+    fun setNeedsPrivateInstructor(needs: Boolean) {
+        _state.update { it.copy(needsPrivateInstructor = needs) }
+    }
+
     fun canProceed(): Boolean {
         val s = _state.value
         return when (s.step) {
-            0 -> !s.selectedCenterId.isNullOrBlank()
-            1 -> !s.selectedServiceId.isNullOrBlank()
-            2 -> s.selectedDateMillis != null
-            3, 4, 5, 6 -> true
-            7 -> true
+            0 -> {
+                if (s.selectedCenterId.isNullOrBlank()) return false
+                if (s.services.isEmpty() && !s.servicesLoading) return true
+                !s.selectedServiceId.isNullOrBlank()
+            }
+            1 -> {
+                if (s.participantsCount <= 0) return false
+                when (s.bookingType) {
+                    BookingWizardType.OPEN_WATER -> {
+                        val start = s.selectedDateMillis ?: return false
+                        val end = s.selectedEndDateMillis ?: return false
+                        end >= start
+                    }
+                    BookingWizardType.POOL -> s.selectedDateMillis != null && s.poolTime.isNotBlank()
+                }
+            }
+            2, 3, 4 -> true
             else -> true
         }
     }
@@ -297,7 +371,7 @@ class BookingWizardViewModel(
     }
 
     fun acknowledgeSubmitSuccess() {
-        _state.update { it.copy(submitSuccess = false, confirmationSummary = null) }
+        _state.update { it.copy(submitSuccess = false, confirmationSummary = null, chatConversationId = null) }
     }
 
     fun submit() {
@@ -312,16 +386,31 @@ class BookingWizardViewModel(
                 _state.update { it.copy(submitError = app.getString(R.string.booking_error_select_center)) }
                 return@launch
             }
-            val serviceId = st.selectedServiceId ?: run {
-                _state.update { it.copy(submitError = app.getString(R.string.booking_error_select_service)) }
-                return@launch
-            }
+            val serviceId = st.selectedServiceId?.takeIf { it.isNotBlank() }
+                ?: when (st.bookingType) {
+                    BookingWizardType.OPEN_WATER -> "open_water_request"
+                    BookingWizardType.POOL -> "pool_session_request"
+                }
             val dateMs = st.selectedDateMillis ?: run {
                 _state.update { it.copy(submitError = app.getString(R.string.booking_error_select_date)) }
                 return@launch
             }
-            val dateStr = Instant.ofEpochMilli(dateMs).atZone(ZoneOffset.UTC).toLocalDate()
+            val zone = ZoneOffset.UTC
+            val dateStr = Instant.ofEpochMilli(dateMs).atZone(zone).toLocalDate()
                 .format(DateTimeFormatter.ISO_LOCAL_DATE)
+            val dateEndStr = st.selectedEndDateMillis?.let { endMs ->
+                Instant.ofEpochMilli(endMs).atZone(zone).toLocalDate()
+                    .format(DateTimeFormatter.ISO_LOCAL_DATE)
+            }
+            val startTime = when (st.bookingType) {
+                BookingWizardType.OPEN_WATER -> st.selectedTime.ifBlank { "09:00" }
+                BookingWizardType.POOL -> st.poolTime.ifBlank { "10:00" }
+            }
+            val sessionId = if (st.bookingType == BookingWizardType.POOL) {
+                "$dateStr-$startTime"
+            } else {
+                null
+            }
             val nowIso = DateTimeFormatter.ISO_INSTANT.format(Instant.now())
             val selectedService = st.services.find { it.id == serviceId }
             val gear = st.gearCatalog.filter { st.selectedGearIds.contains(it.id) }.map { g ->
@@ -356,6 +445,21 @@ class BookingWizardViewModel(
                 }.getOrNull()
             }
             var participants = st.participants
+            while (participants.size < st.participantsCount) {
+                val idx = participants.size + 1
+                participants = participants + BookingParticipantDto(
+                    id = UUID.randomUUID().toString(),
+                    name = "Participant $idx",
+                    email = null,
+                    phoneNumber = null,
+                    certificationLevel = null,
+                    isFriend = false,
+                    friendUserId = null,
+                )
+            }
+            if (participants.size > st.participantsCount) {
+                participants = participants.take(st.participantsCount)
+            }
             if (participants.isEmpty()) {
                 participants = listOf(
                     BookingParticipantDto(
@@ -369,17 +473,45 @@ class BookingWizardViewModel(
                     ),
                 )
             }
+            val mergedNotes = buildBookingNotes(st)
+            val gearList = if (st.needsEquipmentRental) {
+                gear.takeIf { it.isNotEmpty() } ?: st.gearCatalog.take(1).map { g ->
+                    BookingGearRentalDto(
+                        id = UUID.randomUUID().toString(),
+                        gearItemId = g.id,
+                        gearName = g.name,
+                        size = g.size,
+                        quantity = st.participantsCount,
+                        price = g.price,
+                    )
+                }
+            } else {
+                gear.takeIf { it.isNotEmpty() }
+            }
+            val instructorPrefs = if (st.bookingType == BookingWizardType.OPEN_WATER) {
+                BookingInstructorPreferencesDto(
+                    language = st.preferredInstructorLanguage.trim().takeIf { it.isNotEmpty() },
+                    notes = st.instructorNotes.trim().takeIf { it.isNotEmpty() },
+                ).takeIf { it.language != null || it.notes != null }
+            } else {
+                null
+            }
+            val equipmentRental = if (st.bookingType == BookingWizardType.POOL) {
+                BookingEquipmentRentalRequestDto(required = st.needsEquipmentRental)
+            } else {
+                null
+            }
             val body = BookingCreateDto(
                 id = UUID.randomUUID().toString(),
                 userId = user.id,
                 diveCenterId = centerId,
                 serviceId = serviceId,
-                diveSiteId = st.selectedDiveSiteId,
-                instructorId = st.selectedInstructorId,
+                diveSiteId = if (st.bookingType == BookingWizardType.OPEN_WATER) st.selectedDiveSiteId else null,
+                instructorId = if (st.bookingType == BookingWizardType.OPEN_WATER) st.selectedInstructorId else null,
                 date = dateStr,
-                startTime = st.selectedTime,
+                startTime = startTime,
                 participants = participants,
-                gearRental = gear.takeIf { it.isNotEmpty() },
+                gearRental = gearList,
                 payment = BookingPaymentDto(
                     method = payMethod,
                     amount = payAmount,
@@ -389,9 +521,16 @@ class BookingWizardViewModel(
                     paidAt = null,
                 ),
                 status = "pending",
-                notes = st.notes.trim().takeIf { it.isNotEmpty() },
+                notes = mergedNotes,
                 createdAt = nowIso,
                 updatedAt = nowIso,
+                bookingType = st.bookingType.apiValue,
+                requestMode = "manual_approval",
+                dateEnd = if (st.bookingType == BookingWizardType.OPEN_WATER) dateEndStr else null,
+                sessionId = sessionId,
+                participantsCount = st.participantsCount,
+                instructorPreferences = instructorPrefs,
+                equipmentRental = equipmentRental,
             )
             _state.update { it.copy(submitLoading = true, submitError = null) }
             val res = bookingRepo.create(body)
@@ -404,6 +543,7 @@ class BookingWizardViewModel(
                     .takeIf { it.isNotBlank() }
                 val summary = BookingConfirmationSummary(
                     bookingId = created.id,
+                    centerId = created.diveCenterId,
                     centerName = centerName,
                     serviceName = serviceName,
                     date = created.date,
@@ -413,8 +553,23 @@ class BookingWizardViewModel(
                     gearSummary = gearSummary,
                     notes = created.notes?.trim()?.takeIf { it.isNotEmpty() },
                 )
+                val chatId = openBookingConversation(
+                    centerId = centerId,
+                    serviceName = serviceName,
+                    date = created.date,
+                    time = created.startTime,
+                    participantCount = created.participants.size,
+                    paymentMethod = payMethod,
+                    needsEquipmentRental = st.needsEquipmentRental,
+                    instructorLanguage = st.preferredInstructorLanguage,
+                )
                 _state.update {
-                    it.copy(submitLoading = false, submitSuccess = true, confirmationSummary = summary)
+                    it.copy(
+                        submitLoading = false,
+                        submitSuccess = true,
+                        confirmationSummary = summary,
+                        chatConversationId = chatId,
+                    )
                 }
             }.onFailure { e ->
                 _state.update {
@@ -426,6 +581,56 @@ class BookingWizardViewModel(
             }
         }
     }
+
+    private fun buildBookingNotes(st: BookingWizardUiState): String? {
+        val lines = mutableListOf<String>()
+        st.notes.trim().takeIf { it.isNotEmpty() }?.let { lines += it }
+        if (st.bookingType == BookingWizardType.OPEN_WATER) {
+            st.preferredInstructorLanguage.trim().takeIf { it.isNotEmpty() }?.let {
+                lines += "Instructor language: $it"
+            }
+            st.instructorNotes.trim().takeIf { it.isNotEmpty() }?.let {
+                lines += "Instructor preferences: $it"
+            }
+        } else {
+            st.poolPreferences.trim().takeIf { it.isNotEmpty() }?.let {
+                lines += "Pool preferences: $it"
+            }
+        }
+        lines += "Equipment rental: ${if (st.needsEquipmentRental) "required" else "not required"}"
+        lines += "Participants count: ${st.participantsCount}"
+        if (st.needsPrivateInstructor) {
+            lines += "Private instructor: requested"
+        }
+        return lines.joinToString("\n").takeIf { it.isNotBlank() }
+    }
+
+    private suspend fun openBookingConversation(
+        centerId: String,
+        serviceName: String,
+        date: String,
+        time: String,
+        participantCount: Int,
+        paymentMethod: String,
+        needsEquipmentRental: Boolean,
+        instructorLanguage: String,
+    ): String? = runCatching {
+        val conv = graph.chatApi().openConversation(
+            OpenConversationRequest(peerType = "dive_center", peerId = centerId),
+        )
+        val langLine = instructorLanguage.trim().ifBlank { "не указан" }
+        val intro = buildString {
+            append("Здравствуйте! Отправил заявку на дайвинг.\n")
+            append("Услуга: $serviceName.\n")
+            append("Дата: $date $time.\n")
+            append("Участников: $participantCount.\n")
+            append("Язык инструктора: $langLine.\n")
+            append("Аренда: ${if (needsEquipmentRental) "нужна" else "не нужна"}.\n")
+            append("Оплата: $paymentMethod.")
+        }
+        graph.chatApi().sendMessage(SendMessageRequest(conversationId = conv.id, content = intro))
+        conv.id
+    }.getOrNull()
 
     companion object {
         fun factory(

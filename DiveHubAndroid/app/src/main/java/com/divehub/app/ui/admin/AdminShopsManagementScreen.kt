@@ -51,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import com.divehub.app.AppGraph
 import com.divehub.app.R
+import com.divehub.app.ui.theme.iosChromePageBackground
 import com.divehub.app.data.AdminShopsDraftsRepository
 import com.divehub.app.data.ExploreRepository
 import com.divehub.app.data.remote.dto.AdminShopDraftLocal
@@ -181,6 +182,7 @@ fun AdminShopsManagementRoute(graph: AppGraph, innerNav: NavController) {
     }
 
     Scaffold(
+        containerColor = iosChromePageBackground(),
         topBar = {
             TopAppBar(
                 title = { Text(stringResource(R.string.admin_shops_title)) },

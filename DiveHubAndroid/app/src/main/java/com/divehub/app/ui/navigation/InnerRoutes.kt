@@ -100,6 +100,10 @@ object InnerRoutes {
 
     fun businessChatOpen(peerType: String, peerId: String) = "business_chat/$peerType/$peerId"
 
+    const val TripGroupChatOpen = "trip_group_chat/{conversationId}"
+
+    fun tripGroupChatOpen(conversationId: String) = "trip_group_chat/$conversationId"
+
     /** New app support topic → opens Messages tab on the new thread. */
     const val AppSupportNewTopic = "help_app_support_new_topic"
 
@@ -107,4 +111,23 @@ object InnerRoutes {
     const val SupportTicketForm = "support_ticket_form/{category}"
 
     fun supportTicketForm(category: String) = "support_ticket_form/$category"
+
+    /** Hashtag-filtered feed (iOS `HashtagFeedView`). */
+    const val HashtagFeed = "hashtag_feed/{tag}"
+
+    fun hashtagFeed(tag: String) = "hashtag_feed/${tag.trim().removePrefix("#").lowercase()}"
+
+    /** Full-screen dive log detail (iOS `DiveLogDetailView`). */
+    const val DiveLogDetail = "dive_log_detail/{logId}"
+
+    fun diveLogDetail(logId: String) = "dive_log_detail/$logId"
+
+    /** Post-booking confirmation (iOS `BookingConfirmationView`). */
+    const val BookingConfirmation = "booking_confirmation"
+
+    /** Full course + modules editor (iOS `CoursesManagementView`). */
+    const val PartnerCourseEditor = "partner_course_editor/{courseId}"
+
+    fun partnerCourseEditor(courseId: String? = null) =
+        "partner_course_editor/${courseId?.takeIf { it.isNotBlank() } ?: "-"}"
 }

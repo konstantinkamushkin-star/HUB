@@ -13,8 +13,8 @@ android {
         applicationId = "com.divehub.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 3
+        versionName = "1.2.0"
         buildConfigField(
             "String",
             "API_BASE_URL_DEBUG",
@@ -96,6 +96,9 @@ dependencies {
     implementation("com.google.firebase:firebase-messaging-ktx")
     implementation("org.osmdroid:osmdroid-android:6.1.18")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation("androidx.work:work-runtime-ktx:2.10.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

@@ -7,6 +7,7 @@ import com.divehub.app.data.remote.dto.NotificationSettingsPatch
 import com.divehub.app.data.remote.dto.PrivacySettingsPatch
 import com.divehub.app.data.remote.dto.RegisterPushTokenRequest
 import com.divehub.app.data.remote.dto.UserDto
+import com.divehub.app.data.remote.dto.UserProfileSummaryDto
 import okhttp3.ResponseBody
 import retrofit2.http.Body
 import retrofit2.http.DELETE
@@ -20,6 +21,9 @@ import retrofit2.http.POST
 interface UsersApi {
     @GET("users/{id}")
     suspend fun getUser(@Path("id") id: String): UserDto
+
+    @GET("users/{id}/summary")
+    suspend fun getUserSummary(@Path("id") id: String): UserProfileSummaryDto
 
     @POST("users/me/push-token")
     suspend fun registerPushToken(@Body body: RegisterPushTokenRequest): Map<String, Boolean>

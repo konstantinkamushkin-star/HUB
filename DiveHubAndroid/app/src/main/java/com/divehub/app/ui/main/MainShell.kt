@@ -49,6 +49,9 @@ import com.divehub.app.ui.admin.AdminWebPanelRoute
 import com.divehub.app.ui.inventory.InventoryRoute
 import com.divehub.app.ui.inventory.InventoryItemDetailRoute
 import com.divehub.app.ui.inventory.InventoryTicketDetailRoute
+import com.divehub.app.ui.feed.HashtagFeedRoute
+import com.divehub.app.ui.logbook.DiveLogDetailRoute
+import com.divehub.app.ui.auth.PostRegistrationProWelcomeHost
 import com.divehub.app.ui.achievements.AchievementsRoute
 import com.divehub.app.ui.notifications.NotificationsRoute
 import com.divehub.app.ui.profile.CertificationsRoute
@@ -70,10 +73,13 @@ import com.divehub.app.ui.statistics.StatisticsRoute
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.Routes
 import com.divehub.app.ui.navigation.resolveShellKind
+import com.divehub.app.ui.partner.PartnerCourseEditorRoute
+import com.divehub.app.ui.booking.BookingConfirmationRoute
 import com.divehub.app.ui.booking.BookingWizardRoute
 import com.divehub.app.ui.centers.DiveCenterPublicRoute
 import com.divehub.app.ui.shops.ShopPublicRoute
 import com.divehub.app.ui.chat.BusinessChatOpenRoute
+import com.divehub.app.ui.chat.TripGroupChatOpenRoute
 import com.divehub.app.ui.help.AppSupportTopicRoute
 import com.divehub.app.ui.help.SupportTicketFormRoute
 import com.divehub.app.ui.diveeditor.DiveEditorRoute
@@ -123,6 +129,7 @@ fun MainShell(
         PushTokenRegistrar.syncCurrentTokenIfNeeded(graph)
     }
 
+    Box(Modifier.fillMaxSize()) {
     NavHost(
         navController = innerNav,
         startDestination = InnerRoutes.Home,
@@ -369,6 +376,22 @@ fun MainShell(
             }
         }
         composable(
+            route = InnerRoutes.TripGroupChatOpen,
+            arguments = listOf(navArgument("conversationId") { type = NavType.StringType }),
+        ) { entry ->
+            val conversationId = entry.arguments?.getString("conversationId").orEmpty()
+            if (conversationId.isNotBlank()) {
+                TripGroupChatOpenRoute(
+                    graph = graph,
+                    innerNav = innerNav,
+                    conversationId = conversationId,
+                )
+            } else {
+                LaunchedEffect(Unit) { innerNav.popBackStack() }
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {}
+            }
+        }
+        composable(
             route = InnerRoutes.BookingWizard,
             arguments = listOf(
                 navArgument("centerId") { type = NavType.StringType },
@@ -387,6 +410,39 @@ fun MainShell(
                 instructorIdArg = pathSeg("instructorId"),
                 courseIdArg = pathSeg("courseId"),
             )
+        }
+        composable(InnerRoutes.BookingConfirmation) {
+            BookingConfirmationRoute(graph = graph, innerNav = innerNav)
+        }
+        composable(
+            route = InnerRoutes.PartnerCourseEditor,
+            arguments = listOf(navArgument("courseId") { type = NavType.StringType }),
+        ) { entry ->
+            val raw = entry.arguments?.getString("courseId")
+            val courseId = raw?.takeIf { it.isNotBlank() && it != "-" }
+            PartnerCourseEditorRoute(graph = graph, innerNav = innerNav, courseId = courseId)
+        }
+        composable(
+            route = InnerRoutes.HashtagFeed,
+            arguments = listOf(navArgument("tag") { type = NavType.StringType }),
+        ) { entry ->
+            val tag = entry.arguments?.getString("tag").orEmpty()
+            if (tag.isNotEmpty()) {
+                HashtagFeedRoute(graph = graph, innerNav = innerNav, tag = tag)
+            } else {
+                LaunchedEffect(Unit) { innerNav.popBackStack() }
+            }
+        }
+        composable(
+            route = InnerRoutes.DiveLogDetail,
+            arguments = listOf(navArgument("logId") { type = NavType.StringType }),
+        ) { entry ->
+            val logId = entry.arguments?.getString("logId").orEmpty()
+            if (logId.isNotEmpty()) {
+                DiveLogDetailRoute(graph = graph, innerNav = innerNav, logId = logId)
+            } else {
+                LaunchedEffect(Unit) { innerNav.popBackStack() }
+            }
         }
         composable(InnerRoutes.DiveEditor) {
             Scaffold(
@@ -413,5 +469,7 @@ fun MainShell(
                 }
             }
         }
+    }
+        PostRegistrationProWelcomeHost(graph = graph, sessionUser = user)
     }
 }

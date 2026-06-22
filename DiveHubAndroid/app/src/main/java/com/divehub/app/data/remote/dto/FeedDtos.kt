@@ -17,6 +17,7 @@ data class FeedPostDto(
     @SerializedName("diveLogId") val diveLogId: String? = null,
     @SerializedName("diveLog") val diveLog: DiveLogLiteDto? = null,
     @SerializedName("photos") val photos: List<String> = emptyList(),
+    @SerializedName("videos") val videos: List<String> = emptyList(),
     @SerializedName("likes") val likes: Int = 0,
     @SerializedName("comments") val comments: Int = 0,
     @SerializedName("isLiked") val isLiked: Boolean = false,
@@ -27,6 +28,7 @@ data class CreateFeedPostRequest(
     @SerializedName("type") val type: String,
     @SerializedName("content") val content: String? = null,
     @SerializedName("photos") val photos: List<String>? = null,
+    @SerializedName("videos") val videos: List<String>? = null,
     @SerializedName("diveLogId") val diveLogId: String? = null,
 )
 
