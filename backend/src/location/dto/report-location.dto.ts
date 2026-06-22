@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsIn, IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { IsBoolean, IsIn, IsNumber, IsOptional, Max, Min } from 'class-validator';
 
 export class ReportLocationDto {
   @ApiProperty()
@@ -24,4 +24,10 @@ export class ReportLocationDto {
   @IsOptional()
   @IsIn(['live', 'last_known'])
   source?: 'live' | 'last_known';
+
+  /** When true, enables share_location on the server before saving coordinates. */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  shareLocation?: boolean;
 }

@@ -33,7 +33,11 @@ export function diverPrivacy(user: User): DiverPrivacy {
 
 export function isLookingForBuddy(user: User): boolean {
   const dp = diverProfileRecord(user);
-  return dp?.lookingForBuddy === true;
+  if (dp?.lookingForBuddy === false) {
+    return false;
+  }
+  // Default discoverable when sharing location unless explicitly opted out.
+  return user.shareLocation === true;
 }
 
 export function isBuddySearchVisible(user: User): boolean {
@@ -41,12 +45,7 @@ export function isBuddySearchVisible(user: User): boolean {
 }
 
 export function isDiscoverableUser(user: User): boolean {
-  return (
-    user.shareLocation === true &&
-    user.showInFriendSearch !== false &&
-    isLookingForBuddy(user) &&
-    isBuddySearchVisible(user)
-  );
+  return user.shareLocation === true && user.showInFriendSearch !== false;
 }
 
 export function privacyAllows(

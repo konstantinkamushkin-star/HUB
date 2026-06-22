@@ -66,6 +66,13 @@ export class LocationService {
       user.shareLocation = dto.shareLocation;
       if (!dto.shareLocation) {
         await this.locationRepo.delete({ userId });
+        const prev = diverProfileRecord(user) ?? {};
+        user.diverProfile = { ...prev, lookingForBuddy: false };
+      } else {
+        const prev = diverProfileRecord(user) ?? {};
+        if (prev.lookingForBuddy !== false) {
+          user.diverProfile = { ...prev, lookingForBuddy: true };
+        }
       }
     }
     if (dto.publicProfile !== undefined) {
@@ -128,6 +135,14 @@ export class LocationService {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
+    }
+    if (dto.shareLocation === true && !user.shareLocation) {
+      user.shareLocation = true;
+      const prev = diverProfileRecord(user) ?? {};
+      if (prev.lookingForBuddy !== false) {
+        user.diverProfile = { ...prev, lookingForBuddy: true };
+      }
+      await this.userRepo.save(user);
     }
     if (!user.shareLocation) {
       throw new BadRequestException('Location sharing is disabled');
