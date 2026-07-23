@@ -44,8 +44,6 @@ export type DiscoverUserDto = {
 
 @Injectable()
 export class LocationService {
-  private readonly lastUploadAt = new Map<string, number>();
-
   constructor(
     @InjectRepository(UserLocationEntity)
     private readonly locationRepo: Repository<UserLocationEntity>,
@@ -122,25 +120,15 @@ export class LocationService {
     userId: string,
     dto: ReportLocationDto,
   ): Promise<{ ok: true; updatedAt: string }> {
-    const now = Date.now();
-    const prev = this.lastUploadAt.get(userId) ?? 0;
-    if (now - prev < 25_000) {
-      const existing = await this.locationRepo.findOne({ where: { userId } });
-      if (existing) {
-        return { ok: true, updatedAt: existing.updatedAt.toISOString() };
-      }
-    }
-    this.lastUploadAt.set(userId, now);
-
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
     if (dto.shareLocation === true && !user.shareLocation) {
       user.shareLocation = true;
-      const prev = diverProfileRecord(user) ?? {};
-      if (prev.lookingForBuddy !== false) {
-        user.diverProfile = { ...prev, lookingForBuddy: true };
+      const prevProfile = diverProfileRecord(user) ?? {};
+      if (prevProfile.lookingForBuddy !== false) {
+        user.diverProfile = { ...prevProfile, lookingForBuddy: true };
       }
       await this.userRepo.save(user);
     }
@@ -150,7 +138,26 @@ export class LocationService {
 
     const source = dto.source ?? 'last_known';
     let row = await this.locationRepo.findOne({ where: { userId } });
-    if (!row) {
+
+    // Skip only when the point is effectively unchanged (clients already
+    // debounce). Never return "ok" while leaving stale coordinates in DB.
+    if (row) {
+      const movedKm = haversineKm(
+        row.latitude,
+        row.longitude,
+        dto.latitude,
+        dto.longitude,
+      );
+      const ageMs = Date.now() - row.updatedAt.getTime();
+      if (movedKm < 0.04 && ageMs < 15_000 && row.source === source) {
+        return { ok: true, updatedAt: row.updatedAt.toISOString() };
+      }
+      row.latitude = dto.latitude;
+      row.longitude = dto.longitude;
+      row.accuracyMeters = dto.accuracyMeters ?? null;
+      row.source = source;
+      row.updatedAt = new Date();
+    } else {
       row = this.locationRepo.create({
         userId,
         latitude: dto.latitude,
@@ -158,11 +165,6 @@ export class LocationService {
         accuracyMeters: dto.accuracyMeters ?? null,
         source,
       });
-    } else {
-      row.latitude = dto.latitude;
-      row.longitude = dto.longitude;
-      row.accuracyMeters = dto.accuracyMeters ?? null;
-      row.source = source;
     }
     const saved = await this.locationRepo.save(row);
     return { ok: true, updatedAt: saved.updatedAt.toISOString() };
