@@ -23,6 +23,13 @@ struct CreateReviewRequest: Codable {
     var language: String?
 }
 
+/// Request body for editing an existing review.
+struct UpdateReviewRequest: Codable {
+    var rating: Int?
+    var text: String?
+    var language: String?
+}
+
 struct Review: Identifiable, Codable {
     let id: String
     var userId: String

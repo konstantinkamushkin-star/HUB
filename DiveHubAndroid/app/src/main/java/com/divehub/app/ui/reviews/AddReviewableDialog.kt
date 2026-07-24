@@ -33,11 +33,16 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.ReviewsRepository
 import com.divehub.app.data.remote.dto.CreateReviewRequest
+import com.divehub.app.data.remote.dto.ReviewDto
+import com.divehub.app.data.remote.dto.UpdateReviewRequest
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.util.Locale
 
-/** Create review for any `reviewableType` / `reviewableId` (dive_site, dive_center, shop). */
+/**
+ * Create or edit a review. One review per user per place — when [existing] is set, saves via PATCH
+ * and offers delete.
+ */
 @Composable
 fun AddReviewableDialog(
     reviewableType: String,
@@ -45,17 +50,62 @@ fun AddReviewableDialog(
     graph: AppGraph,
     onDismiss: () -> Unit,
     onSuccess: () -> Unit,
+    existing: ReviewDto? = null,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    var rating by remember { mutableIntStateOf(5) }
-    var text by remember { mutableStateOf("") }
+    val editing = existing != null
+    var rating by remember(existing?.id) { mutableIntStateOf(existing?.rating?.coerceIn(1, 5) ?: 5) }
+    var text by remember(existing?.id) { mutableStateOf(existing?.text.orEmpty()) }
     var busy by remember { mutableStateOf(false) }
+    var confirmDelete by remember { mutableStateOf(false) }
     var err by remember { mutableStateOf<String?>(null) }
+
+    if (confirmDelete && existing != null) {
+        AlertDialog(
+            onDismissRequest = { if (!busy) confirmDelete = false },
+            title = { Text(stringResource(R.string.review_delete_title)) },
+            text = { Text(stringResource(R.string.review_delete_confirm)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        busy = true
+                        scope.launch {
+                            runCatching { ReviewsRepository(graph).deleteReview(existing.id) }
+                                .onSuccess {
+                                    busy = false
+                                    confirmDelete = false
+                                    onSuccess()
+                                }
+                                .onFailure { e ->
+                                    busy = false
+                                    confirmDelete = false
+                                    err = e.message ?: context.getString(R.string.review_failed)
+                                }
+                        }
+                    },
+                    enabled = !busy,
+                ) {
+                    Text(stringResource(R.string.review_delete), color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmDelete = false }, enabled = !busy) {
+                    Text(stringResource(R.string.common_cancel))
+                }
+            },
+        )
+    }
 
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
-        title = { Text(stringResource(R.string.review_dialog_title)) },
+        title = {
+            Text(
+                stringResource(
+                    if (editing) R.string.review_dialog_edit_title else R.string.review_dialog_title,
+                ),
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 StarRatingPicker(rating = rating, onRating = { rating = it })
@@ -78,17 +128,30 @@ fun AddReviewableDialog(
                     if (text.trim().isEmpty()) return@Button
                     busy = true
                     err = null
+                    val lang = Locale.getDefault().language.takeIf { it.length == 2 } ?: "en"
                     scope.launch {
                         runCatching {
-                            ReviewsRepository(graph).createReview(
-                                CreateReviewRequest(
-                                    reviewableType = reviewableType,
-                                    reviewableId = reviewableId,
-                                    rating = rating.coerceIn(1, 5),
-                                    text = text.trim(),
-                                    language = Locale.getDefault().language.takeIf { it.length == 2 } ?: "en",
-                                ),
-                            )
+                            val repo = ReviewsRepository(graph)
+                            if (existing != null) {
+                                repo.updateReview(
+                                    existing.id,
+                                    UpdateReviewRequest(
+                                        rating = rating.coerceIn(1, 5),
+                                        text = text.trim(),
+                                        language = lang,
+                                    ),
+                                )
+                            } else {
+                                repo.createReview(
+                                    CreateReviewRequest(
+                                        reviewableType = reviewableType,
+                                        reviewableId = reviewableId,
+                                        rating = rating.coerceIn(1, 5),
+                                        text = text.trim(),
+                                        language = lang,
+                                    ),
+                                )
+                            }
                         }.onSuccess {
                             busy = false
                             onSuccess()
@@ -97,6 +160,7 @@ fun AddReviewableDialog(
                             err = when (e) {
                                 is HttpException -> when (e.code()) {
                                     401 -> context.getString(R.string.review_login_required)
+                                    409 -> context.getString(R.string.review_already_exists)
                                     else -> context.getString(R.string.review_failed)
                                 }
                                 else -> e.message ?: context.getString(R.string.review_failed)
@@ -109,13 +173,26 @@ fun AddReviewableDialog(
                 if (busy) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
-                    Text(stringResource(R.string.review_send))
+                    Text(stringResource(if (editing) R.string.review_save else R.string.review_send))
                 }
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss, enabled = !busy) {
-                Text(stringResource(R.string.common_close))
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (editing) {
+                    TextButton(
+                        onClick = { confirmDelete = true },
+                        enabled = !busy,
+                    ) {
+                        Text(
+                            stringResource(R.string.review_delete),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+                TextButton(onClick = onDismiss, enabled = !busy) {
+                    Text(stringResource(R.string.common_close))
+                }
             }
         },
     )

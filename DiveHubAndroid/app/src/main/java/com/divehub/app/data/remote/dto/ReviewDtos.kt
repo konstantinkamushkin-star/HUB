@@ -10,6 +10,12 @@ data class CreateReviewRequest(
     val language: String? = "en",
 )
 
+data class UpdateReviewRequest(
+    val rating: Int? = null,
+    val text: String? = null,
+    val language: String? = null,
+)
+
 data class ReviewDto(
     @SerializedName("id") val id: String,
     @SerializedName("userId") val userId: String? = null,
@@ -17,4 +23,5 @@ data class ReviewDto(
     @SerializedName("rating") val rating: Int,
     @SerializedName("text") val text: String,
     @SerializedName("createdAt") val createdAt: String? = null,
+    @SerializedName("updatedAt") val updatedAt: String? = null,
 )

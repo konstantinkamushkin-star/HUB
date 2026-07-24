@@ -206,10 +206,10 @@ class NetworkService {
     )
 
     /// Production Nest API (TLS). WebSocket: `https` → `wss` в `chatWebSocketURL`.
-    private static let productionAPIBaseURL = "https://api.dive-hub.ru"
+    nonisolated private static let productionAPIBaseURL = "https://api.dive-hub.ru"
     
     /// Пусто → встроенный default. Без завершающего `/`. Профиль → «Сервер (разработка)» в DEBUG.
-    static let apiBaseURLUserDefaultsKey = "networkServiceAPIBaseURL"
+    nonisolated static let apiBaseURLUserDefaultsKey = "networkServiceAPIBaseURL"
     
     /// Базовый URL веб-админки (Next `admin-web`), без завершающего `/`. Пусто в UserDefaults → выводится из `baseURL` (`api.*` → `admin.*`).
     static let adminWebBaseURLUserDefaultsKey = "networkServiceAdminWebBaseURL"
@@ -289,6 +289,10 @@ class NetworkService {
         configuration.waitsForConnectivity = true
         return URLSession(configuration: configuration)
     }()
+
+    /// Coalesce concurrent token refreshes (avoids refresh storms).
+    /// MainActor isolation serializes access between `await` points — no NSLock.
+    private var inFlightRefresh: (id: UUID, task: Task<String, Error>)?
     
     private init() {
         let configuration = URLSessionConfiguration.default
@@ -305,22 +309,38 @@ class NetworkService {
     /// - Parameter path: The image path (can be relative like "/uploads/..." or already a full URL)
     /// - Returns: A full URL string, or nil if the path is empty
     func fullImageURL(from path: String?) -> String? {
-        guard let path = path, !path.isEmpty else {
+        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty else {
             return nil
         }
-        
-        // If it's already a full URL, return as is
+
+        // Bundled diving presets are stored as `preset:<id>` — not remote media.
+        if path.hasPrefix("preset:") {
+            return nil
+        }
+
         if path.hasPrefix("http://") || path.hasPrefix("https://") {
             return path
         }
-        
-        // If it's a relative path starting with "/", prepend baseURL
+
         if path.hasPrefix("/") {
             return baseURL + path
         }
-        
-        // Otherwise, assume it's a relative path and prepend baseURL + "/"
+
         return baseURL + "/" + path
+    }
+
+    /// Store `/api/media/files/...` in profile/feed/chat payloads instead of absolute URLs.
+    func mediaRelativePath(from urlOrPath: String) -> String {
+        let trimmed = urlOrPath.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.hasPrefix("http://") || trimmed.hasPrefix("https://"),
+           let url = URL(string: trimmed),
+           !url.path.isEmpty {
+            return url.path
+        }
+        if trimmed.hasPrefix("/") {
+            return trimmed
+        }
+        return "/" + trimmed
     }
     
     // MARK: - HTTP error body (Nest / FastAPI)
@@ -412,9 +432,17 @@ class NetworkService {
     func request<T: Decodable>(
         endpoint: String,
         method: HTTPMethod = .get,
-        headers: [String: String]? = nil
+        headers: [String: String]? = nil,
+        allowsAuthRetry: Bool = true
     ) async throws -> T {
-        try await request(endpoint: endpoint, method: method, body: nil as String?, jsonBody: nil, headers: headers)
+        try await request(
+            endpoint: endpoint,
+            method: method,
+            body: nil as String?,
+            jsonBody: nil,
+            headers: headers,
+            allowsAuthRetry: allowsAuthRetry
+        )
     }
 
     func request<T: Decodable, B: Encodable>(
@@ -422,7 +450,8 @@ class NetworkService {
         method: HTTPMethod = .get,
         body: B?,
         jsonBody: Data? = nil,
-        headers: [String: String]? = nil
+        headers: [String: String]? = nil,
+        allowsAuthRetry: Bool = true
     ) async throws -> T {
         let fullURL = baseURL + endpoint
 
@@ -497,7 +526,12 @@ class NetworkService {
                 }
 
                 // Try to refresh token if 401 and we have a refresh token
-                if httpResponse.statusCode == 401 && getAuthToken() != nil && KeychainService.shared.getRefreshToken() != nil {
+                let isRefreshEndpoint = endpoint.contains("/auth/refresh")
+                if httpResponse.statusCode == 401,
+                   allowsAuthRetry,
+                   !isRefreshEndpoint,
+                   getAuthToken() != nil,
+                   KeychainService.shared.getRefreshToken() != nil {
                     do {
                         let newToken = try await refreshAccessToken()
                         // Retry the original request with new token
@@ -513,15 +547,16 @@ class NetworkService {
 
                         let (retryData, retryHttpResponse) = try await sessionDataWithRateLimitRetry(for: retryRequest)
                         guard (200...299).contains(retryHttpResponse.statusCode) else {
+                            if retryHttpResponse.statusCode == 401 {
+                                invalidateSessionAfterFailedAuth()
+                            }
                             throw httpFailureError(data: retryData, statusCode: retryHttpResponse.statusCode)
                         }
 
                         let decoder = Self.apiJSONDecoder()
                         return try decoder.decode(T.self, from: retryData)
-                    } catch let networkError as NetworkError {
-                        throw networkError
                     } catch {
-                        clearAuthTokens()
+                        invalidateSessionAfterFailedAuth()
                         throw NetworkError.serverError(401)
                     }
                 }
@@ -571,9 +606,17 @@ class NetworkService {
         endpoint: String,
         method: HTTPMethod = .get,
         jsonBody: Data?,
-        headers: [String: String]? = nil
+        headers: [String: String]? = nil,
+        allowsAuthRetry: Bool = true
     ) async throws -> T {
-        try await request(endpoint: endpoint, method: method, body: nil as String?, jsonBody: jsonBody, headers: headers)
+        try await request(
+            endpoint: endpoint,
+            method: method,
+            body: nil as String?,
+            jsonBody: jsonBody,
+            headers: headers,
+            allowsAuthRetry: allowsAuthRetry
+        )
     }
     
     // MARK: - Helper Methods
@@ -590,24 +633,54 @@ class NetworkService {
     func clearAuthTokens() {
         KeychainService.shared.clearAllTokens()
     }
+
+    /// Drop tokens and notify auth layer — stops infinite refresh retries on a dead session.
+    private func invalidateSessionAfterFailedAuth() {
+        clearAuthTokens()
+        NotificationCenter.default.post(name: .diveHubSessionExpired, object: nil)
+    }
     
-    func refreshAccessToken() async throws -> String {guard let refreshToken = KeychainService.shared.getRefreshToken() else {throw NetworkError.serverError(401)
+    func refreshAccessToken() async throws -> String {
+        if let existing = inFlightRefresh {
+            return try await existing.task.value
         }
-        
+
+        let id = UUID()
+        let task = Task<String, Error> {
+            try await self.performTokenRefresh()
+        }
+        inFlightRefresh = (id, task)
+
+        do {
+            let token = try await task.value
+            if inFlightRefresh?.id == id { inFlightRefresh = nil }
+            return token
+        } catch {
+            if inFlightRefresh?.id == id { inFlightRefresh = nil }
+            throw error
+        }
+    }
+
+    /// Direct refresh call — never goes through `request`'s 401→refresh path (avoids recursion).
+    private func performTokenRefresh() async throws -> String {
+        guard let refreshToken = KeychainService.shared.getRefreshToken() else {
+            throw NetworkError.serverError(401)
+        }
+
         struct RefreshRequest: Codable {
             let refreshToken: String
         }
-        
+
         struct RefreshResponse: Codable {
             let accessToken: String
             let refreshToken: String
         }
-        
-        let request = RefreshRequest(refreshToken: refreshToken)
-        let response: RefreshResponse = try await self.request(
+
+        let response: RefreshResponse = try await request(
             endpoint: "/api/auth/refresh",
             method: .post,
-            body: request
+            body: RefreshRequest(refreshToken: refreshToken),
+            allowsAuthRetry: false
         )
         saveAuthTokens(accessToken: response.accessToken, refreshToken: response.refreshToken)
         return response.accessToken
@@ -1174,7 +1247,15 @@ extension NetworkService {
     }
     
     func getDiveCenter(id: String) async throws -> DiveCenter {
-        return try await request(endpoint: "/api/dive-centers/\(id)")
+        struct Envelope: Codable {
+            let success: Bool
+            let data: DiveCenter
+        }
+        let response: Envelope = try await request(endpoint: "/api/v1/dive-centers/\(id)")
+        guard response.success else {
+            throw NetworkError.serverError(404)
+        }
+        return response.data
     }
     
     // MARK: - Geo Search API for Dive Centers (New optimized endpoints)
@@ -1305,6 +1386,75 @@ extension NetworkService {
 
         return response.data
     }
+
+    // MARK: - Shops (separate entity from dive centers)
+
+    /// Popular shops for Explore when location is unavailable.
+    func getPopularShops(limit: Int = 20) async throws -> [Shop] {
+        var endpoint = "/api/v1/shops/popular"
+        let lim = min(max(limit, 1), 100)
+        endpoint += "?limit=\(lim)"
+
+        struct PopularResponse: Codable {
+            let success: Bool
+            let data: [Shop]
+        }
+
+        let response: PopularResponse = try await request(endpoint: endpoint)
+        return response.data
+    }
+
+    /// Geo search for shops (`GET /api/v1/shops/search`).
+    func searchShopsByLocation(
+        latitude: Double,
+        longitude: Double,
+        radius: Int = 50000,
+        type: ShopType? = nil,
+        serviceAvailable: Bool? = nil,
+        search: String? = nil,
+        limit: Int = 50,
+        cursor: String? = nil
+    ) async throws -> ShopSearchResult {
+        var endpoint = "/api/v1/shops/search"
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "lat", value: String(latitude)),
+            URLQueryItem(name: "lng", value: String(longitude)),
+            URLQueryItem(name: "radius", value: String(radius)),
+            URLQueryItem(name: "limit", value: String(min(limit, 100))),
+        ]
+        if let cursor {
+            queryItems.append(URLQueryItem(name: "cursor", value: cursor))
+        }
+        if let type {
+            queryItems.append(URLQueryItem(name: "type", value: type.rawValue))
+        }
+        if let serviceAvailable {
+            queryItems.append(URLQueryItem(name: "serviceAvailable", value: serviceAvailable ? "true" : "false"))
+        }
+        if let search, !search.isEmpty {
+            queryItems.append(URLQueryItem(name: "search", value: search))
+        }
+        let queryString = queryItems.compactMap { item -> String? in
+            guard let value = item.value else { return nil }
+            let encodedName = item.name.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? item.name
+            let encodedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+            return "\(encodedName)=\(encodedValue)"
+        }.joined(separator: "&")
+        endpoint = "\(endpoint)?\(queryString)"
+        return try await request(endpoint: endpoint)
+    }
+
+    func getShop(id: String) async throws -> Shop {
+        struct ShopEnvelope: Codable {
+            let success: Bool
+            let data: Shop
+        }
+        let response: ShopEnvelope = try await request(endpoint: "/api/v1/shops/\(id)")
+        guard response.success else {
+            throw NetworkError.serverError(404)
+        }
+        return response.data
+    }
     
     // MARK: - Response Models for Dive Center Geo Search
     
@@ -1313,6 +1463,13 @@ extension NetworkService {
         let data: [DiveCenter]
         let pagination: PaginationInfo?
         let meta: SearchMeta?
+    }
+
+    struct ShopSearchResult: Codable {
+        let success: Bool
+        let data: [Shop]
+        let cursor: String?
+        let total: Int?
     }
     
     // Bookings
@@ -1331,6 +1488,11 @@ extension NetworkService {
     // Dive Logs
     struct CreateDiveLogRequest: Codable {
         let diveSiteId: String?
+        let diveCenterId: String?
+        let buddy: String?
+        let country: String?
+        let title: String?
+        let locationName: String?
         let date: String // ISO date string
         let startTime: String?
         let endTime: String?
@@ -1344,8 +1506,8 @@ extension NetworkService {
         let notes: String?
         let photoUrls: [String]?
         let videoUrls: [String]?
-        
-        // gearUsed and diveComputerData are complex types, skip for now
+        let fishSpecies: [String]?
+        let isPublished: Bool?
     }
     
     func createDiveLog(_ log: DiveLog) async throws -> DiveLog {// Convert DiveLog to CreateDiveLogRequest DTO
@@ -1396,15 +1558,38 @@ extension NetworkService {
         
         // Validate required fields
         guard log.bottomTime > 0 else {
-            throw NetworkError.unknown(NSError(domain: "DiveLogError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Bottom time must be greater than 0"]))
+            let msg = LocalizationService.shared.localizedString("errBottomTimeMin", table: "logbook")
+            throw NetworkError.unknown(NSError(domain: "DiveLogError", code: 400, userInfo: [NSLocalizedDescriptionKey: msg]))
         }
         
         guard log.maxDepth > 0 else {
-            throw NetworkError.unknown(NSError(domain: "DiveLogError", code: 400, userInfo: [NSLocalizedDescriptionKey: "Max depth must be greater than 0"]))
+            let msg = LocalizationService.shared.localizedString("errMaxDepthMin", table: "logbook")
+            throw NetworkError.unknown(NSError(domain: "DiveLogError", code: 400, userInfo: [NSLocalizedDescriptionKey: msg]))
         }
+
+        let reef = log.location.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let locationLabel = (log.locationName?.trimmingCharacters(in: .whitespacesAndNewlines)).flatMap { $0.isEmpty ? nil : $0 }
+            ?? (reef.isEmpty ? nil : reef)
+        let resolvedTitle = DiveLogTitle.resolve(
+            customTitle: log.title,
+            reefOrSite: locationLabel,
+            date: log.date,
+            diveNumber: max(log.diveNumber, 1)
+        )
         
         let request = CreateDiveLogRequest(
             diveSiteId: log.diveSiteId,
+            diveCenterId: log.diveCenterId,
+            buddy: log.buddy.flatMap { s in
+                let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                return t.isEmpty ? nil : t
+            },
+            country: log.country.flatMap { s in
+                let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+                return t.isEmpty ? nil : t
+            },
+            title: resolvedTitle,
+            locationName: locationLabel,
             date: dateFormatter.string(from: log.date),
             startTime: startTime,
             endTime: endTime,
@@ -1417,7 +1602,9 @@ extension NetworkService {
             diveType: nil, // Not in our model yet
             notes: log.notes.isEmpty ? nil : log.notes,
             photoUrls: log.photos.isEmpty ? nil : log.photos,
-            videoUrls: log.videos.isEmpty ? nil : log.videos
+            videoUrls: log.videos.isEmpty ? nil : log.videos,
+            fishSpecies: log.fishSpecies.isEmpty ? nil : log.fishSpecies,
+            isPublished: log.isPublished
         )
         do {
             let result: DiveLog = try await self.request(endpoint: "/api/dive-logs", method: .post, body: request)
@@ -1429,6 +1616,21 @@ extension NetworkService {
     
     func getDiveLogs(userId: String) async throws -> [DiveLog] {
         return try await request(endpoint: "/api/dive-logs?userId=\(userId)")
+    }
+
+    func getMyAchievements() async throws -> AchievementsSyncResponse {
+        try await request(endpoint: "/api/users/me/achievements")
+    }
+
+    func syncMyAchievements(_ items: [AchievementUnlockDTO]) async throws -> AchievementsSyncResponse {
+        struct Body: Codable {
+            let items: [AchievementUnlockDTO]
+        }
+        return try await request(
+            endpoint: "/api/users/me/achievements",
+            method: .put,
+            body: Body(items: items)
+        )
     }
     
     // Get public dive logs for a dive site (only from users who share their logbook)
@@ -1458,6 +1660,15 @@ extension NetworkService {
     // Reviews
     func createReview(_ createReviewRequest: CreateReviewRequest) async throws -> Review {
         return try await request(endpoint: "/api/reviews", method: .post, body: createReviewRequest)
+    }
+
+    func updateReview(id: String, _ body: UpdateReviewRequest) async throws -> Review {
+        return try await request(endpoint: "/api/reviews/\(id)", method: .patch, body: body)
+    }
+
+    func deleteReview(id: String) async throws {
+        struct Ok: Decodable { let success: Bool? }
+        _ = try await request(endpoint: "/api/reviews/\(id)", method: .delete) as Ok
     }
     
     func getReviews(reviewableType: ReviewableType, reviewableId: String) async throws -> [Review] {
@@ -1680,23 +1891,25 @@ extension NetworkService {
 
         let (responseData, http) = try await sessionDataWithRateLimitRetry(for: request)
         if http.statusCode == 401, allowAuthRetry {
-            _ = try await refreshAccessToken()
-            return try await performMediaUpload(
-                data: data,
-                fileName: fileName,
-                mimeType: mimeType,
-                allowAuthRetry: false
-            )
+            do {
+                _ = try await refreshAccessToken()
+                return try await performMediaUpload(
+                    data: data,
+                    fileName: fileName,
+                    mimeType: mimeType,
+                    allowAuthRetry: false
+                )
+            } catch {
+                invalidateSessionAfterFailedAuth()
+                throw NetworkError.serverError(401)
+            }
         }
         guard (200...299).contains(http.statusCode) else {
             throw httpFailureError(data: responseData, statusCode: http.statusCode)
         }
         let decoded = try JSONDecoder().decode(MediaUploadResponse.self, from: responseData)
         let path = decoded.url.isEmpty ? decoded.path : decoded.url
-        if path.hasPrefix("http") {
-            return path
-        }
-        return baseURL + path
+        return mediaRelativePath(from: path)
     }
 
     private func performMediaImageUpload(
@@ -1746,10 +1959,7 @@ extension NetworkService {
             req.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         }
         req.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-        let (data, response) = try await sessionDataWithRateLimitRetry(for: req)
-        guard let http = response as? HTTPURLResponse else {
-            throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
-        }
+        let (data, http) = try await sessionDataWithRateLimitRetry(for: req)
         guard (200...299).contains(http.statusCode) else {
             if http.statusCode == 401, getAuthToken() != nil, KeychainService.shared.getRefreshToken() != nil {
                 do {
@@ -1759,14 +1969,13 @@ extension NetworkService {
                     retry.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     retry.setValue("Bearer \(newToken)", forHTTPHeaderField: "Authorization")
                     retry.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
-                    let (retryData, retryResp) = try await sessionDataWithRateLimitRetry(for: retry)
-                    guard let retryHttp = retryResp as? HTTPURLResponse,
-                          (200...299).contains(retryHttp.statusCode) else {
-                        throw httpFailureError(data: retryData, statusCode: (retryResp as? HTTPURLResponse)?.statusCode ?? 0)
+                    let (retryData, retryHttp) = try await sessionDataWithRateLimitRetry(for: retry)
+                    guard (200...299).contains(retryHttp.statusCode) else {
+                        throw httpFailureError(data: retryData, statusCode: retryHttp.statusCode)
                     }
                     return
                 } catch {
-                    clearAuthTokens()
+                    invalidateSessionAfterFailedAuth()
                     throw NetworkError.serverError(401)
                 }
             }
@@ -2076,6 +2285,20 @@ extension NetworkService {
         return try await request(endpoint: "/api/users/\(userId)")
     }
     
+    static func isFriendRequestConflict(_ error: NetworkError) -> Bool {
+        switch error {
+        case .serverError(400):
+            return true
+        case .serverErrorWithDetail(400, let message):
+            let lower = message.lowercased()
+            return lower.contains("friend request")
+                || lower.contains("already friends")
+                || lower.contains("already pending")
+        default:
+            return false
+        }
+    }
+
     func sendFriendRequest(userId: String) async throws {struct FriendRequest: Codable {
             let userId: String
         }
@@ -2085,8 +2308,8 @@ extension NetworkService {
                 endpoint: "/api/friends/requests",
                 method: .post,
                 body: request
-            ) as EmptyResponse} catch let error as NetworkError {// Re-throw with more context if it's a 400 error
-            if case .serverError(400) = error {
+            ) as EmptyResponse} catch let error as NetworkError {
+            if Self.isFriendRequestConflict(error) {
                 throw FriendRequestError.alreadyExists
             }
             throw error
@@ -2126,82 +2349,14 @@ extension NetworkService {
         ) as EmptyResponse
     }
     
-    // Profile Image Upload
+    // Profile Image Upload — uses shared media storage (`POST /api/media/upload`).
     func uploadProfileImage(imageData: Data) async throws -> String {
-        guard let url = URL(string: baseURL + "/api/users/me/avatar") else {
-            throw NetworkError.invalidURL
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        
-        // Create multipart form data
-        let boundary = UUID().uuidString
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        
-        if let token = getAuthToken() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-        
-        var body = Data()
-        body.append("--\(boundary)\r\n".data(using: .utf8)!)
-        body.append("Content-Disposition: form-data; name=\"avatar\"; filename=\"avatar.jpg\"\r\n".data(using: .utf8)!)
-        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
-        body.append(imageData)
-        body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-        
-        request.httpBody = body
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
-        }
-        
-        if httpResponse.statusCode == 401 {
-            // Try to refresh token
-            let newAccessToken = try await refreshAccessToken()
-            request.setValue("Bearer \(newAccessToken)", forHTTPHeaderField: "Authorization")
-            let (retryData, retryResponse) = try await session.data(for: request)
-            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
-                throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
-            }
-            guard (200...299).contains(retryHttpResponse.statusCode) else {
-                throw NetworkError.serverError(retryHttpResponse.statusCode)
-            }
-            
-            struct UploadResponse: Codable {
-                let avatarUrl: String
-            }
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let uploadResponse = try decoder.decode(UploadResponse.self, from: retryData)
-            
-            // Convert relative URL to absolute URL if needed
-            var avatarUrl = uploadResponse.avatarUrl
-            if avatarUrl.hasPrefix("/") && !avatarUrl.hasPrefix("http") {
-                avatarUrl = baseURL + avatarUrl
-            }
-            return avatarUrl
-        }
-        
-        guard (200...299).contains(httpResponse.statusCode) else {
-            throw NetworkError.serverError(httpResponse.statusCode)
-        }
-        
-        struct UploadResponse: Codable {
-            let avatarUrl: String
-        }
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        let uploadResponse = try decoder.decode(UploadResponse.self, from: data)
-        
-        // Convert relative URL to absolute URL if needed
-        var avatarUrl = uploadResponse.avatarUrl
-        if avatarUrl.hasPrefix("/") && !avatarUrl.hasPrefix("http") {
-            avatarUrl = baseURL + avatarUrl
-        }
-        return avatarUrl
+        try await performMediaUpload(
+            data: imageData,
+            fileName: "avatar.jpg",
+            mimeType: "image/jpeg",
+            allowAuthRetry: true
+        )
     }
     
     // MARK: - Certifications API
@@ -2411,30 +2566,38 @@ extension NetworkService {
         }
         if httpResponse.statusCode == 401 {
             // Try to refresh token
-            let newAccessToken = try await refreshAccessToken()
-            request.setValue("Bearer \(newAccessToken)", forHTTPHeaderField: "Authorization")
-            let (retryData, retryResponse) = try await session.data(for: request)
-            guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
-                throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
+            do {
+                let newAccessToken = try await refreshAccessToken()
+                request.setValue("Bearer \(newAccessToken)", forHTTPHeaderField: "Authorization")
+                let (retryData, retryResponse) = try await session.data(for: request)
+                guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
+                    throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
+                }
+                guard (200...299).contains(retryHttpResponse.statusCode) else {
+                    if retryHttpResponse.statusCode == 401 {
+                        invalidateSessionAfterFailedAuth()
+                    }
+                    throw NetworkError.serverError(retryHttpResponse.statusCode)
+                }
+                
+                struct UploadResponse: Codable {
+                    let url: String
+                }
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                let uploadResponse = try decoder.decode(UploadResponse.self, from: retryData)
+                
+                // Convert relative URL to absolute URL if needed
+                var imageUrl = uploadResponse.url
+                if imageUrl.hasPrefix("/") && !imageUrl.hasPrefix("http") {
+                    imageUrl = baseURL + imageUrl
+                }
+                
+                return imageUrl
+            } catch {
+                invalidateSessionAfterFailedAuth()
+                throw NetworkError.serverError(401)
             }
-            guard (200...299).contains(retryHttpResponse.statusCode) else {
-                throw NetworkError.serverError(retryHttpResponse.statusCode)
-            }
-            
-            struct UploadResponse: Codable {
-                let url: String
-            }
-            let decoder = JSONDecoder()
-            decoder.dateDecodingStrategy = .iso8601
-            let uploadResponse = try decoder.decode(UploadResponse.self, from: retryData)
-            
-            // Convert relative URL to absolute URL if needed
-            var imageUrl = uploadResponse.url
-            if imageUrl.hasPrefix("/") && !imageUrl.hasPrefix("http") {
-                imageUrl = baseURL + imageUrl
-            }
-            
-            return imageUrl
         }
         
         guard (200...299).contains(httpResponse.statusCode) else {
@@ -2773,7 +2936,7 @@ extension NetworkService {
         progress: (@MainActor (VideoUnderwaterProcessingProgress) -> Void)? = nil
     ) async throws -> Data {
         let base = Self.underwaterVisionModuleBaseURLString()
-        var items: [URLQueryItem] = [
+        let items: [URLQueryItem] = [
             // UVM prod: `fast` | `full` (bech keyframes + global tone). `bech_turbo` — только после обновления UVM.
             URLQueryItem(name: "video_mode", value: "fast"),
             URLQueryItem(name: "sample_frames", value: "12"),
@@ -3333,6 +3496,11 @@ extension NetworkService {
         return trip
     }
 
+    /// Trips the current user has booked (`GET /api/trips/mine`).
+    func getMyBookedTrips() async throws -> [Trip] {
+        return try await request(endpoint: "/api/trips/mine")
+    }
+
     /// Импорт поездки по прямой ссылке сайта для текущего дайв-центра.
     struct ManagedDiveCenterBrief: Codable, Identifiable, Hashable {
         let id: String
@@ -3373,6 +3541,7 @@ extension NetworkService {
         struct CreateTripDTO: Encodable {
             let diveCenterId: String?
             let tripType: String
+            let name: String
             let country: String
             let region: String
             let startDate: String
@@ -3482,6 +3651,7 @@ extension NetworkService {
         let dto = CreateTripDTO(
             diveCenterId: trip.organizerType == .diveCenter ? trip.organizerId : nil,
             tripType: trip.tripType.rawValue,
+            name: trip.name.trimmingCharacters(in: .whitespacesAndNewlines),
             country: trip.country.trimmingCharacters(in: .whitespacesAndNewlines),
             region: trimmedRegion,
             startDate: Self.apiCalendarDateString(from: trip.startDate),
@@ -3554,6 +3724,7 @@ extension NetworkService {
         // IMPORTANT: We need to explicitly encode nil values as null for the server to clear fields
         struct UpdateTripDTO: Encodable {
             let tripType: String
+            let name: String
             let country: String
             let region: String?
             let startDate: String
@@ -3809,6 +3980,7 @@ extension NetworkService {
 
         let dto = UpdateTripDTO(
             tripType: trip.tripType.rawValue,
+            name: trip.name.trimmingCharacters(in: .whitespacesAndNewlines),
             country: trip.country.trimmingCharacters(in: .whitespacesAndNewlines),
             region: trip.region?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty,
             startDate: Self.apiCalendarDateString(from: trip.startDate),
@@ -3885,6 +4057,18 @@ extension NetworkService {
         }
         let request = BookTripRequest(participants: participants)
         return try await self.request(endpoint: "/api/trips/\(tripId)/book", method: .post, body: request)
+    }
+
+    /// Marketplace trip group chat (`GET /api/trips/:id/chat`).
+    func getTripChatConversationId(tripId: String) async throws -> String {
+        struct TripChatResponse: Codable {
+            let conversationId: String
+        }
+        let res: TripChatResponse = try await request(
+            endpoint: "/api/trips/\(tripId)/chat",
+            method: .get
+        )
+        return res.conversationId
     }
     
     // MARK: - Hotels API
@@ -4373,6 +4557,59 @@ extension NetworkService {
             method: .post,
             body: body
         )
+    }
+
+    /// Public ownership-proof upload for catalog partner contact form.
+    func uploadPartnerProof(fileData: Data, filename: String, mimeType: String) async throws -> String {
+        guard let url = URL(string: baseURL + "/api/v1/partner-registrations/proof") else {
+            throw NetworkError.invalidURL
+        }
+        let boundary = UUID().uuidString
+        let body = Self.buildGenericMultipartBody(
+            fileData: fileData,
+            filename: filename,
+            mimeType: mimeType,
+            fieldName: "file",
+            boundary: boundary
+        )
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+        let (data, response) = try await session.data(for: request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.unknown(NSError(domain: "Invalid response", code: -1))
+        }
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw NetworkError.serverError(httpResponse.statusCode)
+        }
+        struct UploadResponse: Codable {
+            let url: String
+            let path: String?
+        }
+        let uploadResponse = try JSONDecoder().decode(UploadResponse.self, from: data)
+        // Keep API-relative path for verification documents.
+        return uploadResponse.path ?? uploadResponse.url
+    }
+
+    private static func buildGenericMultipartBody(
+        fileData: Data,
+        filename: String,
+        mimeType: String,
+        fieldName: String,
+        boundary: String
+    ) -> Data {
+        var body = Data()
+        let lineBreak = "\r\n"
+        body.append("--\(boundary)\(lineBreak)".data(using: .utf8)!)
+        body.append(
+            "Content-Disposition: form-data; name=\"\(fieldName)\"; filename=\"\(filename)\"\(lineBreak)"
+                .data(using: .utf8)!
+        )
+        body.append("Content-Type: \(mimeType)\(lineBreak)\(lineBreak)".data(using: .utf8)!)
+        body.append(fileData)
+        body.append("\(lineBreak)--\(boundary)--\(lineBreak)".data(using: .utf8)!)
+        return body
     }
 
     func addInstructorToDiveCenter(userId: String, diveCenterId: String) async throws -> Instructor {

@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
@@ -6,6 +12,7 @@ import { DiveCenterEntity } from '../dive-centers/entities/dive-center.entity';
 import { DiveSiteEntity } from '../dive-sites/entities/dive-site.entity';
 import { ShopEntity } from '../shops/entities/shop.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
+import { UpdateReviewDto } from './dto/update-review.dto';
 import { ReviewableType } from './types/reviewable-type.enum';
 import { ReviewEntity } from './entities/review.entity';
 
@@ -25,6 +32,19 @@ export class ReviewsService {
   ) {}
 
   async createReview(userId: string, dto: CreateReviewDto) {
+    const existing = await this.reviewRepository.findOne({
+      where: {
+        userId,
+        reviewableType: dto.reviewableType,
+        reviewableId: dto.reviewableId,
+      },
+    });
+    if (existing) {
+      throw new ConflictException(
+        'You already reviewed this place. Edit or delete your existing review.',
+      );
+    }
+
     const language = dto.language?.trim() ? dto.language.trim() : 'en';
     const saved = await this.reviewRepository.save(
       this.reviewRepository.create({
@@ -39,25 +59,46 @@ export class ReviewsService {
     );
 
     await this.recalculateAggregates(dto.reviewableType, dto.reviewableId);
+    return this.toResponse(saved);
+  }
 
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    const userName = user ? `${user.firstName} ${user.lastName}`.trim() : '';
-    const userAvatarURL = user?.avatarUrl;
+  async updateReview(userId: string, reviewId: string, dto: UpdateReviewDto) {
+    const review = await this.reviewRepository.findOne({ where: { id: reviewId } });
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+    if (review.userId !== userId) {
+      throw new ForbiddenException('You can only edit your own review');
+    }
+    if (dto.rating == null && dto.text == null && dto.language == null) {
+      throw new BadRequestException('Nothing to update');
+    }
+    if (dto.rating != null) {
+      review.rating = dto.rating;
+    }
+    if (dto.text != null) {
+      review.text = dto.text.trim();
+    }
+    if (dto.language?.trim()) {
+      review.language = dto.language.trim();
+    }
+    const saved = await this.reviewRepository.save(review);
+    await this.recalculateAggregates(saved.reviewableType, saved.reviewableId);
+    return this.toResponse(saved);
+  }
 
-    return {
-      id: saved.id,
-      userId: saved.userId,
-      userName,
-      userAvatarURL,
-      reviewableType: saved.reviewableType as ReviewableType,
-      reviewableId: saved.reviewableId,
-      rating: saved.rating,
-      text: saved.text,
-      categories: saved.categories ?? null,
-      language: saved.language,
-      createdAt: saved.createdAt,
-      updatedAt: saved.updatedAt,
-    };
+  async deleteReview(userId: string, reviewId: string) {
+    const review = await this.reviewRepository.findOne({ where: { id: reviewId } });
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+    if (review.userId !== userId) {
+      throw new ForbiddenException('You can only delete your own review');
+    }
+    const { reviewableType, reviewableId } = review;
+    await this.reviewRepository.delete({ id: reviewId });
+    await this.recalculateAggregates(reviewableType, reviewableId);
+    return { success: true };
   }
 
   async listReviews(reviewableType: string, reviewableId: string) {
@@ -86,24 +127,30 @@ export class ReviewsService {
     });
     const userMap = new Map(users.map((u) => [u.id, u]));
 
-    return rows.map((r) => {
-      const u = userMap.get(r.userId);
-      const userName = u ? `${u.firstName} ${u.lastName}`.trim() : '';
-      return {
-        id: r.id,
-        userId: r.userId,
-        userName,
-        userAvatarURL: u?.avatarUrl ?? null,
-        reviewableType: r.reviewableType as ReviewableType,
-        reviewableId: r.reviewableId,
-        rating: r.rating,
-        text: r.text,
-        categories: r.categories ?? null,
-        language: r.language,
-        createdAt: r.createdAt,
-        updatedAt: r.updatedAt,
-      };
-    });
+    return rows.map((r) => this.mapRow(r, userMap.get(r.userId)));
+  }
+
+  private async toResponse(saved: ReviewEntity) {
+    const user = await this.userRepository.findOne({ where: { id: saved.userId } });
+    return this.mapRow(saved, user);
+  }
+
+  private mapRow(r: ReviewEntity, u?: User | null) {
+    const userName = u ? `${u.firstName} ${u.lastName}`.trim() : '';
+    return {
+      id: r.id,
+      userId: r.userId,
+      userName,
+      userAvatarURL: u?.avatarUrl ?? null,
+      reviewableType: r.reviewableType as ReviewableType,
+      reviewableId: r.reviewableId,
+      rating: r.rating,
+      text: r.text,
+      categories: r.categories ?? null,
+      language: r.language,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    };
   }
 
   /**
@@ -183,7 +230,6 @@ export class ReviewsService {
         break;
       }
       default:
-        // instructor (and future types) have no denormalized columns yet
         break;
     }
   }

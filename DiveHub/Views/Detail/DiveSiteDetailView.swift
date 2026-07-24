@@ -10,14 +10,28 @@ import SwiftUI
 struct DiveSiteDetailView: View {
     let site: DiveSite
     var onShowOnMap: (() -> Void)? = nil
+    @State private var displayedSite: DiveSite
     @State private var contributionMode: DiveSiteContributionMode?
     @StateObject private var localizationService = LocalizationService.shared
     @State private var recentDivePhotos: [String] = []
-    
+    @State private var isLoadingDetail = false
+
+    init(site: DiveSite, onShowOnMap: (() -> Void)? = nil) {
+        self.site = site
+        self.onShowOnMap = onShowOnMap
+        _displayedSite = State(initialValue: site)
+    }
+
+    /// Extra site photos (often dive maps / diagrams from catalog imports).
+    private var diveMapPhotos: [String] {
+        Array(displayedSite.photos.dropFirst())
+    }
+
     private var galleryPhotos: [String] {
         var seen = Set<String>()
         var merged: [String] = []
-        for raw in site.photos + recentDivePhotos {
+        let cover = displayedSite.photos.prefix(1)
+        for raw in cover + recentDivePhotos {
             let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
             if value.isEmpty { continue }
             if seen.insert(value).inserted {
@@ -52,10 +66,10 @@ struct DiveSiteDetailView: View {
                     // Title and Rating
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(site.displayName)
+                            Text(displayedSite.displayName)
                                 .font(.title)
                                 .fontWeight(.bold)
-                            Text(site.siteType.displayName)
+                            Text(displayedSite.siteType.displayName)
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
                         }
@@ -64,10 +78,10 @@ struct DiveSiteDetailView: View {
                             HStack {
                                 Image(systemName: "star.fill")
                                     .foregroundColor(.yellow)
-                                Text(String(format: "%.1f", site.averageRating))
+                                Text(String(format: "%.1f", displayedSite.averageRating))
                                     .fontWeight(.semibold)
                             }
-                            Text("(\(site.reviewCount) \(localizationService.localizedString("reviews", table: "common")))")
+                            Text("(\(displayedSite.reviewCount) \(localizationService.localizedString("reviews", table: "common")))")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
@@ -77,24 +91,36 @@ struct DiveSiteDetailView: View {
                     
                     // Key Info
                     VStack(alignment: .leading, spacing: 8) {
-                        DiveSiteInfoRow(icon: "gauge", title: localizationService.localizedString("maxDepth", table: "logbook"), value: "\(Int(site.maxDepth))m")
-                        DiveSiteInfoRow(icon: "chart.bar", title: localizationService.localizedString("avgDepth", table: "logbook"), value: "\(Int(site.averageDepth))m")
-                        DiveSiteInfoRow(icon: "exclamationmark.triangle", title: localizationService.localizedString("difficulty", table: "explore"), value: site.difficulty.displayName)
-                        if let visibility = site.visibility {
+                        DiveSiteInfoRow(icon: "gauge", title: localizationService.localizedString("maxDepth", table: "logbook"), value: "\(Int(displayedSite.maxDepth))m")
+                        DiveSiteInfoRow(icon: "chart.bar", title: localizationService.localizedString("avgDepth", table: "logbook"), value: "\(Int(displayedSite.averageDepth))m")
+                        DiveSiteInfoRow(icon: "exclamationmark.triangle", title: localizationService.localizedString("difficulty", table: "explore"), value: displayedSite.difficulty.displayName)
+                        if let visibility = displayedSite.visibility {
                             DiveSiteInfoRow(icon: "eye", title: localizationService.localizedString("visibility", table: "logbook"), value: visibility)
                         }
                     }
                     
                     // Description
-                    if !site.displayDescription.isEmpty {
+                    if !displayedSite.displayDescription.isEmpty {
                         Text(localizationService.localizedString("description", table: "common"))
                             .font(.headline)
-                        Text(site.displayDescription)
+                        Text(displayedSite.displayDescription)
                             .font(.body)
+                    }
+
+                    if !diveMapPhotos.isEmpty {
+                        Text(localizationService.localizedString("diveMaps", table: "diveSite"))
+                            .font(.headline)
+                        DiveSiteMediaStrip(urls: diveMapPhotos)
+                    }
+
+                    if !displayedSite.videos.isEmpty {
+                        Text(localizationService.localizedString("diveVideos", table: "diveSite"))
+                            .font(.headline)
+                        DiveSiteMediaStrip(urls: displayedSite.videos)
                     }
                     
                     // AI Summary
-                    if let aiSummary = site.aiSummary {
+                    if let aiSummary = displayedSite.aiSummary {
                         VStack(alignment: .leading, spacing: 4) {
                             HStack {
                                 Image(systemName: "sparkles")
@@ -112,12 +138,12 @@ struct DiveSiteDetailView: View {
                     }
                     
                     // Marine Life
-                    if !site.marineLife.isEmpty {
+                    if !displayedSite.marineLife.isEmpty {
                         Text(localizationService.localizedString("marineLife", table: "diveSite"))
                             .font(.headline)
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack {
-                                ForEach(site.marineLife, id: \.self) { life in
+                                ForEach(displayedSite.marineLife, id: \.self) { life in
                                     Text(life)
                                         .padding(.horizontal, 12)
                                         .padding(.vertical, 6)
@@ -131,24 +157,27 @@ struct DiveSiteDetailView: View {
                     
                     // Recent Dives Section (only if users share their logbook)
                     RecentDivesSection(
-                        diveSiteId: site.id,
+                        diveSiteId: displayedSite.id,
                         onPhotosLoaded: { photos in
                             recentDivePhotos = photos
                         }
                     )
                     
                     // Reviews Section
-                    ReviewsSection(reviewableType: .diveSite, reviewableId: site.id)
+                    ReviewsSection(reviewableType: .diveSite, reviewableId: displayedSite.id)
                 }
                 .padding()
             }
         }
-        .navigationTitle(site.displayName)
+        .navigationTitle(displayedSite.displayName)
         .navigationBarTitleDisplayMode(.inline)
+        .task(id: site.id) {
+            await loadFullSiteIfNeeded()
+        }
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 if AuthenticationService.shared.isAuthenticated {
-                    Button(action: { contributionMode = .correction(site) }) {
+                    Button(action: { contributionMode = .correction(displayedSite) }) {
                         Image(systemName: "exclamationmark.bubble")
                     }
                     .accessibilityLabel(localizationService.localizedString("reportDiveSiteInaccuracy", table: "diveSite"))
@@ -162,6 +191,46 @@ struct DiveSiteDetailView: View {
         }
         .sheet(item: $contributionMode) { mode in
             DiveSiteContributionSheet(mode: mode)
+        }
+    }
+
+    private func loadFullSiteIfNeeded() async {
+        guard !isLoadingDetail else { return }
+        isLoadingDetail = true
+        defer { isLoadingDetail = false }
+        do {
+            let full = try await NetworkService.shared.getDiveSite(id: site.id)
+            displayedSite = full
+        } catch {
+            #if DEBUG
+            print("⚠️ [DiveSiteDetailView] Failed to load site \(site.id): \(error)")
+            #endif
+        }
+    }
+}
+
+private struct DiveSiteMediaStrip: View {
+    let urls: [String]
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(urls, id: \.self) { raw in
+                    AsyncImage(url: URL(string: NetworkService.shared.fullImageURL(from: raw) ?? "")) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                        default:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.3))
+                        }
+                    }
+                    .frame(width: 220, height: 160)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+            }
         }
     }
 }
@@ -191,7 +260,7 @@ struct ReviewsSection: View {
     @StateObject private var viewModel = ReviewsViewModel()
     @StateObject private var localizationService = LocalizationService.shared
     @StateObject private var authService = AuthenticationService.shared
-    @State private var showAddReview = false
+    @State private var showReviewEditor = false
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -200,10 +269,12 @@ struct ReviewsSection: View {
                     .font(.headline)
                 Spacer()
                 if authService.isAuthenticated {
-                    Button(action: { showAddReview = true }) {
+                    Button(action: { showReviewEditor = true }) {
                         Label(
-                            localizationService.localizedString("addReview", table: "common"),
-                            systemImage: "plus.circle.fill"
+                            viewModel.myReview == nil
+                                ? localizationService.localizedString("addReview", table: "common")
+                                : localizationService.localizedString("editReview", table: "common"),
+                            systemImage: viewModel.myReview == nil ? "plus.circle.fill" : "pencil.circle.fill"
                         )
                         .font(.subheadline)
                     }
@@ -216,19 +287,24 @@ struct ReviewsSection: View {
                     .foregroundColor(.secondary)
             } else {
                 ForEach(viewModel.reviews) { review in
-                    ReviewRow(review: review)
+                    ReviewRow(
+                        review: review,
+                        isMine: review.userId == authService.currentUser?.id,
+                        onEdit: { showReviewEditor = true }
+                    )
                 }
             }
         }
         .task {
             await viewModel.loadReviews(type: reviewableType, id: reviewableId)
         }
-        .sheet(isPresented: $showAddReview) {
+        .sheet(isPresented: $showReviewEditor) {
             AddReviewView(
                 reviewableType: reviewableType,
                 reviewableId: reviewableId,
+                existing: viewModel.myReview,
                 viewModel: viewModel,
-                onDismiss: { showAddReview = false }
+                onDismiss: { showReviewEditor = false }
             )
         }
     }
@@ -237,6 +313,7 @@ struct ReviewsSection: View {
 struct AddReviewView: View {
     let reviewableType: ReviewableType
     let reviewableId: String
+    var existing: Review? = nil
     @ObservedObject var viewModel: ReviewsViewModel
     var onDismiss: () -> Void
     
@@ -244,7 +321,10 @@ struct AddReviewView: View {
     @State private var rating: Int = 5
     @State private var text: String = ""
     @State private var errorMessage: String?
+    @State private var confirmDelete = false
     @Environment(\.dismiss) private var dismiss
+
+    private var isEditing: Bool { existing != nil }
     
     var body: some View {
         NavigationView {
@@ -269,6 +349,16 @@ struct AddReviewView: View {
                     TextEditor(text: $text)
                         .frame(minHeight: 100)
                 }
+                if isEditing {
+                    Section {
+                        Button(role: .destructive) {
+                            confirmDelete = true
+                        } label: {
+                            Text(localizationService.localizedString("deleteReview", table: "common"))
+                        }
+                        .disabled(viewModel.isSubmitting)
+                    }
+                }
                 if let error = errorMessage {
                     Section {
                         Text(error)
@@ -277,7 +367,9 @@ struct AddReviewView: View {
                     }
                 }
             }
-            .navigationTitle(localizationService.localizedString("addReview", table: "common"))
+            .navigationTitle(
+                localizationService.localizedString(isEditing ? "editReview" : "addReview", table: "common")
+            )
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -287,13 +379,29 @@ struct AddReviewView: View {
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(localizationService.localizedString("submit", table: "common")) {
+                    Button(localizationService.localizedString(isEditing ? "save" : "submit", table: "common")) {
                         Task { await submit() }
                     }
                     .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || viewModel.isSubmitting)
                 }
             }
+            .onAppear {
+                if let existing {
+                    rating = existing.rating
+                    text = existing.text
+                }
+            }
             .onSubmit { Task { await submit() } }
+            .confirmationDialog(
+                localizationService.localizedString("deleteReviewConfirm", table: "common"),
+                isPresented: $confirmDelete,
+                titleVisibility: .visible
+            ) {
+                Button(localizationService.localizedString("deleteReview", table: "common"), role: .destructive) {
+                    Task { await deleteMine() }
+                }
+                Button(localizationService.localizedString("cancel", table: "common"), role: .cancel) {}
+            }
         }
     }
     
@@ -305,7 +413,38 @@ struct AddReviewView: View {
         }
         errorMessage = nil
         do {
-            try await viewModel.submitReview(reviewableType: reviewableType, reviewableId: reviewableId, rating: rating, text: trimmed)
+            if let existing {
+                try await viewModel.updateReview(
+                    id: existing.id,
+                    reviewableType: reviewableType,
+                    reviewableId: reviewableId,
+                    rating: rating,
+                    text: trimmed
+                )
+            } else {
+                try await viewModel.submitReview(
+                    reviewableType: reviewableType,
+                    reviewableId: reviewableId,
+                    rating: rating,
+                    text: trimmed
+                )
+            }
+            onDismiss()
+            dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func deleteMine() async {
+        guard let existing else { return }
+        errorMessage = nil
+        do {
+            try await viewModel.deleteReview(
+                id: existing.id,
+                reviewableType: reviewableType,
+                reviewableId: reviewableId
+            )
             onDismiss()
             dismiss()
         } catch {
@@ -493,6 +632,9 @@ struct RecentDiveRow: View {
 
 struct ReviewRow: View {
     let review: Review
+    var isMine: Bool = false
+    var onEdit: (() -> Void)? = nil
+    @StateObject private var localizationService = LocalizationService.shared
     
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -500,6 +642,12 @@ struct ReviewRow: View {
                 Text(review.userName)
                     .fontWeight(.semibold)
                 Spacer()
+                if isMine, let onEdit {
+                    Button(action: onEdit) {
+                        Text(localizationService.localizedString("editReview", table: "common"))
+                            .font(.caption)
+                    }
+                }
                 HStack {
                     ForEach(1...5, id: \.self) { index in
                         Image(systemName: index <= review.rating ? "star.fill" : "star")

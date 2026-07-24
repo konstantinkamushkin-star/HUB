@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -14,7 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
@@ -26,7 +26,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -48,9 +47,11 @@ import com.divehub.app.AppGraph
 import com.divehub.app.R
 import com.divehub.app.data.ReviewsRepository
 import com.divehub.app.data.remote.dto.ReviewDto
+import com.divehub.app.ui.components.IosPushRouteHeader
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.reviews.AddReviewableDialog
 import com.divehub.app.ui.reviews.ReviewListRow
+import com.divehub.app.ui.theme.iosChromePageBackground
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,41 +67,43 @@ fun ShopPublicRoute(
     )
     val state by vm.state.collectAsState()
     var loggedIn by remember { mutableStateOf(false) }
+    var currentUserId by remember { mutableStateOf<String?>(null) }
     var reviews by remember { mutableStateOf<List<ReviewDto>>(emptyList()) }
     var reviewsLoading by remember { mutableStateOf(false) }
     var showReviewDialog by remember { mutableStateOf(false) }
+    val myReview = reviews.firstOrNull { !it.userId.isNullOrBlank() && it.userId == currentUserId }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
     LaunchedEffect(graph.tokenStore) {
         loggedIn = !graph.tokenStore.getAccessToken().isNullOrBlank()
+        currentUserId = graph.tokenStore.getUserJson()?.let { raw ->
+            runCatching {
+                graph.gson.fromJson(raw, com.divehub.app.data.remote.dto.UserDto::class.java).id
+            }.getOrNull()
+        }
     }
 
-    LaunchedEffect(shopId, loggedIn) {
+    LaunchedEffect(shopId) {
         reviewsLoading = true
-        reviews = if (loggedIn) {
-            runCatching { ReviewsRepository(graph).listReviews("shop", shopId) }.getOrElse { emptyList() }
-        } else {
-            emptyList()
-        }
+        reviews = runCatching {
+            ReviewsRepository(graph).listReviews("shop", shopId)
+        }.getOrElse { emptyList() }
         reviewsLoading = false
+        vm.refresh()
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        state.shop?.name ?: stringResource(R.string.shop_public_title),
-                        maxLines = 1,
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = { innerNav.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+        containerColor = iosChromePageBackground(),
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            IosPushRouteHeader(
+                title = state.shop?.name ?: stringResource(R.string.shop_public_title),
+                onBack = { innerNav.popBackStack() },
+                backContentDescription = stringResource(R.string.common_back),
+                useLargeTitle = false,
+                toolbarTrailing = {
                     if (loggedIn) {
                         IconButton(
                             onClick = {
@@ -110,18 +113,11 @@ fun ShopPublicRoute(
                             Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = stringResource(R.string.explore_message_shop))
                         }
                     }
-                    TextButton(
-                        onClick = { innerNav.navigate(InnerRoutes.bookingWizard()) },
-                    ) {
-                        Text(stringResource(R.string.explore_book))
-                    }
                 },
             )
-        },
-    ) { padding ->
         when {
             state.loading && state.shop == null && state.error == null -> Box(
-                Modifier.fillMaxSize().padding(padding),
+                Modifier.fillMaxSize().weight(1f),
                 contentAlignment = Alignment.Center,
             ) {
                 CircularProgressIndicator()
@@ -129,7 +125,7 @@ fun ShopPublicRoute(
             state.error != null && state.shop == null -> Column(
                 Modifier
                     .fillMaxSize()
-                    .padding(padding)
+                    .weight(1f)
                     .padding(24.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
@@ -145,7 +141,7 @@ fun ShopPublicRoute(
                 Column(
                     Modifier
                         .fillMaxSize()
-                        .padding(padding)
+                        .weight(1f)
                         .verticalScroll(rememberScrollState())
                         .padding(20.dp),
                 ) {
@@ -160,11 +156,17 @@ fun ShopPublicRoute(
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f),
                         )
+                        val displayRating = when {
+                            !reviewsLoading && reviews.isNotEmpty() ->
+                                reviews.map { it.rating.toDouble() }.average()
+                            !reviewsLoading -> 0.0
+                            else -> s.averageRating ?: 0.0
+                        }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(4.dp))
                             Text(
-                                "%.1f".format(s.averageRating ?: 0.0),
+                                "%.1f".format(displayRating),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold,
                             )
@@ -182,6 +184,28 @@ fun ShopPublicRoute(
                     s.address?.takeIf { it.isNotBlank() }?.let { a ->
                         Spacer(Modifier.height(4.dp))
                         Text(a, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    val phones = (s.phone ?: "")
+                        .split(',', ';', '\n', '/', '|')
+                        .map { it.trim() }
+                        .filter { it.isNotEmpty() }
+                    if (phones.isNotEmpty() || !s.email.isNullOrBlank() || !s.website.isNullOrBlank()) {
+                        Spacer(Modifier.height(12.dp))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(12.dp))
+                        Text(stringResource(R.string.dive_center_admin_contact_section), fontWeight = FontWeight.SemiBold)
+                        Spacer(Modifier.height(8.dp))
+                        phones.forEach { phone ->
+                            Text(phone, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(4.dp))
+                        }
+                        s.email?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.height(4.dp))
+                        }
+                        s.website?.takeIf { it.isNotBlank() }?.let {
+                            Text(it, color = MaterialTheme.colorScheme.primary)
+                        }
                     }
                     Spacer(Modifier.height(12.dp))
                     HorizontalDivider()
@@ -214,7 +238,11 @@ fun ShopPublicRoute(
                         ) {
                             Icon(Icons.Default.Star, null, tint = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.width(4.dp))
-                            Text(stringResource(R.string.explore_add_review))
+                            Text(
+                                stringResource(
+                                    if (myReview != null) R.string.review_edit else R.string.explore_add_review,
+                                ),
+                            )
                         }
                     }
                     when {
@@ -226,11 +254,6 @@ fun ShopPublicRoute(
                             Spacer(Modifier.width(8.dp))
                             Text(stringResource(R.string.chat_loading), style = MaterialTheme.typography.bodySmall)
                         }
-                        !loggedIn -> Text(
-                            stringResource(R.string.review_login_required),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
                         reviews.isEmpty() -> Text(
                             stringResource(R.string.explore_no_reviews_yet),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -238,15 +261,20 @@ fun ShopPublicRoute(
                         else -> {
                             reviews.forEach { r ->
                                 HorizontalDivider(Modifier.padding(vertical = 4.dp))
-                                ReviewListRow(r)
+                                ReviewListRow(
+                                    r = r,
+                                    isMine = !r.userId.isNullOrBlank() && r.userId == currentUserId,
+                                    onEdit = { showReviewDialog = true },
+                                )
                             }
                         }
                     }
                 }
             }
-            else -> Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
+            else -> Box(Modifier.fillMaxSize().weight(1f), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
+        }
         }
     }
 
@@ -255,16 +283,25 @@ fun ShopPublicRoute(
             reviewableType = "shop",
             reviewableId = shopId,
             graph = graph,
+            existing = myReview,
             onDismiss = { showReviewDialog = false },
             onSuccess = {
+                val editingMine = myReview != null
                 showReviewDialog = false
                 scope.launch {
                     reviews = runCatching {
                         ReviewsRepository(graph).listReviews("shop", shopId)
                     }.getOrElse { emptyList() }
+                    val stillMine = reviews.any { it.userId == currentUserId }
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            if (editingMine && !stillMine) R.string.review_deleted else R.string.review_sent,
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
                 vm.refresh()
-                Toast.makeText(context, context.getString(R.string.review_sent), Toast.LENGTH_SHORT).show()
             },
         )
     }

@@ -16,18 +16,15 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,9 +47,11 @@ import com.divehub.app.data.ReviewsRepository
 import com.divehub.app.data.UsersRepository
 import com.divehub.app.data.remote.dto.ReviewDto
 import com.divehub.app.data.remote.dto.UserDto
+import com.divehub.app.ui.components.IosPushRouteHeader
 import com.divehub.app.ui.navigation.InnerRoutes
 import com.divehub.app.ui.reviews.AddReviewableDialog
 import com.divehub.app.ui.reviews.ReviewListRow
+import com.divehub.app.ui.theme.iosChromePageBackground
 import com.divehub.app.util.absoluteMediaUrl
 import kotlinx.coroutines.launch
 
@@ -101,11 +100,18 @@ fun InstructorPublicRoute(
     var error by remember { mutableStateOf<String?>(null) }
     var loading by remember { mutableStateOf(true) }
     var showReviewDialog by remember { mutableStateOf(false) }
+    var currentUserId by remember { mutableStateOf<String?>(null) }
+    val myReview = reviews.firstOrNull { !it.userId.isNullOrBlank() && it.userId == currentUserId }
 
     LaunchedEffect(userId) {
         loading = true
         error = null
         apiRoot = graph.tokenStore.getRootBaseUrl()
+        currentUserId = graph.tokenStore.getUserJson()?.let { raw ->
+            runCatching {
+                graph.gson.fromJson(raw, UserDto::class.java).id
+            }.getOrNull()
+        }
         runCatching {
             val u = repo.getUser(userId)
             user = u
@@ -117,15 +123,14 @@ fun InstructorPublicRoute(
     }
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text(user?.displayName() ?: stringResource(R.string.instructor_public_title)) },
-                navigationIcon = {
-                    IconButton(onClick = { innerNav.popBackStack() }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                },
-                actions = {
+        containerColor = iosChromePageBackground(),
+    ) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            IosPushRouteHeader(
+                title = user?.displayName() ?: stringResource(R.string.instructor_public_title),
+                onBack = { innerNav.popBackStack() },
+                backContentDescription = stringResource(R.string.common_back),
+                toolbarTrailing = {
                     if (user != null) {
                         TextButton(
                             onClick = {
@@ -145,43 +150,40 @@ fun InstructorPublicRoute(
                     }
                 },
             )
-        },
-    ) { padding ->
-        when {
-            loading -> Box(
-                Modifier.fillMaxSize().padding(padding),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
-            error != null -> Column(
-                Modifier.fillMaxSize().padding(padding).padding(24.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Text(error ?: "")
-                Spacer(Modifier.height(12.dp))
-                TextButton(onClick = { innerNav.popBackStack() }) {
-                    Text(stringResource(R.string.common_back))
-                }
-            }
-            user != null -> {
-                val u = user!!
-                val avg = if (reviews.isNotEmpty()) {
-                    reviews.map { it.rating }.average()
-                } else {
-                    null
-                }
-                val certs = u.fallbackCertifications()
-                val langs = u.languagesFromProfile()
-                Column(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(padding)
-                        .verticalScroll(rememberScrollState())
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+            when {
+                loading -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
                 ) {
+                    CircularProgressIndicator()
+                }
+                error != null -> Column(
+                    Modifier.fillMaxSize().padding(24.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(error ?: "")
+                    Spacer(Modifier.height(12.dp))
+                    TextButton(onClick = { innerNav.popBackStack() }) {
+                        Text(stringResource(R.string.common_back))
+                    }
+                }
+                user != null -> {
+                    val u = user!!
+                    val avg = if (reviews.isNotEmpty()) {
+                        reviews.map { it.rating }.average()
+                    } else {
+                        null
+                    }
+                    val certs = u.fallbackCertifications()
+                    val langs = u.languagesFromProfile()
+                    Column(
+                        Modifier
+                            .fillMaxSize()
+                            .verticalScroll(rememberScrollState())
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
@@ -280,16 +282,27 @@ fun InstructorPublicRoute(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
-                        reviews.forEach { r -> ReviewListRow(r) }
+                        reviews.forEach { r ->
+                            ReviewListRow(
+                                r = r,
+                                isMine = !r.userId.isNullOrBlank() && r.userId == currentUserId,
+                                onEdit = { showReviewDialog = true },
+                            )
+                        }
                     }
                     TextButton(
                         onClick = { showReviewDialog = true },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text(stringResource(R.string.explore_add_review))
+                        Text(
+                            stringResource(
+                                if (myReview != null) R.string.review_edit else R.string.explore_add_review,
+                            ),
+                        )
                     }
                 }
             }
+        }
         }
     }
 
@@ -298,14 +311,23 @@ fun InstructorPublicRoute(
             reviewableType = "instructor",
             reviewableId = userId,
             graph = graph,
+            existing = myReview,
             onDismiss = { showReviewDialog = false },
             onSuccess = {
+                val editingMine = myReview != null
                 showReviewDialog = false
                 scope.launch {
                     runCatching {
                         reviews = ReviewsRepository(graph).listReviews("instructor", userId)
                     }
-                    Toast.makeText(context, context.getString(R.string.review_sent), Toast.LENGTH_SHORT).show()
+                    val stillMine = reviews.any { it.userId == currentUserId }
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            if (editingMine && !stillMine) R.string.review_deleted else R.string.review_sent,
+                        ),
+                        Toast.LENGTH_SHORT,
+                    ).show()
                 }
             },
         )
