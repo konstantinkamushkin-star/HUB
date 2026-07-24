@@ -74,6 +74,15 @@ const MIGRATION_FILES = [
   '037_user_locations_and_privacy.sql',
   '038_group_trips_and_chat_trip.sql',
   '039_feed_post_videos.sql',
+  '040_transliterate_dive_site_names.sql',
+  '041_transliterate_hebrew_dive_site_names.sql',
+  '042_trip_name.sql',
+  '043_catalog_listing_only.sql',
+  '044_dive_log_title.sql',
+  '045_fix_trips_courses_updated_at_trigger.sql',
+  '046_group_trips_itinerary.sql',
+  '047_user_achievements.sql',
+  '048_reviews_one_per_user.sql',
 ];
 
 function pick(envFile, key, fallback) {
