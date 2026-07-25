@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { FriendsService } from '../friends/friends.service';
 import { FeedPost } from './entities/feed-post.entity';
@@ -17,6 +17,7 @@ import { DiveSiteEntity } from '../dive-sites/entities/dive-site.entity';
 import {
   normalizeStoredMediaUrls,
 } from '../common/media-url.util';
+import { FeedPostStatus, UserAccountStatus } from '../common/statuses';
 
 function toPublicUser(user: User): Omit<User, 'password'> {
   const { password: _, ...rest } = user;
@@ -73,13 +74,69 @@ export class FeedService {
     return [...new Set([viewerId, ...friendIds])];
   }
 
+  private isPublishedFeedPost(post: FeedPost, author?: User | null): boolean {
+    if (post.deletedAt) {
+      return false;
+    }
+    if (post.moderationStatus !== FeedPostStatus.PUBLISHED) {
+      return false;
+    }
+    if (!author) {
+      return false;
+    }
+    if (author.deletedAt || author.accountStatus !== UserAccountStatus.ACTIVE) {
+      return false;
+    }
+    return true;
+  }
+
+  private applyUnifiedFeedVisibility(
+    qb: ReturnType<Repository<FeedPost>['createQueryBuilder']>,
+    authorIds: string[],
+  ) {
+    qb.andWhere('p.deletedAt IS NULL');
+    qb.andWhere('u.accountStatus = :activeStatus', {
+      activeStatus: UserAccountStatus.ACTIVE,
+    });
+    qb.andWhere('u.deletedAt IS NULL');
+    qb.andWhere(
+      new Brackets((outer) => {
+        outer
+          .where(
+            new Brackets((friends) => {
+              friends
+                .where('p.userId IN (:...authorIds)', { authorIds })
+                .andWhere('p.moderationStatus = :published', {
+                  published: FeedPostStatus.PUBLISHED,
+                });
+            }),
+          )
+          .orWhere(
+            new Brackets((discover) => {
+              discover
+                .where('p.userId NOT IN (:...authorIds)', { authorIds })
+                .andWhere('p.moderationStatus = :published', {
+                  published: FeedPostStatus.PUBLISHED,
+                });
+            }),
+          );
+      }),
+    );
+  }
+
   private async assertPostVisible(postId: string, viewerId: string) {
-    const post = await this.postRepository.findOne({ where: { id: postId } });
+    const post = await this.postRepository.findOne({
+      where: { id: postId },
+      relations: ['user'],
+    });
     if (!post) {
       throw new NotFoundException('Post not found');
     }
     const allowed = await this.visibleAuthorIds(viewerId);
-    if (!allowed.includes(post.userId)) {
+    if (
+      !allowed.includes(post.userId) &&
+      !this.isPublishedFeedPost(post, post.user)
+    ) {
       throw new ForbiddenException('Post not visible');
     }
     return post;
@@ -211,10 +268,16 @@ export class FeedService {
     limit = DEFAULT_FEED_LIMIT,
     cursor?: string | null,
   ) {
-    if (viewerId !== profileUserId) {
+    const isSelf = viewerId === profileUserId;
+    if (!isSelf) {
       const friends = await this.friendsService.listFriendUserIds(viewerId);
       if (!friends.includes(profileUserId)) {
-        throw new ForbiddenException('Not allowed to view this profile feed');
+        const profileUser = await this.postRepository.manager
+          .getRepository(User)
+          .findOne({ where: { id: profileUserId } });
+        if (!profileUser?.publicProfile) {
+          throw new ForbiddenException('Not allowed to view this profile feed');
+        }
       }
     }
     const lim = Math.min(Math.max(limit, 1), MAX_FEED_LIMIT);
@@ -222,9 +285,16 @@ export class FeedService {
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.user', 'u')
       .where('p.userId = :uid', { uid: profileUserId })
+      .andWhere('p.deletedAt IS NULL')
       .orderBy('p.createdAt', 'DESC')
       .addOrderBy('p.id', 'DESC')
       .take(lim + 1);
+
+    if (!isSelf) {
+      qb.andWhere('p.moderationStatus = :published', {
+        published: FeedPostStatus.PUBLISHED,
+      });
+    }
 
     if (cursor) {
       const c = decodeFeedCursor(cursor);
@@ -269,9 +339,9 @@ export class FeedService {
     const lim = Math.min(Math.max(limit, 1), MAX_FEED_LIMIT);
     const qb = this.postRepository
       .createQueryBuilder('p')
-      .leftJoinAndSelect('p.user', 'u')
-      .where('p.userId IN (:...authorIds)', { authorIds })
-      .orderBy('p.createdAt', 'DESC')
+      .leftJoinAndSelect('p.user', 'u');
+    this.applyUnifiedFeedVisibility(qb, authorIds);
+    qb.orderBy('p.createdAt', 'DESC')
       .addOrderBy('p.id', 'DESC')
       .take(lim + 1);
 

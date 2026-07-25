@@ -29,7 +29,10 @@ export class FeedController {
   constructor(private readonly feedService: FeedService) {}
 
   @Get('posts')
-  @ApiOperation({ summary: 'Friends + own posts (cursor pagination)' })
+  @ApiOperation({
+    summary:
+      'Unified feed: own + friends + published posts from other active users (cursor pagination)',
+  })
   async listPosts(
     @Request() req: { user: { sub: string } },
     @Query('limit') limitStr?: string,
@@ -47,7 +50,8 @@ export class FeedController {
 
   @Get('profile/:userId/posts')
   @ApiOperation({
-    summary: 'Posts by one user (self or accepted friend)',
+    summary:
+      'Posts by one user (self, accepted friend, or public profile)',
   })
   async listProfilePosts(
     @Request() req: { user: { sub: string } },
