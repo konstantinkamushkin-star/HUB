@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
@@ -8,6 +9,14 @@ import {
   MinLength,
   Equals,
 } from 'class-validator';
+
+/** `@IsOptional` skips only null/undefined — empty string still fails `@IsEmail`. */
+function emptyToUndefined({ value }: { value: unknown }): unknown {
+  if (typeof value === 'string' && value.trim() === '') {
+    return undefined;
+  }
+  return typeof value === 'string' ? value.trim() : value;
+}
 
 export class GoogleAuthDto {
   @ApiProperty({ description: 'Google ID token from GIDGoogleUser.idToken' })
@@ -22,16 +31,19 @@ export class GoogleAuthDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsEmail()
   email?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsString()
   firstName?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsString()
   lastName?: string;
 

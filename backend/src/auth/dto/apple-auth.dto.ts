@@ -1,4 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsEmail,
@@ -9,6 +10,14 @@ import {
   Equals,
 } from 'class-validator';
 
+/** `@IsOptional` skips only null/undefined — empty string still fails `@IsEmail`. */
+function emptyToUndefined({ value }: { value: unknown }): unknown {
+  if (typeof value === 'string' && value.trim() === '') {
+    return undefined;
+  }
+  return typeof value === 'string' ? value.trim() : value;
+}
+
 export class AppleAuthDto {
   @ApiProperty({ description: 'Apple identity token (JWT) from ASAuthorizationAppleIDCredential' })
   @IsString()
@@ -17,16 +26,19 @@ export class AppleAuthDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsEmail()
   email?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsString()
   firstName?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
+  @Transform(emptyToUndefined)
   @IsString()
   lastName?: string;
 
