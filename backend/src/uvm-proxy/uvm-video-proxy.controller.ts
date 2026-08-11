@@ -13,9 +13,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import axios, { AxiosError } from 'axios';
 import FormData from 'form-data';
 import type { Response } from 'express';
+import { MediaBrandingService } from '../branding/media-branding.service';
 
 @Controller('v1/process/video')
 export class UvmVideoProxyController {
+  constructor(private readonly branding: MediaBrandingService) {}
+
   @Post(':engine')
   @UseInterceptors(
     FileInterceptor('video', {
@@ -70,8 +73,10 @@ export class UvmVideoProxyController {
       });
       res.status(r.status);
       if (r.status >= 200 && r.status < 300) {
+        const raw = Buffer.from(r.data);
+        const branded = await this.branding.watermarkMp4(raw);
         res.setHeader('Content-Type', r.headers['content-type'] || 'video/mp4');
-        return res.send(Buffer.from(r.data));
+        return res.send(branded);
       }
       const bodyText = Buffer.from(r.data).toString('utf-8');
       return res.send(bodyText);

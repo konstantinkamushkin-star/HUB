@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios, { AxiosInstance } from 'axios';
 import FormData from 'form-data';
+import { MediaBrandingService } from '../branding/media-branding.service';
 
 export interface ProcessUnderwaterOptions {
   depthMeters?: number;
@@ -24,7 +25,10 @@ export class UnderwaterAiService {
   private readonly client: AxiosInstance;
   private readonly baseUrl: string | null;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly branding: MediaBrandingService,
+  ) {
     this.baseUrl = this.configService.get<string>('AI_UNDERWATER_SERVICE_URL') || null;
     const rawTimeout = this.configService.get<string>('AI_UNDERWATER_HTTP_TIMEOUT_MS');
     const parsed = rawTimeout != null ? parseInt(String(rawTimeout).trim(), 10) : NaN;
@@ -113,7 +117,8 @@ export class UnderwaterAiService {
             },
           );
           if (uvmResp.status === 200 && uvmResp.data?.image_jpeg_base64) {
-            return Buffer.from(uvmResp.data.image_jpeg_base64, 'hex');
+            const jpeg = Buffer.from(uvmResp.data.image_jpeg_base64, 'hex');
+            return this.branding.watermarkJpeg(jpeg);
           }
         } catch (e: any) {
           this.logger.warn(`UVM fallback failed: ${e?.message}`);
@@ -135,6 +140,6 @@ export class UnderwaterAiService {
       throw new Error(`AI service: ${detail}`);
     }
 
-    return Buffer.from(response.data as ArrayBuffer);
+    return this.branding.watermarkJpeg(Buffer.from(response.data as ArrayBuffer));
   }
 }
