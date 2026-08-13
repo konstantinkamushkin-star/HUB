@@ -18,6 +18,7 @@ import { UnderwaterAiModule } from './underwater-ai/underwater-ai.module';
 import { ImageProcessingModule } from './image-processing/image-processing.module';
 import { UvmProxyModule } from './uvm-proxy/uvm-proxy.module';
 import { FriendsModule } from './friends/friends.module';
+import { BuddySearchModule } from './buddy-search/buddy-search.module';
 import { FeedModule } from './feed/feed.module';
 import { ChatModule } from './chat/chat.module';
 import { UsersModule } from './users/users.module';
@@ -122,6 +123,7 @@ import { GroupTripsModule } from './group-trips/group-trips.module';
     UsersModule,
     CertificationsModule,
     FriendsModule,
+    BuddySearchModule,
     FeedModule,
     ChatModule,
     MediaModule,

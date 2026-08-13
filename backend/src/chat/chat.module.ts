@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { FriendsModule } from '../friends/friends.module';
+import { BuddySearchModule } from '../buddy-search/buddy-search.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { PushModule } from '../push/push.module';
 import { User } from '../users/entities/user.entity';
@@ -26,6 +27,7 @@ import { ChatGateway } from './chat.gateway';
     ]),
     AuthModule,
     FriendsModule,
+    BuddySearchModule,
     NotificationsModule,
     PushModule,
   ],

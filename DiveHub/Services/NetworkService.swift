@@ -2348,6 +2348,50 @@ extension NetworkService {
             method: .delete
         ) as EmptyResponse
     }
+
+    // MARK: - Find buddy (place + time, not trips)
+
+    func getMyBuddySearch() async throws -> BuddySearchIntent? {
+        struct MeResponse: Codable { let search: BuddySearchIntent? }
+        let res: MeResponse = try await request(endpoint: "/api/buddy-search/me")
+        return res.search
+    }
+
+    func upsertBuddySearch(
+        place: String,
+        dateFrom: String,
+        dateTo: String,
+        certificationLevel: String?,
+        diveCount: Int?,
+        languages: [String],
+        interests: [String]
+    ) async throws -> BuddySearchUpsertResponse {
+        let body = BuddySearchUpsertBody(
+            place: place,
+            dateFrom: dateFrom,
+            dateTo: dateTo,
+            certificationLevel: certificationLevel,
+            diveCount: diveCount,
+            languages: languages,
+            interests: interests
+        )
+        return try await request(
+            endpoint: "/api/buddy-search",
+            method: .put,
+            body: body
+        )
+    }
+
+    func listBuddySearchMatches() async throws -> BuddySearchMatchesResponse {
+        return try await request(endpoint: "/api/buddy-search/matches")
+    }
+
+    func closeBuddySearch() async throws {
+        _ = try await self.request(
+            endpoint: "/api/buddy-search",
+            method: .delete
+        ) as EmptyResponse
+    }
     
     // Profile Image Upload — uses shared media storage (`POST /api/media/upload`).
     func uploadProfileImage(imageData: Data) async throws -> String {

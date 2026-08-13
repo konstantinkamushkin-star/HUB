@@ -15,6 +15,7 @@ import { User } from '../users/entities/user.entity';
 import { DiveCenterEntity } from '../dive-centers/entities/dive-center.entity';
 import { ShopEntity } from '../shops/entities/shop.entity';
 import { FriendsService } from '../friends/friends.service';
+import { BuddySearchService } from '../buddy-search/buddy-search.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { PushService } from '../push/push.service';
 import { ChatConversation } from './entities/chat-conversation.entity';
@@ -93,6 +94,7 @@ export class ChatService {
     @InjectRepository(ShopEntity)
     private readonly shopRepository: Repository<ShopEntity>,
     private readonly friendsService: FriendsService,
+    private readonly buddySearchService: BuddySearchService,
     private readonly eventEmitter: EventEmitter2,
     private readonly pushService: PushService,
     private readonly notificationsService: NotificationsService,
@@ -238,7 +240,15 @@ export class ChatService {
       }
       const friends = await this.friendsService.listFriendUserIds(userId);
       if (!friends.includes(dto.peerId)) {
-        throw new ForbiddenException('You can only message accepted friends');
+        const buddyOk = await this.buddySearchService.canMessageAsBuddyMatch(
+          userId,
+          dto.peerId,
+        );
+        if (!buddyOk) {
+          throw new ForbiddenException(
+            'You can only message accepted friends or place+time buddy matches',
+          );
+        }
       }
     }
 
