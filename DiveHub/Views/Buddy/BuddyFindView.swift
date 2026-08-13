@@ -45,8 +45,8 @@ struct BuddyFindView: View {
             List {
                 Section {
                     Text(isRussian
-                         ? "Найди бадди по месту и датам — кто будет там же, когда и ты."
-                         : "Find a buddy by place and dates — who will be there when you are.")
+                         ? "Заполните короткую анкету и найдите, с кем поехать нырять. Совпадение — по месту и датам, без привязки к поездкам."
+                         : "Fill a short form and find someone to dive with. Matches are by place and dates — not tied to trips.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
@@ -85,7 +85,7 @@ struct BuddyFindView: View {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                         } else {
-                            Text(isRussian ? "Find buddy" : "Find buddy")
+                            Text(isRussian ? "Найти бадди" : "Find buddy")
                                 .fontWeight(.semibold)
                                 .frame(maxWidth: .infinity)
                         }
@@ -95,7 +95,9 @@ struct BuddyFindView: View {
 
                 if let errorText {
                     Section {
-                        Text(errorText)
+                        Text(errorText.isEmpty
+                             ? (isRussian ? "Не удалось загрузить совпадения. Проверьте сеть и API." : "Could not load matches. Check network and API.")
+                             : errorText)
                             .foregroundStyle(.red)
                             .font(.footnote)
                     }
@@ -206,7 +208,7 @@ struct BuddyFindView: View {
             matches = response.matches
             didSearch = true
         } catch {
-            errorText = error.localizedDescription
+            errorText = friendlyError(error)
         }
     }
 
@@ -234,7 +236,15 @@ struct BuddyFindView: View {
                 didSearch = true
             }
         } catch {
-            // No open search yet — fine.
+            // No open search yet is fine; surface real API failures only.
+            if let net = error as? NetworkError {
+                switch net {
+                case .serverError(404), .serverErrorWithDetail(404, _):
+                    return
+                default:
+                    errorText = friendlyError(error)
+                }
+            }
         }
     }
 
@@ -245,7 +255,7 @@ struct BuddyFindView: View {
             matches = []
             matchCount = 0
         } catch {
-            errorText = error.localizedDescription
+            errorText = friendlyError(error)
         }
     }
 
@@ -257,8 +267,19 @@ struct BuddyFindView: View {
                 peerId: peerId
             )
         } catch {
-            errorText = error.localizedDescription
+            errorText = friendlyError(error)
         }
+    }
+
+    private func friendlyError(_ error: Error) -> String {
+        let raw = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed == "Ошибка" || trimmed.lowercased() == "error" {
+            return isRussian
+                ? "Не удалось выполнить запрос. Проверьте интернет и что API доступен."
+                : "Request failed. Check internet and that the API is reachable."
+        }
+        return trimmed
     }
 }
 

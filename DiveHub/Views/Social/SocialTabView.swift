@@ -8,39 +8,9 @@
 import SwiftUI
 
 struct SocialTabView: View {
-    /// One shared model for friends list, requests sheet, and tracking tab so accept/add updates all UIs.
-    @StateObject private var socialViewModel = SocialViewModel()
-    @State private var selectedTab = 0
-    @StateObject private var localizationService = LocalizationService.shared
-    
+    /// Legacy entry point — Buddies is Find buddy by place + dates (not trip-tied Social).
     var body: some View {
-        NavigationStack {
-            VStack {
-                Picker("", selection: $selectedTab) {
-                    Text(localizationService.localizedString("friends", table: "social")).tag(0)
-                    Text(localizationService.localizedString("groupTrips", table: "social")).tag(1)
-                    Text(localizationService.localizedString("tracking", table: "social")).tag(2)
-                }
-                .pickerStyle(.segmented)
-                .padding()
-                
-                TabView(selection: $selectedTab) {
-                    FriendsView()
-                        .environmentObject(socialViewModel)
-                        .tag(0)
-                    
-                    GroupTripsView()
-                        .tag(1)
-                    
-                    FriendTrackingView()
-                        .environmentObject(socialViewModel)
-                        .tag(2)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-            }
-            .navigationTitle(localizationService.localizedString("social", table: "common"))
-            .diveHubNavigationChrome()
-        }
+        BuddyFindView()
     }
 }
 

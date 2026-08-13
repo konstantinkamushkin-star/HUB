@@ -52,12 +52,13 @@ struct MainTabView: View {
 }
 
 // MARK: - Diver tabs (carousel, full-width bar)
-// IA: Поездки · Бадди · Сообщения · Редактор · Профиль
+// IA matches shipping diver shell: Explore · Feed · Logbook · Trips · Buddies
+// Buddies = Find buddy by place + dates (NOT commercial trips, NOT trip-picker).
 
 struct DiverTabView: View {
     @StateObject private var localizationService = LocalizationService.shared
     @AppStorage(FeatureFlags.underwaterEditorKey) private var diveEditorEnabled = true
-    @State private var selectedTab = 1 // default: Buddies
+    @State private var selectedTab = 4 // default: Buddies
     @Environment(\.displayScale) private var displayScale
 
     private var isRussian: Bool {
@@ -72,27 +73,47 @@ struct DiverTabView: View {
         var items: [CarouselTabItem] = [
             CarouselTabItem(
                 id: 0,
+                title: localizationService.localizedString("explore", table: "common"),
+                systemImage: "magnifyingglass",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 1,
+                title: localizationService.localizedString("feed", table: "feed"),
+                systemImage: "newspaper",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 2,
+                title: localizationService.localizedString("logbook", table: "common"),
+                systemImage: "book",
+                accessibilityLabel: nil
+            ),
+            CarouselTabItem(
+                id: 3,
                 title: isRussian ? "Поездки" : "Trips",
                 systemImage: "airplane",
                 accessibilityLabel: nil
             ),
             CarouselTabItem(
-                id: 1,
+                id: 4,
                 title: isRussian ? "Бадди" : "Buddies",
                 systemImage: "person.2",
-                accessibilityLabel: nil
-            ),
-            CarouselTabItem(
-                id: 2,
-                title: localizationService.localizedString("messages", table: "common"),
-                systemImage: "message",
                 accessibilityLabel: nil
             ),
         ]
         if diveEditorEnabled {
             items.append(
                 CarouselTabItem(
-                    id: 3,
+                    id: 5,
+                    title: localizationService.localizedString("messages", table: "common"),
+                    systemImage: "message",
+                    accessibilityLabel: nil
+                )
+            )
+            items.append(
+                CarouselTabItem(
+                    id: 6,
                     title: localizationService.localizedString("diveEditorTabShort", table: "imageEditing"),
                     systemImage: "camera.filters",
                     accessibilityLabel: localizationService.localizedString("diveEditorTabTitle", table: "imageEditing")
@@ -100,7 +121,7 @@ struct DiverTabView: View {
             )
             items.append(
                 CarouselTabItem(
-                    id: 4,
+                    id: 7,
                     title: localizationService.localizedString("profile", table: "common"),
                     systemImage: "person.circle",
                     accessibilityLabel: nil
@@ -109,7 +130,15 @@ struct DiverTabView: View {
         } else {
             items.append(
                 CarouselTabItem(
-                    id: 3,
+                    id: 5,
+                    title: localizationService.localizedString("messages", table: "common"),
+                    systemImage: "message",
+                    accessibilityLabel: nil
+                )
+            )
+            items.append(
+                CarouselTabItem(
+                    id: 6,
                     title: localizationService.localizedString("profile", table: "common"),
                     systemImage: "person.circle",
                     accessibilityLabel: nil
@@ -139,18 +168,20 @@ struct DiverTabView: View {
         .id(localizationService.currentLanguage)
         .onChange(of: diveEditorEnabled) { _, on in
             if on {
-                if selectedTab == 3 { selectedTab = 4 }
+                if selectedTab == 6 { selectedTab = 7 }
             } else {
-                if selectedTab == 4 { selectedTab = 3 }
-                else if selectedTab == 3 { selectedTab = 1 }
+                if selectedTab == 7 { selectedTab = 6 }
+                else if selectedTab == 6 { selectedTab = 4 }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diveHubNavigateToExploreDiveSitesMap)) { _ in
-            // Explore removed from primary bar — open trips catalog as closest entry.
             selectedTab = 0
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                NotificationCenter.default.post(name: .diveHubExploreApplyDiveSitesMap, object: nil)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .diveHubNavigateToSocial)) { _ in
-            selectedTab = 1
+            selectedTab = 4
         }
     }
 
@@ -158,14 +189,20 @@ struct DiverTabView: View {
     private var tabContent: some View {
         switch selectedTab {
         case 0:
-            TripsListView()
+            ExploreView()
         case 1:
-            BuddyFindView()
+            FeedView()
         case 2:
+            LogbookTabView()
+        case 3:
+            TripsListView()
+        case 4:
+            BuddyFindView()
+        case 5:
             NavigationStack {
                 ChatHubView()
             }
-        case 3:
+        case 6:
             if diveEditorEnabled {
                 NavigationStack {
                     DiveEditorTabView()
@@ -173,7 +210,7 @@ struct DiverTabView: View {
             } else {
                 ProfileTabView()
             }
-        case 4:
+        case 7:
             ProfileTabView()
         default:
             BuddyFindView()
