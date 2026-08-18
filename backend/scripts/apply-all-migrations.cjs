@@ -84,6 +84,7 @@ const MIGRATION_FILES = [
   '047_user_achievements.sql',
   '048_reviews_one_per_user.sql',
   '049_create_buddy_searches.sql',
+  '051_processed_media.sql',
 ];
 
 function pick(envFile, key, fallback) {

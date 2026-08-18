@@ -34,6 +34,14 @@ const LABELS: Record<string, string> = {
   cmsPagesPublished: "CMS-страниц опубликовано",
   integrationsEnabled: "Интеграций включено",
   subscriptionPlansActive: "Тарифных планов активно",
+  processingTotal: "Обработок всего",
+  processingOffline: "Обработок офлайн (на устройстве)",
+  processingServer: "Обработок на сервере",
+  processingLast24h: "Обработок за 24 ч",
+  processingLast7d: "Обработок за 7 дн.",
+  processingPhotos: "Обработок фото",
+  processingVideos: "Обработок видео",
+  processingGalleryItems: "Файлов в галерее обработки",
 };
 
 export default function DashboardPage() {

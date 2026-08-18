@@ -19,6 +19,8 @@ import { AdminIntegrationEntity } from './entities/admin-integration.entity';
 import { AdminSubscriptionPlanEntity } from './entities/admin-subscription-plan.entity';
 import { ErrorStatsService } from './error-stats.service';
 import { ReportStatus, VerificationStatus } from '../common/statuses';
+import { AnalyticsEventEntity } from './entities/analytics-event.entity';
+import { ProcessedMediaEntity } from '../processed-media/entities/processed-media.entity';
 
 @Injectable()
 export class AdminDashboardService {
@@ -55,6 +57,10 @@ export class AdminDashboardService {
     private readonly integrationsRepo: Repository<AdminIntegrationEntity>,
     @InjectRepository(AdminSubscriptionPlanEntity)
     private readonly plansRepo: Repository<AdminSubscriptionPlanEntity>,
+    @InjectRepository(AnalyticsEventEntity)
+    private readonly analyticsEventsRepo: Repository<AnalyticsEventEntity>,
+    @InjectRepository(ProcessedMediaEntity)
+    private readonly processedMediaRepo: Repository<ProcessedMediaEntity>,
     private readonly errorStatsService: ErrorStatsService,
   ) {}
 
@@ -89,6 +95,14 @@ export class AdminDashboardService {
       cmsPublished,
       integrationsOn,
       plansActive,
+      processingTotal,
+      processingOffline,
+      processingServer,
+      processingLast24h,
+      processingLast7d,
+      processingPhotos,
+      processingVideos,
+      processingGalleryItems,
     ] = await Promise.all([
       this.usersRepo.count(),
       this.usersRepo
@@ -140,6 +154,47 @@ export class AdminDashboardService {
       this.cmsRepo.count({ where: { status: 'published' } }),
       this.integrationsRepo.count({ where: { enabled: true } }),
       this.plansRepo.count({ where: { active: true } }),
+      this.analyticsEventsRepo
+        .createQueryBuilder('e')
+        .where('e.name IN (:...names)', {
+          names: ['photo_processing_completed', 'video_processing_completed'],
+        })
+        .getCount(),
+      this.analyticsEventsRepo
+        .createQueryBuilder('e')
+        .where('e.name IN (:...names)', {
+          names: ['photo_processing_completed', 'video_processing_completed'],
+        })
+        .andWhere('e.source = :src', { src: 'offline' })
+        .getCount(),
+      this.analyticsEventsRepo
+        .createQueryBuilder('e')
+        .where('e.name IN (:...names)', {
+          names: ['photo_processing_completed', 'video_processing_completed'],
+        })
+        .andWhere('e.source = :src', { src: 'server' })
+        .getCount(),
+      this.analyticsEventsRepo
+        .createQueryBuilder('e')
+        .where('e.name IN (:...names)', {
+          names: ['photo_processing_completed', 'video_processing_completed'],
+        })
+        .andWhere('e.createdAt > :d', { d: d1 })
+        .getCount(),
+      this.analyticsEventsRepo
+        .createQueryBuilder('e')
+        .where('e.name IN (:...names)', {
+          names: ['photo_processing_completed', 'video_processing_completed'],
+        })
+        .andWhere('e.createdAt > :d', { d: d7 })
+        .getCount(),
+      this.analyticsEventsRepo.count({
+        where: { name: 'photo_processing_completed' },
+      }),
+      this.analyticsEventsRepo.count({
+        where: { name: 'video_processing_completed' },
+      }),
+      this.processedMediaRepo.count(),
     ]);
 
     const errorStats = this.errorStatsService.getStats();
@@ -171,6 +226,14 @@ export class AdminDashboardService {
         cmsPagesPublished: cmsPublished,
         integrationsEnabled: integrationsOn,
         subscriptionPlansActive: plansActive,
+        processingTotal,
+        processingOffline,
+        processingServer,
+        processingLast24h,
+        processingLast7d,
+        processingPhotos,
+        processingVideos,
+        processingGalleryItems,
       },
       systemHealth: errorStats,
     };

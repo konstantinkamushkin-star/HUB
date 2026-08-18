@@ -38,6 +38,7 @@ import { TranslateModule } from './translate/translate.module';
 import { SupportModule } from './support/support.module';
 import { LocationModule } from './location/location.module';
 import { GroupTripsModule } from './group-trips/group-trips.module';
+import { ProcessedMediaModule } from './processed-media/processed-media.module';
 
 @Module({
   controllers: [AppController, LegalPagesController, LocalizationController],
@@ -149,6 +150,7 @@ import { GroupTripsModule } from './group-trips/group-trips.module';
     SupportModule,
     LocationModule,
     GroupTripsModule,
+    ProcessedMediaModule,
   ],
   providers: [
     {

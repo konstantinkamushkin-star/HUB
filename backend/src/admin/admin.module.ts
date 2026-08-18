@@ -71,6 +71,7 @@ import { AdminBillingPlansController } from './admin-billing-plans.controller';
 import { AdminAnalyticsService } from './admin-analytics.service';
 import { AdminAnalyticsController } from './admin-analytics.controller';
 import { AnalyticsEventEntity } from './entities/analytics-event.entity';
+import { ProcessedMediaEntity } from '../processed-media/entities/processed-media.entity';
 import { MailModule } from '../mail/mail.module';
 import { PartnerAccountService } from './partner-account.service';
 import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
@@ -102,6 +103,7 @@ import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
       AdminIntegrationEntity,
       AdminSubscriptionPlanEntity,
       AnalyticsEventEntity,
+      ProcessedMediaEntity,
     ]),
   ],
   controllers: [

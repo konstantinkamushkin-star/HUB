@@ -71,6 +71,11 @@ def get_color_filter_matrix_rgba(pixels: np.ndarray, width: int, height: int) ->
 
     avg_r, avg_g, avg_b = _calculate_average_color(pixels, width, height)
 
+    # Deep blue water has almost no red; uncapped hue-shift reconstructs magenta.
+    if avg_b - avg_r > 20.0 and avg_r < 55.0:
+        max_hue_shift = 50
+        blue_magic_value = 1.0
+
     new_avg_red = avg_r
     while new_avg_red < min_avg_red:
         shifted = _hue_shift_red(avg_r, avg_g, avg_b, hue_shift)
@@ -155,6 +160,20 @@ def get_color_filter_matrix_rgba(pixels: np.ndarray, width: int, height: int) ->
     return matrix, hue_shift
 
 
+def _suppress_magenta_rgb_inplace(rgb: np.ndarray) -> None:
+    """Pull Bech magenta (high R+B, weak G) toward a natural cyan/blue, matching GPT hue remap intent."""
+    r = rgb[:, 0]
+    g = rgb[:, 1]
+    b = rgb[:, 2]
+    mag = np.minimum(r, b) - g
+    mag = np.maximum(mag, 0.0)
+    w = np.clip((mag - 4.0) / 20.0, 0.0, 1.0)
+    mag_w = mag * w
+    rgb[:, 1] = np.minimum(255.0, g + mag_w * 0.62)
+    rgb[:, 0] = np.maximum(0.0, r - mag_w * 0.32)
+    rgb[:, 2] = np.maximum(0.0, b - mag_w * 0.08)
+
+
 def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -> None:
     """
     JS loop from README (mutates RGBA buffer).
@@ -173,9 +192,11 @@ def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -
     # alpha unchanged (JS does not touch i+3)
 
 
-def process_bgr_uint8(bgr: np.ndarray) -> tuple[np.ndarray, dict[str, Any]]:
+def process_bgr_uint8(bgr: np.ndarray, strength: float = 1.0) -> tuple[np.ndarray, dict[str, Any]]:
     """
-    BGR uint8 image → same as upstream: build RGBA, `getColorFilterMatrix`, README apply loop → BGR uint8.
+    Nikolaj Bech matrix + README apply loop, then optional linear blend toward original.
+
+    ``strength=1.0`` — full correction (upstream). ``0.9`` — типичный look карточек DiveHub.
     """
     if bgr.ndim != 3 or bgr.shape[2] != 3:
         raise ValueError('bgr must be HxWx3')
@@ -188,12 +209,19 @@ def process_bgr_uint8(bgr: np.ndarray) -> tuple[np.ndarray, dict[str, Any]]:
     flt, hue_shift_used = get_color_filter_matrix_rgba(flat, w, h)
     work = flat.astype(np.float64)
     apply_color_filter_matrix_rgba_inplace(work, flt)
+    _suppress_magenta_rgb_inplace(work[:, :3])
     corrected_rgb = work[:, :3].reshape(h, w, 3)
-    out = corrected_rgb[..., ::-1].astype(np.uint8)
+    corrected_bgr = corrected_rgb[..., ::-1].astype(np.float64)
+
+    s = float(min(1.0, max(0.0, strength)))
+    out_f = s * corrected_bgr + (1.0 - s) * orig.astype(np.float64)
+    out = np.clip(np.round(out_f), 0, 255).astype(np.uint8)
 
     report: dict[str, Any] = {
         'backend': 'nikolaj_bech_underwater_color_correction',
         'upstream': 'https://github.com/nikolajbech/underwater-image-color-correction',
+        'strength': strength,
+        'blend_strength': s,
         'hue_shift_deg': hue_shift_used,
     }
     return out, report
