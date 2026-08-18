@@ -156,16 +156,14 @@ def get_color_filter_matrix_rgba(pixels: np.ndarray, width: int, height: int) ->
 
 
 def _neutralize_magenta_rgb_inplace(rgb: np.ndarray) -> None:
-    """After Bech, magenta is R and B both above G. Fold extra red into teal/blue; leave warm subjects alone."""
+    """Drop reconstructed red on magenta pixels so water stays deep blue, not teal or purple."""
     r = rgb[:, 0]
     g = rgb[:, 1]
     b = rgb[:, 2]
     mag = np.minimum(r, b) - g
     mag = np.maximum(mag, 0.0)
     w = np.clip((mag - 6.0) / 18.0, 0.0, 1.0)
-    mag_w = mag * w
-    rgb[:, 0] = np.maximum(0.0, r - mag_w)
-    rgb[:, 1] = np.minimum(255.0, g + mag_w * 0.45)
+    rgb[:, 0] = np.maximum(0.0, r - mag * w)
 
 
 def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -> None:

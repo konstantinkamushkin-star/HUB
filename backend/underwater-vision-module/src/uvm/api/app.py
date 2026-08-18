@@ -28,10 +28,12 @@ from uvm.pipeline.nikolaj_bech_color_correction import process_bgr_uint8
 app = FastAPI(title='Underwater Vision Module', version='0.2.0')
 
 _VALID_ENGINES = frozenset({'ai1', 'ai2', 'cursor', 'seathru'})
+# Match iOS/Android Dive Editor working size so local and server Bech histograms agree.
+_PHOTO_MAX_SIDE = 2048
 
 
-def _run_bech(bgr: np.ndarray, eng: str) -> tuple[np.ndarray, dict]:
-    out, rep = process_bgr_uint8(bgr)
+def _run_bech(bgr: np.ndarray, eng: str, strength: float = 1.0) -> tuple[np.ndarray, dict]:
+    out, rep = process_bgr_uint8(bgr, strength)
     rep = dict(rep)
     rep['engine'] = eng
     return out, rep
@@ -41,6 +43,7 @@ async def _process_photo_core(
     request: Request,
     eng: str,
     image: UploadFile,
+    strength: float,
     *,
     route_tag: str,
 ) -> JSONResponse:
@@ -48,17 +51,19 @@ async def _process_photo_core(
     if eng not in _VALID_ENGINES:
         return JSONResponse({'error': 'invalid engine', 'allowed': sorted(_VALID_ENGINES)}, status_code=400)
 
-    print(f'[uvm] {route_tag} engine={eng!r}', flush=True)
+    print(f'[uvm] {route_tag} engine={eng!r} strength={strength}', flush=True)
 
     data = await image.read()
     bgr, decoder_tag = decode_upload_bgr(data)
     if bgr is None:
         return JSONResponse({'error': 'invalid image'}, status_code=400)
 
-    report: dict = {'engine': eng, 'decoder': decoder_tag}
+    report: dict = {'engine': eng, 'strength': strength, 'decoder': decoder_tag}
     try:
-        out, r = _run_bech(bgr, eng)
+        work, _orig_wh = downscale_bgr_for_process(bgr, _PHOTO_MAX_SIDE)
+        out, r = _run_bech(work, eng, strength)
         report.update(r)
+        report['photo_max_side'] = _PHOTO_MAX_SIDE
     except Exception as e:
         return JSONResponse({'error': 'processing_failed', 'detail': str(e)}, status_code=500)
 
@@ -94,9 +99,12 @@ async def process_photo_by_path(
     request: Request,
     engine: str,
     image: UploadFile = File(...),
+    strength: float = Query(1.0, ge=0.0, le=1.0),
 ):
     eng = (engine or '').strip().lower()
-    return await _process_photo_core(request, eng, image, route_tag='process_photo_by_path')
+    return await _process_photo_core(
+        request, eng, image, strength, route_tag='process_photo_by_path'
+    )
 
 
 @app.post('/v1/process/video')
