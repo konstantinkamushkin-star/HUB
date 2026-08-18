@@ -121,6 +121,8 @@ def get_color_filter_matrix_rgba(pixels: np.ndarray, width: int, height: int) ->
     red_gain = 256.0 / span_r
     green_gain = 256.0 / span_g
     blue_gain = 256.0 / span_b
+    blue_gain = min(blue_gain, green_gain * 1.12)
+    red_gain = min(red_gain, green_gain * 1.40)
 
     red_offset = (-adjust_r[0] / 256.0) * red_gain
     green_offset = (-adjust_g[0] / 256.0) * green_gain
@@ -188,16 +190,25 @@ def _balance_highlights_rgb_inplace(rgb: np.ndarray) -> None:
     hg = float(np.mean(g[mask]))
     hb = float(np.mean(b[mask]))
     target = (hr + hg + hb) / 3.0
-    mix = 0.62
+    mix = 0.75
 
     def gain(ch: float) -> float:
         if ch < 1.0:
             return 1.0
-        return float(np.clip(1.0 + mix * (target / ch - 1.0), 0.84, 1.20))
+        return float(np.clip(1.0 + mix * (target / ch - 1.0), 0.78, 1.28))
 
     rgb[:, 0] = np.clip(r * gain(hr), 0.0, 255.0)
     rgb[:, 1] = np.clip(g * gain(hg), 0.0, 255.0)
     rgb[:, 2] = np.clip(b * gain(hb), 0.0, 255.0)
+
+
+def _lift_if_too_dark_rgb_inplace(rgb: np.ndarray) -> None:
+    y = 0.299 * rgb[:, 0] + 0.587 * rgb[:, 1] + 0.114 * rgb[:, 2]
+    mean = float(np.mean(y))
+    if mean < 1.0 or mean >= 78.0:
+        return
+    s = min(1.45, 82.0 / mean)
+    rgb[:] = np.clip(rgb * s, 0.0, 255.0)
 
 
 def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -> None:
@@ -237,6 +248,7 @@ def process_bgr_uint8(bgr: np.ndarray, strength: float = 1.0) -> tuple[np.ndarra
     apply_color_filter_matrix_rgba_inplace(work, flt)
     _neutralize_magenta_rgb_inplace(work[:, :3])
     _balance_highlights_rgb_inplace(work[:, :3])
+    _lift_if_too_dark_rgb_inplace(work[:, :3])
     corrected_rgb = work[:, :3].reshape(h, w, 3)
     corrected_bgr = corrected_rgb[..., ::-1].astype(np.float64)
 
