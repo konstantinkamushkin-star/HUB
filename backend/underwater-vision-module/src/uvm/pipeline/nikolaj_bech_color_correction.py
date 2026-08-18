@@ -71,11 +71,6 @@ def get_color_filter_matrix_rgba(pixels: np.ndarray, width: int, height: int) ->
 
     avg_r, avg_g, avg_b = _calculate_average_color(pixels, width, height)
 
-    # Deep blue water has almost no red; uncapped hue-shift reconstructs magenta.
-    if avg_b - avg_r > 20.0 and avg_r < 55.0:
-        max_hue_shift = 50
-        blue_magic_value = 1.0
-
     new_avg_red = avg_r
     while new_avg_red < min_avg_red:
         shifted = _hue_shift_red(avg_r, avg_g, avg_b, hue_shift)
@@ -160,18 +155,17 @@ def get_color_filter_matrix_rgba(pixels: np.ndarray, width: int, height: int) ->
     return matrix, hue_shift
 
 
-def _suppress_magenta_rgb_inplace(rgb: np.ndarray) -> None:
-    """Pull Bech magenta (high R+B, weak G) toward a natural cyan/blue, matching GPT hue remap intent."""
+def _neutralize_magenta_rgb_inplace(rgb: np.ndarray) -> None:
+    """After Bech, magenta is R and B both above G. Fold extra red into teal/blue; leave warm subjects alone."""
     r = rgb[:, 0]
     g = rgb[:, 1]
     b = rgb[:, 2]
     mag = np.minimum(r, b) - g
     mag = np.maximum(mag, 0.0)
-    w = np.clip((mag - 4.0) / 20.0, 0.0, 1.0)
+    w = np.clip((mag - 6.0) / 18.0, 0.0, 1.0)
     mag_w = mag * w
-    rgb[:, 1] = np.minimum(255.0, g + mag_w * 0.62)
-    rgb[:, 0] = np.maximum(0.0, r - mag_w * 0.32)
-    rgb[:, 2] = np.maximum(0.0, b - mag_w * 0.08)
+    rgb[:, 0] = np.maximum(0.0, r - mag_w)
+    rgb[:, 1] = np.minimum(255.0, g + mag_w * 0.45)
 
 
 def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -> None:
@@ -209,7 +203,7 @@ def process_bgr_uint8(bgr: np.ndarray, strength: float = 1.0) -> tuple[np.ndarra
     flt, hue_shift_used = get_color_filter_matrix_rgba(flat, w, h)
     work = flat.astype(np.float64)
     apply_color_filter_matrix_rgba_inplace(work, flt)
-    _suppress_magenta_rgb_inplace(work[:, :3])
+    _neutralize_magenta_rgb_inplace(work[:, :3])
     corrected_rgb = work[:, :3].reshape(h, w, 3)
     corrected_bgr = corrected_rgb[..., ::-1].astype(np.float64)
 
