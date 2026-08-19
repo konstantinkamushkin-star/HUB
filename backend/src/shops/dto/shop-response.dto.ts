@@ -21,6 +21,8 @@ export class ShopListItemDto {
   ownerId?: string;
   createdAt: Date;
   updatedAt: Date;
+  listingOnly?: boolean;
+  dataSource?: string | null;
 }
 
 export class ShopSearchResultDto {

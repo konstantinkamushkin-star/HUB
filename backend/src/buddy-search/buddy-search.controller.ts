@@ -4,6 +4,7 @@ import {
   Put,
   Delete,
   Body,
+  Query,
   UseGuards,
   Request,
   HttpCode,
@@ -13,6 +14,7 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { BuddySearchService } from './buddy-search.service';
 import { UpsertBuddySearchDto } from './dto/upsert-buddy-search.dto';
+import { ListBuddySearchQueryDto } from './dto/list-buddy-search.dto';
 
 @ApiTags('buddy-search')
 @Controller('buddy-search')
@@ -26,6 +28,18 @@ export class BuddySearchController {
   async me(@Request() req: { user: { sub: string } }) {
     const search = await this.buddySearchService.getMine(req.user.sub);
     return { search };
+  }
+
+  @Get('listings')
+  @ApiOperation({
+    summary:
+      'Open buddy questionnaires from other divers (optional place/date/cert/language filters)',
+  })
+  async listings(
+    @Request() req: { user: { sub: string } },
+    @Query() query: ListBuddySearchQueryDto,
+  ) {
+    return this.buddySearchService.listListings(req.user.sub, query);
   }
 
   @Get('matches')

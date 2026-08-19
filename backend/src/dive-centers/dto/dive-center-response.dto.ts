@@ -16,6 +16,16 @@ export class DiveCenterListItemDto {
   price_from?: number;
   /** Public profile text when loaded by id (optional on list/search payloads). */
   description?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  address?: string;
+  /** View-only catalog entry from open sources — booking disabled */
+  listing_only?: boolean;
+  data_source?: string | null;
+  /** Inverse of listing_only — partner center that can take bookings */
+  is_partner?: boolean;
+  locations?: unknown[];
 }
 
 export class PaginationInfoDto {

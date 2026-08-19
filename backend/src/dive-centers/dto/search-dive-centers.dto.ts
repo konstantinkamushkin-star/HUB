@@ -84,6 +84,10 @@ export class MapSearchCentersDto {
   @Min(1)
   @Max(500)
   limit?: number = 500;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
 }
 
 export class PopularDiveCentersDto {

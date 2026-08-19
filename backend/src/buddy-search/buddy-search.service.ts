@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
 import { BuddySearch } from './entities/buddy-search.entity';
 import { UpsertBuddySearchDto } from './dto/upsert-buddy-search.dto';
+import { ListBuddySearchQueryDto } from './dto/list-buddy-search.dto';
 
 function toPublicUser(user: User): Omit<User, 'password'> {
   const { password: _, ...rest } = user;
@@ -40,6 +41,18 @@ function placeTokens(place: string): string[] {
     .split(/[\s,/|-]+/)
     .map((t) => t.trim())
     .filter((t) => t.length >= 2);
+}
+
+function splitCsv(raw?: string): string[] {
+  if (!raw?.trim()) return [];
+  return [
+    ...new Set(
+      raw
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0),
+    ),
+  ];
 }
 
 @Injectable()
@@ -137,10 +150,91 @@ export class BuddySearchService {
       where: { userId, status: 'open' },
     });
     if (!mine) {
-      return { matchCount: 0, matches: [] as ReturnType<BuddySearchService['toMatch']>[] };
+      return {
+        mine: null,
+        matchCount: 0,
+        matches: [] as ReturnType<BuddySearchService['toMatch']>[],
+      };
     }
     const matches = await this.findMatches(userId, mine);
-    return { matchCount: matches.length, matches };
+    return { mine: this.toDto(mine), matchCount: matches.length, matches };
+  }
+
+  /** All open questionnaires except the current user, with optional filters. */
+  async listListings(userId: string, query: ListBuddySearchQueryDto = {}) {
+    const mine = await this.searchRepository.findOne({
+      where: { userId, status: 'open' },
+    });
+
+    const qb = this.searchRepository
+      .createQueryBuilder('s')
+      .leftJoinAndSelect('s.user', 'user')
+      .where('s.status = :status', { status: 'open' })
+      .andWhere('s.userId != :uid', { uid: userId })
+      .orderBy('s.updatedAt', 'DESC');
+
+    const dateFrom = query.dateFrom ? normalizeDate(query.dateFrom) : undefined;
+    const dateTo = query.dateTo ? normalizeDate(query.dateTo) : undefined;
+    if (dateFrom && dateTo && dateTo < dateFrom) {
+      throw new BadRequestException('dateTo must be >= dateFrom');
+    }
+    if (dateFrom && dateTo) {
+      qb.andWhere('s.dateFrom <= :to', { to: dateTo }).andWhere(
+        's.dateTo >= :from',
+        { from: dateFrom },
+      );
+    } else if (dateFrom) {
+      qb.andWhere('s.dateTo >= :from', { from: dateFrom });
+    } else if (dateTo) {
+      qb.andWhere('s.dateFrom <= :to', { to: dateTo });
+    }
+
+    const cert = query.certificationLevel?.trim();
+    if (cert) {
+      qb.andWhere('LOWER(s.certificationLevel) = LOWER(:cert)', { cert });
+    }
+
+    let others = await qb.getMany();
+
+    const place = query.place?.trim();
+    if (place && place.length >= 2) {
+      others = others.filter((o) => this.placesOverlap(place, o.place));
+    }
+
+    const languages = splitCsv(query.languages);
+    if (languages.length) {
+      const want = new Set(languages.map((l) => l.toLowerCase()));
+      others = others.filter((o) =>
+        (o.languages || []).some((l) => want.has(String(l).toLowerCase())),
+      );
+    }
+
+    const interests = splitCsv(query.interests);
+    if (interests.length) {
+      const want = new Set(interests.map((i) => i.toLowerCase()));
+      others = others.filter((o) =>
+        (o.interests || []).some((i) => want.has(String(i).toLowerCase())),
+      );
+    }
+
+    const matches = others
+      .map((o) => (mine ? this.toMatch(o, mine) : this.toListing(o)))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 80);
+
+    return {
+      mine: mine ? this.toDto(mine) : null,
+      matchCount: matches.length,
+      matches,
+    };
+  }
+
+  async list(userId: string) {
+    return this.listListings(userId, {});
+  }
+
+  async remove(userId: string): Promise<void> {
+    await this.close(userId);
   }
 
   async close(userId: string): Promise<void> {
@@ -215,6 +309,14 @@ export class BuddySearchService {
     }
     return {
       score,
+      search: this.toDto(row),
+      user: row.user ? toPublicUser(row.user) : undefined,
+    };
+  }
+
+  private toListing(row: BuddySearch) {
+    return {
+      score: 0,
       search: this.toDto(row),
       user: row.user ? toPublicUser(row.user) : undefined,
     };

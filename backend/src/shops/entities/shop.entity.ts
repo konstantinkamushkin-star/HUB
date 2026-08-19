@@ -103,6 +103,18 @@ export class ShopEntity {
   @Index()
   verification_status: string;
 
+  @Column({ type: 'boolean', default: false })
+  listing_only: boolean;
+
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  data_source: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  external_import_key: string | null;
+
+  @Column({ type: 'jsonb', nullable: true, default: () => "'[]'" })
+  locations: Record<string, unknown>[] | null;
+
   @CreateDateColumn()
   created_at: Date;
 

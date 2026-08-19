@@ -90,10 +90,17 @@ export class DiveCentersService {
           review_count,
           country,
           city,
+          address,
+          phone,
+          email,
+          website,
           photo_urls,
           certification_agency,
           nitrox_available,
           price_from,
+          listing_only,
+          data_source,
+          locations,
           ST_Distance(
             location::geography,
             ST_SetSRID(ST_MakePoint($1, $2), 4326)::geography
@@ -141,10 +148,17 @@ export class DiveCentersService {
         review_count,
         country,
         city,
+        address,
+        phone,
+        email,
+        website,
         photo_urls,
         certification_agency,
         nitrox_available,
         price_from,
+        listing_only,
+        data_source,
+        locations,
         ROUND(distance_meters::numeric, 0)::INTEGER as distance_meters
       FROM geo_filtered
     `;
@@ -201,6 +215,10 @@ export class DiveCentersService {
       review_count: row.review_count || 0,
       country: row.country || undefined,
       city: row.city || undefined,
+      address: row.address || undefined,
+      phone: row.phone || undefined,
+      email: row.email || undefined,
+      website: row.website || undefined,
       thumbnail_url:
         Array.isArray(row.photo_urls) && row.photo_urls.length > 0
           ? row.photo_urls[0]
@@ -209,6 +227,10 @@ export class DiveCentersService {
       certification_agency: row.certification_agency || undefined,
       nitrox_available: row.nitrox_available || false,
       price_from: row.price_from ? parseFloat(row.price_from) : undefined,
+      listing_only: !!row.listing_only,
+      data_source: row.data_source || undefined,
+      is_partner: !row.listing_only,
+      locations: Array.isArray(row.locations) ? row.locations : [],
     }));
 
     // Check if there's more
@@ -277,10 +299,17 @@ export class DiveCentersService {
         review_count,
         country,
         city,
+        address,
+        phone,
+        email,
+        website,
         photo_urls,
         certification_agency,
         nitrox_available,
-        price_from
+        price_from,
+        listing_only,
+        data_source,
+        locations
       FROM dive_centers
       WHERE is_active = true
         AND location::geometry && ST_MakeEnvelope($1, $2, $3, $4, 4326)
@@ -307,6 +336,12 @@ export class DiveCentersService {
       paramIndex++;
     }
 
+    if (searchDto.country && String(searchDto.country).trim()) {
+      query += ` AND TRIM(COALESCE(country, '')) ILIKE TRIM($${paramIndex}::text)`;
+      params.push(String(searchDto.country).trim());
+      paramIndex++;
+    }
+
     query += ` LIMIT $${paramIndex}`;
     params.push(searchDto.limit || 500);
 
@@ -322,6 +357,10 @@ export class DiveCentersService {
       review_count: row.review_count || 0,
       country: row.country || undefined,
       city: row.city || undefined,
+      address: row.address || undefined,
+      phone: row.phone || undefined,
+      email: row.email || undefined,
+      website: row.website || undefined,
       thumbnail_url:
         Array.isArray(row.photo_urls) && row.photo_urls.length > 0
           ? row.photo_urls[0]
@@ -330,6 +369,10 @@ export class DiveCentersService {
       certification_agency: row.certification_agency || undefined,
       nitrox_available: row.nitrox_available || false,
       price_from: row.price_from ? parseFloat(row.price_from) : undefined,
+      listing_only: !!row.listing_only,
+      data_source: row.data_source || undefined,
+      is_partner: !row.listing_only,
+      locations: Array.isArray(row.locations) ? row.locations : [],
     }));
 
     // Cache result
@@ -346,7 +389,7 @@ export class DiveCentersService {
   /**
    * Get popular dive centers (fallback when no location)
    */
-  async getPopular(searchDto: PopularDiveCentersDto): Promise<DiveCenterListItemDto[]> {
+    async getPopular(searchDto: PopularDiveCentersDto): Promise<DiveCenterListItemDto[]> {
     let query = `
       SELECT 
         id,
@@ -358,10 +401,17 @@ export class DiveCentersService {
         review_count,
         country,
         city,
+        address,
+        phone,
+        email,
+        website,
         photo_urls,
         certification_agency,
         nitrox_available,
-        price_from
+        price_from,
+        listing_only,
+        data_source,
+        locations
       FROM dive_centers
       WHERE is_active = true
     `;
@@ -377,6 +427,7 @@ export class DiveCentersService {
 
     query += `
       ORDER BY 
+        CASE WHEN listing_only IS TRUE THEN 1 ELSE 0 END ASC,
         (average_rating * LN(review_count + 1)) DESC,
         review_count DESC
       LIMIT $${paramIndex}
@@ -396,6 +447,10 @@ export class DiveCentersService {
         review_count: row.review_count || 0,
         country: row.country || undefined,
         city: row.city || undefined,
+        address: row.address || undefined,
+        phone: row.phone || undefined,
+        email: row.email || undefined,
+        website: row.website || undefined,
         thumbnail_url:
           Array.isArray(row.photo_urls) && row.photo_urls.length > 0
             ? row.photo_urls[0]
@@ -404,6 +459,10 @@ export class DiveCentersService {
         certification_agency: row.certification_agency || undefined,
         nitrox_available: row.nitrox_available || false,
         price_from: row.price_from ? parseFloat(row.price_from) : undefined,
+        listing_only: !!row.listing_only,
+        data_source: row.data_source || undefined,
+        is_partner: !row.listing_only,
+        locations: Array.isArray(row.locations) ? row.locations : [],
       }));
     } catch (error) {
       console.error('Database query error in getPopular:', error);
@@ -411,6 +470,253 @@ export class DiveCentersService {
       console.error('Params:', params);
       throw error;
     }
+  }
+
+  /**
+   * Paginated explore list with filters + total (same contract as dive-sites/explore).
+   */
+  async listExplore(raw: {
+    page?: number | string;
+    limit?: number | string;
+    country?: string;
+    city?: string;
+    minRating?: number | string;
+    certificationAgency?: string;
+    sort?: string;
+    userLat?: number | string;
+    userLng?: number | string;
+    q?: string;
+  }): Promise<{
+    data: DiveCenterListItemDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const parseNum = (v: unknown, fallback: number): number => {
+      if (v === undefined || v === null || v === '') return fallback;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : fallback;
+    };
+
+    const page = Math.max(1, Math.floor(parseNum(raw.page, 1)));
+    let limit = Math.floor(parseNum(raw.limit, 20));
+    limit = Math.min(100, Math.max(1, limit));
+    const offset = (page - 1) * limit;
+
+    const sortRaw = (raw.sort || 'popularity').toLowerCase();
+    const sort =
+      sortRaw === 'distance' ||
+      sortRaw === 'rating' ||
+      sortRaw === 'name' ||
+      sortRaw === 'reviews' ||
+      sortRaw === 'popularity'
+        ? sortRaw
+        : 'popularity';
+
+    const minRating =
+      raw.minRating !== undefined && raw.minRating !== null && raw.minRating !== ''
+        ? parseNum(raw.minRating, NaN)
+        : undefined;
+    const userLat =
+      raw.userLat !== undefined && raw.userLat !== null && raw.userLat !== ''
+        ? parseNum(raw.userLat, NaN)
+        : undefined;
+    const userLng =
+      raw.userLng !== undefined && raw.userLng !== null && raw.userLng !== ''
+        ? parseNum(raw.userLng, NaN)
+        : undefined;
+
+    let q = (raw.q || '').trim();
+    if (q.length > 200) q = q.slice(0, 200);
+
+    let where = `
+      WHERE is_active = true
+    `;
+    const params: any[] = [];
+    let p = 1;
+
+    if (raw.country && String(raw.country).trim()) {
+      where += ` AND TRIM(COALESCE(country, '')) ILIKE TRIM($${p}::text)`;
+      params.push(String(raw.country).trim());
+      p++;
+    }
+    if (raw.city && String(raw.city).trim()) {
+      where += ` AND TRIM(COALESCE(city, '')) ILIKE TRIM($${p}::text)`;
+      params.push(String(raw.city).trim());
+      p++;
+    }
+    if (minRating !== undefined && !Number.isNaN(minRating) && minRating > 0) {
+      where += ` AND average_rating >= $${p}`;
+      params.push(minRating);
+      p++;
+    }
+    if (raw.certificationAgency && String(raw.certificationAgency).trim()) {
+      where += ` AND COALESCE(certification_agency, '') ILIKE $${p}`;
+      params.push(`%${String(raw.certificationAgency).trim()}%`);
+      p++;
+    }
+
+    if (q.length > 0) {
+      const escaped = q.replace(/([%_])/g, '\\$1');
+      if (q.length < 3) {
+        where += ` AND (
+          name ILIKE $${p}
+          OR name ILIKE $${p + 1}
+        )`;
+        params.push(`${escaped}%`);
+        params.push(`% ${escaped}%`);
+        p += 2;
+      } else {
+        where += ` AND (
+          name ILIKE $${p}
+          OR TRIM(COALESCE(city, '')) ILIKE $${p + 1}
+          OR TRIM(COALESCE(country, '')) ILIKE $${p + 2}
+          OR TRIM(COALESCE(country, '')) ILIKE TRIM($${p + 3}::text)
+        )`;
+        params.push(`%${escaped}%`);
+        params.push(`${escaped}%`);
+        params.push(`${escaped}%`);
+        params.push(q);
+        p += 4;
+      }
+    }
+
+    const countRows = await this.dataSource.query(
+      `SELECT COUNT(*)::int AS c FROM dive_centers ${where}`,
+      params,
+    );
+    const total = countRows?.[0]?.c ?? 0;
+
+    let orderBy = `
+      ORDER BY
+        CASE WHEN listing_only IS TRUE THEN 1 ELSE 0 END ASC,
+        (average_rating * LN(COALESCE(review_count, 0) + 1)) DESC,
+        review_count DESC,
+        id
+    `;
+    const orderExtra: any[] = [];
+
+    if (sort === 'rating') {
+      orderBy = ` ORDER BY average_rating DESC NULLS LAST, review_count DESC NULLS LAST, id `;
+    } else if (sort === 'name') {
+      orderBy = ` ORDER BY LOWER(name) ASC NULLS LAST, id `;
+    } else if (sort === 'reviews') {
+      orderBy = ` ORDER BY review_count DESC NULLS LAST, average_rating DESC NULLS LAST, id `;
+    } else if (
+      sort === 'distance' &&
+      userLat !== undefined &&
+      !Number.isNaN(userLat) &&
+      userLng !== undefined &&
+      !Number.isNaN(userLng)
+    ) {
+      const latIdx = params.length + 1;
+      const lngIdx = params.length + 2;
+      orderExtra.push(userLat, userLng);
+      orderBy = `
+        ORDER BY
+          CASE
+            WHEN latitude IS NULL OR longitude IS NULL THEN 1
+            WHEN ABS(latitude) < 0.0001 AND ABS(longitude) < 0.0001 THEN 1
+            ELSE 0
+          END ASC,
+          (POWER(COALESCE(latitude, 0) - $${latIdx}::double precision, 2)
+          + POWER(COALESCE(longitude, 0) - $${lngIdx}::double precision, 2)) ASC NULLS LAST,
+          id
+      `;
+    }
+
+    const limitIdx = params.length + orderExtra.length + 1;
+    const offsetIdx = params.length + orderExtra.length + 2;
+    const dataParams = [...params, ...orderExtra, limit, offset];
+
+    const results = await this.dataSource.query(
+      `
+      SELECT
+        id,
+        name,
+        latitude,
+        longitude,
+        services,
+        average_rating,
+        review_count,
+        country,
+        city,
+        address,
+        phone,
+        email,
+        website,
+        photo_urls,
+        certification_agency,
+        nitrox_available,
+        price_from,
+        listing_only,
+        data_source,
+        locations
+      FROM dive_centers
+      ${where}
+      ${orderBy}
+      LIMIT $${limitIdx} OFFSET $${offsetIdx}
+      `,
+      dataParams,
+    );
+
+    const data: DiveCenterListItemDto[] = results.map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      latitude: parseFloat(row.latitude) || 0,
+      longitude: parseFloat(row.longitude) || 0,
+      services: Array.isArray(row.services) ? row.services : [],
+      average_rating: parseFloat(row.average_rating) || 0,
+      review_count: row.review_count || 0,
+      country: row.country || undefined,
+      city: row.city || undefined,
+      address: row.address || undefined,
+      phone: row.phone || undefined,
+      email: row.email || undefined,
+      website: row.website || undefined,
+      thumbnail_url:
+        Array.isArray(row.photo_urls) && row.photo_urls.length > 0
+          ? row.photo_urls[0]
+          : undefined,
+      photos: Array.isArray(row.photo_urls) ? row.photo_urls : [],
+      certification_agency: row.certification_agency || undefined,
+      nitrox_available: row.nitrox_available || false,
+      price_from: row.price_from ? parseFloat(row.price_from) : undefined,
+      listing_only: !!row.listing_only,
+      data_source: row.data_source || undefined,
+      is_partner: !row.listing_only,
+      locations: Array.isArray(row.locations) ? row.locations : [],
+    }));
+
+    return { data, total, page, limit };
+  }
+
+  async listExploreIosPayload(raw: {
+    page?: number | string;
+    limit?: number | string;
+    country?: string;
+    city?: string;
+    minRating?: number | string;
+    certificationAgency?: string;
+    sort?: string;
+    userLat?: number | string;
+    userLng?: number | string;
+    q?: string;
+  }): Promise<{
+    success: boolean;
+    data: DiveCenterListItemDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const result = await this.listExplore(raw);
+    return {
+      success: true,
+      data: result.data,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    };
   }
 
   /** Single public dive center (mobile detail / iOS `getDiveCenter`). */
@@ -427,11 +733,18 @@ export class DiveCentersService {
         review_count,
         country,
         city,
+        address,
+        phone,
+        email,
+        website,
         photo_urls,
         certification_agency,
         nitrox_available,
         price_from,
-        description
+        description,
+        listing_only,
+        data_source,
+        locations
       FROM dive_centers
       WHERE id = $1 AND is_active = true
       LIMIT 1
@@ -442,6 +755,7 @@ export class DiveCentersService {
       throw new NotFoundException('Dive center not found');
     }
     const row = results[0];
+    const listingOnly = !!row.listing_only;
     return {
       id: row.id,
       name: row.name,
@@ -452,6 +766,10 @@ export class DiveCentersService {
       review_count: row.review_count || 0,
       country: row.country || undefined,
       city: row.city || undefined,
+      address: row.address || undefined,
+      phone: row.phone || undefined,
+      email: row.email || undefined,
+      website: row.website || undefined,
       thumbnail_url:
         Array.isArray(row.photo_urls) && row.photo_urls.length > 0
           ? row.photo_urls[0]
@@ -461,7 +779,37 @@ export class DiveCentersService {
       nitrox_available: row.nitrox_available || false,
       price_from: row.price_from ? parseFloat(row.price_from) : undefined,
       description: row.description || undefined,
+      listing_only: listingOnly,
+      data_source: row.data_source || undefined,
+      is_partner: !listingOnly,
+      locations: Array.isArray(row.locations) ? row.locations : [],
     };
+  }
+
+  /** Unique countries that have at least one active dive center. */
+  async getCountries(): Promise<string[]> {
+    const cacheKey = 'countries:divecenters';
+    try {
+      const cached = await this.cacheManager.get<string[]>(cacheKey);
+      if (cached) return cached;
+    } catch {}
+
+    const result = await this.dataSource.query(`
+      SELECT DISTINCT country
+      FROM dive_centers
+      WHERE is_active = true
+        AND country IS NOT NULL
+        AND TRIM(country) != ''
+      ORDER BY country ASC
+    `);
+
+    const countries: string[] = result.map((row: any) => String(row.country));
+
+    try {
+      await this.cacheManager.set(cacheKey, countries, 3600000);
+    } catch {}
+
+    return countries;
   }
 
   /**
@@ -484,7 +832,7 @@ export class DiveCentersService {
     return `divecenters:geo:${latRounded}:${lngRounded}:r${dto.radius || 50000}:f${filtersHash}:sort${dto.sort || 'distance'}:limit${dto.limit || 20}:cursor${dto.cursor || ''}`;
   }
 
-  private generateBoundsCacheKey(dto: MapSearchCentersDto): string {
+    private generateBoundsCacheKey(dto: MapSearchCentersDto): string {
     const northRounded = Math.round(dto.north * 1000);
     const southRounded = Math.round(dto.south * 1000);
     const eastRounded = Math.round(dto.east * 1000);
@@ -492,6 +840,7 @@ export class DiveCentersService {
     const filters = JSON.stringify({
       min_rating: dto.min_rating,
       services: dto.services,
+      country: dto.country,
     });
     const filtersHash = crypto
       .createHash('md5')

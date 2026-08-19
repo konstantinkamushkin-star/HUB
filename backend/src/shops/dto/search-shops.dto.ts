@@ -40,6 +40,19 @@ export class SearchShopsDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  /** Alias for `city` (Explore region filter). */
+  @IsOptional()
+  @IsString()
+  region?: string;
 }
 
 /** Public list when client has no lat/lng (matches dive-centers/popular). */
@@ -48,8 +61,21 @@ export class PopularShopsDto {
   @IsNumber()
   @Type(() => Number)
   @Min(1)
-  @Max(100)
+  @Max(200)
   limit?: number = 20;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  /** Alias for `city` (Explore region filter). */
+  @IsOptional()
+  @IsString()
+  region?: string;
 }
 
 export class MapSearchShopsDto {
@@ -72,4 +98,24 @@ export class MapSearchShopsDto {
   @IsOptional()
   @IsEnum(['offline', 'online'])
   type?: string;
+
+  @IsOptional()
+  @IsString()
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  city?: string;
+
+  /** Alias for `city` (Explore region filter). */
+  @IsOptional()
+  @IsString()
+  region?: string;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  @Min(1)
+  @Max(500)
+  limit?: number = 500;
 }

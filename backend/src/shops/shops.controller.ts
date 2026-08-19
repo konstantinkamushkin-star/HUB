@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  ParseUUIDPipe,
   Query,
   HttpCode,
   HttpStatus,
@@ -52,6 +53,55 @@ export class ShopsController {
   }> {
     const data = await this.shopsService.getPopular(searchDto);
     return { success: true, data };
+  }
+
+  /** Paginated explore (same contract as `GET /v1/dive-sites/explore`). */
+  @Get('explore')
+  @HttpCode(HttpStatus.OK)
+  async explore(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('country') country?: string,
+    @Query('city') city?: string,
+    @Query('region') region?: string,
+    @Query('type') type?: string,
+    @Query('serviceAvailable') serviceAvailable?: string,
+    @Query('minRating') minRating?: number,
+    @Query('sort') sort?: string,
+    @Query('userLat') userLat?: number,
+    @Query('userLng') userLng?: number,
+    @Query('q') q?: string,
+  ) {
+    return this.shopsService.listExploreIosPayload({
+      page,
+      limit,
+      country,
+      city,
+      region,
+      type,
+      serviceAvailable,
+      minRating,
+      sort,
+      userLat,
+      userLng,
+      q,
+    });
+  }
+
+  @Get('countries')
+  @HttpCode(HttpStatus.OK)
+  async getCountries(): Promise<{ success: boolean; data: string[] }> {
+    const countries = await this.shopsService.getCountries();
+    return { success: true, data: countries };
+  }
+
+  @Get('regions')
+  @HttpCode(HttpStatus.OK)
+  async getRegions(
+    @Query('country') country?: string,
+  ): Promise<{ success: boolean; data: string[] }> {
+    const regions = await this.shopsService.getRegions(country ?? '');
+    return { success: true, data: regions };
   }
 
   @Get('map')
@@ -165,7 +215,9 @@ export class ShopsController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string): Promise<{
+  async findOne(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<{
     success: boolean;
     data: ShopListItemDto;
   }> {

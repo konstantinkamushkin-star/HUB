@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseUUIDPipe,
   Patch,
   Post,
   Query,
@@ -64,6 +65,42 @@ export class DiveCentersController {
     }
   }
 
+  @Get('countries')
+  @HttpCode(HttpStatus.OK)
+  async getCountries(): Promise<{ success: boolean; data: string[] }> {
+    const countries = await this.diveCentersService.getCountries();
+    return { success: true, data: countries };
+  }
+
+  /** Paginated explore (same contract as `GET /v1/dive-sites/explore`). */
+  @Get('explore')
+  @HttpCode(HttpStatus.OK)
+  async explore(
+    @Query('page') page?: number,
+    @Query('limit') limit?: number,
+    @Query('country') country?: string,
+    @Query('city') city?: string,
+    @Query('minRating') minRating?: number,
+    @Query('certificationAgency') certificationAgency?: string,
+    @Query('sort') sort?: string,
+    @Query('userLat') userLat?: number,
+    @Query('userLng') userLng?: number,
+    @Query('q') q?: string,
+  ) {
+    return this.diveCentersService.listExploreIosPayload({
+      page,
+      limit,
+      country,
+      city,
+      minRating,
+      certificationAgency,
+      sort,
+      userLat,
+      userLng,
+      q,
+    });
+  }
+
   @Get('popular')
   @HttpCode(HttpStatus.OK)
   async popular(@Query() searchDto: PopularDiveCentersDto): Promise<{
@@ -84,7 +121,9 @@ export class DiveCentersController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  async getPublicById(@Param('id') id: string): Promise<{
+  async getPublicById(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ): Promise<{
     success: boolean;
     data: DiveCenterListItemDto;
   }> {
@@ -94,7 +133,9 @@ export class DiveCentersController {
 
   @Get(':id/instructors')
   @HttpCode(HttpStatus.OK)
-  async getInstructors(@Param('id') id: string) {
+  async getInstructors(
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
     try {
       const instructors = await this.diveCentersService.getInstructors(id);
       return instructors;

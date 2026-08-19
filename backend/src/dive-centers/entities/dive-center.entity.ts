@@ -135,6 +135,21 @@ export class DiveCenterEntity {
   @Column({ type: 'timestamp', nullable: true })
   deleted_at?: Date;
 
+  /** Imported catalog entry — view only, booking disabled */
+  @Column({ type: 'boolean', default: false })
+  listing_only: boolean;
+
+  /** e.g. open_sources */
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  data_source: string | null;
+
+  @Column({ type: 'varchar', length: 512, nullable: true })
+  external_import_key: string | null;
+
+  /** Branch / multi-site addresses (open-catalog import). */
+  @Column({ type: 'jsonb', nullable: true, default: () => "'[]'" })
+  locations: Record<string, unknown>[] | null;
+
   @CreateDateColumn()
   created_at: Date;
 
