@@ -186,6 +186,22 @@ def apply_color_filter_matrix_rgba_inplace(data: np.ndarray, flt: list[float]) -
     # alpha unchanged (JS does not touch i+3)
 
 
+def apply_bech_matrix_bgr(bgr: np.ndarray, flt: list[float], strength: float = 1.0) -> np.ndarray:
+    """Apply a precomputed Bech 4×5 matrix + magenta fold (same as photos)."""
+    orig = np.asarray(bgr, dtype=np.uint8)
+    h, w = orig.shape[:2]
+    rgb = orig[..., ::-1]
+    rgba = np.concatenate([rgb, np.full((h, w, 1), 255, dtype=np.uint8)], axis=-1)
+    work = rgba.reshape(-1, 4).astype(np.float64)
+    apply_color_filter_matrix_rgba_inplace(work, flt)
+    _neutralize_magenta_rgb_inplace(work[:, :3])
+    out_bgr = work[:, :3].reshape(h, w, 3)[..., ::-1]
+    s = float(min(1.0, max(0.0, strength)))
+    if s < 1.0:
+        out_bgr = s * out_bgr + (1.0 - s) * orig.astype(np.float64)
+    return np.clip(np.round(out_bgr), 0, 255).astype(np.uint8)
+
+
 def process_bgr_uint8(bgr: np.ndarray, strength: float = 1.0) -> tuple[np.ndarray, dict[str, Any]]:
     """
     Nikolaj Bech matrix + README apply loop, then optional linear blend toward original.

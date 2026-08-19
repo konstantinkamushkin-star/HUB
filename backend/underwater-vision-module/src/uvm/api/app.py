@@ -127,7 +127,7 @@ async def process_video_by_path(
     ),
     video_mode: str = Query(
         'fast',
-        description='fast: Bech on keyframes + global LAB tone; full: Bech every frame',
+        description='fast: one Bech matrix from keyframes on every frame; full: Bech every frame',
     ),
     sample_frames: int = Query(
         DEFAULT_SAMPLE_FRAMES,
