@@ -93,6 +93,30 @@ export class BuddySearchService {
     return this.placesOverlap(mine.place, peer.place);
   }
 
+  /** Anyone listed in buddy discovery may be messaged (open questionnaire + active account). */
+  async canMessageOpenListing(userId: string, peerId: string): Promise<boolean> {
+    if (userId === peerId) return false;
+    const peer = await this.searchRepository
+      .createQueryBuilder('s')
+      .innerJoinAndSelect('s.user', 'user')
+      .where('s.userId = :peerId', { peerId })
+      .andWhere('s.status = :status', { status: 'open' })
+      .andWhere('user.accountStatus = :active', {
+        active: UserAccountStatus.ACTIVE,
+      })
+      .andWhere('user.deletedAt IS NULL')
+      .getOne();
+    return peer != null && isBuddySearchVisible(peer.user);
+  }
+
+  async canMessageUser(userId: string, peerId: string): Promise<boolean> {
+    if (userId === peerId) return false;
+    return (
+      (await this.canMessageAsBuddyMatch(userId, peerId)) ||
+      (await this.canMessageOpenListing(userId, peerId))
+    );
+  }
+
   async getMine(userId: string) {
     const row = await this.searchRepository.findOne({
       where: { userId, status: 'open' },

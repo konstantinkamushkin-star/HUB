@@ -23,6 +23,7 @@ import { ChatParticipant } from './entities/chat-participant.entity';
 import { ChatMessageEntity } from './entities/chat-message.entity';
 import { ChatPeerTypeDto, OpenChatDto } from './dto/open-chat.dto';
 import { SendChatMessageDto } from './dto/send-chat-message.dto';
+import { normalizeStoredMediaUrl } from '../common/media-url.util';
 import { randomUUID } from 'crypto';
 
 function pgDriverMeta(err: unknown): {
@@ -74,6 +75,34 @@ function senderDisplayName(
     return shopCache.get(senderId)?.name ?? 'Shop';
   }
   return 'Unknown';
+}
+
+function firstPhotoUrl(urls: string[] | null | undefined): string | null {
+  if (!Array.isArray(urls) || urls.length === 0) {
+    return null;
+  }
+  const first = urls[0];
+  return typeof first === 'string' && first.trim() ? first.trim() : null;
+}
+
+function senderAvatarUrl(
+  senderType: string,
+  senderId: string,
+  userCache: Map<string, User>,
+  centerCache: Map<string, DiveCenterEntity>,
+  shopCache: Map<string, ShopEntity>,
+): string | null {
+  if (senderType === 'user') {
+    const url = userCache.get(senderId)?.avatarUrl;
+    return url?.trim() ? url.trim() : null;
+  }
+  if (senderType === 'dive_center') {
+    return firstPhotoUrl(centerCache.get(senderId)?.photo_urls);
+  }
+  if (senderType === 'shop') {
+    return firstPhotoUrl(shopCache.get(senderId)?.photo_urls);
+  }
+  return null;
 }
 
 @Injectable()
@@ -240,13 +269,13 @@ export class ChatService {
       }
       const friends = await this.friendsService.listFriendUserIds(userId);
       if (!friends.includes(dto.peerId)) {
-        const buddyOk = await this.buddySearchService.canMessageAsBuddyMatch(
+        const buddyOk = await this.buddySearchService.canMessageUser(
           userId,
           dto.peerId,
         );
         if (!buddyOk) {
           throw new ForbiddenException(
-            'You can only message accepted friends or place+time buddy matches',
+            'You can only message accepted friends or divers with an open buddy form',
           );
         }
       }
@@ -404,6 +433,13 @@ export class ChatService {
       conversationId: m.conversationId,
       senderId: m.senderId,
       senderName,
+      senderAvatarUrl: senderAvatarUrl(
+        m.senderType,
+        m.senderId,
+        userCache,
+        centerCache,
+        shopCache,
+      ),
       content: m.content,
       messageType: m.messageType,
       attachments: m.attachments ?? null,
@@ -444,6 +480,7 @@ export class ChatService {
       conv.kind === 'TRIP_GROUP' && conv.title?.trim()
         ? conv.title.trim()
         : 'Chat';
+    let peerAvatarUrl: string | null = null;
     const peerUserIds: string[] = [];
     for (const p of parts) {
       if (p.participantType === 'user' && p.participantId !== viewerId) {
@@ -475,6 +512,10 @@ export class ChatService {
           } else {
             peerDisplayName = raw;
           }
+          const avatar = u.avatarUrl?.trim();
+          if (avatar) {
+            peerAvatarUrl = avatar;
+          }
         }
       } else if (p.participantType === 'dive_center') {
         peerIds.push(p.participantId);
@@ -483,6 +524,7 @@ export class ChatService {
         });
         if (c) {
           peerDisplayName = c.name;
+          peerAvatarUrl = firstPhotoUrl(c.photo_urls);
         }
       } else if (p.participantType === 'shop') {
         peerIds.push(p.participantId);
@@ -491,6 +533,7 @@ export class ChatService {
         });
         if (s) {
           peerDisplayName = s.name;
+          peerAvatarUrl = firstPhotoUrl(s.photo_urls);
         }
       }
     }
@@ -560,6 +603,7 @@ export class ChatService {
       id: conv.id,
       participants: peerIds,
       peerDisplayName,
+      peerAvatarUrl,
       diveCenterId: conv.diveCenterId,
       shopId: conv.shopId,
       bookingId: conv.bookingId,
@@ -637,6 +681,13 @@ export class ChatService {
         lastReadAt: null,
       }),
     );
+  }
+
+  /** Resolve marketplace / group trip chat by `canonicalKey = trip:{tripId}`. */
+  async findTripGroupConversationId(tripId: string): Promise<string | null> {
+    const key = `trip:${tripId}`;
+    const conv = await this.convRepository.findOne({ where: { canonicalKey: key } });
+    return conv?.id ?? null;
   }
 
   async listConversations(userId: string) {
@@ -781,11 +832,21 @@ export class ChatService {
 
     const type = dto.messageType ?? 'text';
     let content = (dto.content ?? '').trim();
-    const attachments = dto.attachments ?? null;
+    const attachments = dto.attachments?.map((att) => ({
+      ...att,
+      url: normalizeStoredMediaUrl(att.url),
+      thumbnailURL: att.thumbnailURL
+        ? normalizeStoredMediaUrl(att.thumbnailURL)
+        : undefined,
+    })) ?? null;
 
-    if (type === 'photo') {
+    if (type === 'photo' || type === 'voice') {
       if (!attachments?.length) {
-        throw new BadRequestException('Photo messages require attachments');
+        throw new BadRequestException(
+          type === 'photo'
+            ? 'Photo messages require attachments'
+            : 'Voice messages require attachments',
+        );
       }
       if (!content) {
         content = ' ';
@@ -858,12 +919,18 @@ export class ChatService {
         const preview =
           type === 'photo'
             ? '📷 Photo'
-            : (serialized.content ?? '').slice(0, 120);
+            : type === 'voice'
+              ? '🎤 Voice'
+              : (serialized.content ?? '').slice(0, 120);
         try {
           await this.pushService.notifyUsers(
             recipients,
             pushSenderTitle,
             preview,
+            {
+              conversationId: dto.conversationId,
+              type: 'message',
+            },
           );
         } catch (pushErr) {
           this.logger.warn(
@@ -1247,6 +1314,119 @@ export class ChatService {
       CHAT_SUPPORT_DISPLAY_NAME,
     );
     return true;
+  }
+
+  /**
+   * Inbox живых чатов «Поддержка» (APP_SUPPORT_TOPIC) для админ-панели.
+   */
+  async listAppSupportInboxForAdmin(limit = 80): Promise<
+    Array<{
+      conversationId: string;
+      customerUserId: string | null;
+      customerName: string | null;
+      customerEmail: string | null;
+      lastMessagePreview: string | null;
+      lastMessageAt: string | null;
+      updatedAt: string;
+      topicId: string | null;
+    }>
+  > {
+    const take = Math.min(Math.max(limit, 1), 200);
+    const convs = await this.convRepository.find({
+      where: { kind: 'APP_SUPPORT_TOPIC' },
+      order: { updatedAt: 'DESC' },
+      take,
+    });
+    if (!convs.length) return [];
+
+    const convIds = convs.map((c) => c.id);
+    const parts = await this.participantRepository.find({
+      where: { conversationId: In(convIds), participantType: 'user' },
+    });
+    const allUserIds = [...new Set(parts.map((p) => p.participantId))];
+    const staffIds = await this.resolveSupportStaffIds(allUserIds);
+    const users =
+      allUserIds.length > 0
+        ? await this.userRepository.find({ where: { id: In(allUserIds) } })
+        : [];
+    const userById = new Map(users.map((u) => [u.id, u]));
+
+    const lastByConv = new Map<string, ChatMessageEntity>();
+    for (const cid of convIds) {
+      const last = await this.messageRepository.findOne({
+        where: { conversationId: cid },
+        order: { createdAt: 'DESC' },
+      });
+      if (last) lastByConv.set(cid, last);
+    }
+
+    return convs.map((conv) => {
+      const userParts = parts.filter((p) => p.conversationId === conv.id);
+      const customerPart =
+        userParts.find((p) => !staffIds.has(p.participantId)) ?? null;
+      const customer = customerPart
+        ? userById.get(customerPart.participantId) ?? null
+        : null;
+      const last = lastByConv.get(conv.id) ?? null;
+      const name = customer
+        ? `${customer.firstName} ${customer.lastName}`.trim() || customer.email
+        : null;
+      return {
+        conversationId: conv.id,
+        customerUserId: customer?.id ?? null,
+        customerName: name,
+        customerEmail: customer?.email ?? null,
+        lastMessagePreview: last?.content?.slice(0, 160) ?? null,
+        lastMessageAt: last?.createdAt?.toISOString?.() ?? null,
+        updatedAt: conv.updatedAt.toISOString(),
+        topicId: this.parseAppSupportTopicIdFromCanonicalKey(conv.canonicalKey),
+      };
+    });
+  }
+
+  async openAppSupportConversationForAdmin(
+    conversationId: string,
+    panelAdminUserId: string,
+  ): Promise<{
+    conversationId: string;
+    deepLink: string;
+    customerName: string | null;
+    customerEmail: string | null;
+  }> {
+    const conv = await this.convRepository.findOne({
+      where: { id: conversationId },
+    });
+    if (!conv || conv.kind !== 'APP_SUPPORT_TOPIC') {
+      throw new NotFoundException('Support conversation not found');
+    }
+    await this.ensureContributionSupportPanelAdmin(
+      conversationId,
+      panelAdminUserId,
+    );
+
+    const parts = await this.participantRepository.find({
+      where: { conversationId, participantType: 'user' },
+    });
+    const staffIds = await this.resolveSupportStaffIds(
+      parts.map((p) => p.participantId),
+    );
+    const customerPart =
+      parts.find((p) => !staffIds.has(p.participantId)) ?? null;
+    const customer = customerPart
+      ? await this.userRepository.findOne({
+          where: { id: customerPart.participantId },
+        })
+      : null;
+    const name = customer
+      ? `${customer.firstName} ${customer.lastName}`.trim() || customer.email
+      : null;
+
+    return {
+      conversationId,
+      deepLink: `divehub://chat?conversationId=${conversationId}`,
+      customerName: name,
+      customerEmail: customer?.email ?? null,
+    };
   }
 
   private async deliverChatPushAndInboxForMessage(
