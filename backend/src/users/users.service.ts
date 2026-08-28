@@ -10,6 +10,7 @@ import { DiveLogModerationStatus, FeedPostStatus, UserAccountStatus } from '../c
 import { AuditLogService } from '../admin/audit-log.service';
 import { DeleteMyAccountDto } from './dto/delete-my-account.dto';
 import { UserPushDevice } from '../push/entities/user-push-device.entity';
+import { BuddySearchService } from '../buddy-search/buddy-search.service';
 
 type PublicUserProfile = {
   id: string;
@@ -69,6 +70,8 @@ function toExportableUser(
 @Injectable()
 export class UsersService {
   private static readonly DELETE_REAUTH_MAX_AGE_MS = 15 * 60 * 1000;
+  /** Fresh incomplete signup (OAuth orphan / abandoned register) — safe to wipe on cancel. */
+  private static readonly ABORT_FRESH_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
   constructor(
     @InjectRepository(User)
@@ -82,6 +85,7 @@ export class UsersService {
     @InjectRepository(UserPushDevice)
     private readonly pushDevicesRepo: Repository<UserPushDevice>,
     private readonly auditLogService: AuditLogService,
+    private readonly buddySearchService: BuddySearchService,
   ) {}
 
   private async safeWriteAudit(input: Parameters<AuditLogService['write']>[0]) {
@@ -215,6 +219,72 @@ export class UsersService {
       );
     }
 
+    return this.anonymizeAccount(user, actor);
+  }
+
+  /**
+   * Leave incomplete profile onboarding: delete a fresh empty account (typical OAuth
+   * orphan), otherwise no-op so the client can simply sign out and use email/password.
+   * Never deletes accounts with completed onboarding or existing content.
+   */
+  async abortIncompleteSignup(
+    userId: string,
+    actor?: {
+      ip?: string | null;
+      userAgent?: string | null;
+      correlationId?: string | null;
+    },
+  ): Promise<{ ok: true; deleted: boolean }> {
+    const user = await this.userRepository.findOne({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const profile = user.diverProfile;
+    const onboardingDone =
+      !!profile &&
+      typeof profile === 'object' &&
+      !Array.isArray(profile) &&
+      (profile as Record<string, unknown>).onboardingCompleted === true;
+    if (onboardingDone) {
+      throw new BadRequestException('Profile onboarding already completed');
+    }
+
+    if (user.accountStatus === UserAccountStatus.DELETED) {
+      return { ok: true, deleted: true };
+    }
+
+    const ageMs = Date.now() - new Date(user.createdAt).getTime();
+    const isFresh = Number.isFinite(ageMs) && ageMs >= 0 && ageMs <= UsersService.ABORT_FRESH_MAX_AGE_MS;
+    if (!isFresh) {
+      return { ok: true, deleted: false };
+    }
+
+    const [posts, logs] = await Promise.all([
+      this.postsRepo.count({ where: { userId } }),
+      this.logsRepo.count({ where: { userId } }),
+    ]);
+    if (posts > 0 || logs > 0) {
+      return { ok: true, deleted: false };
+    }
+
+    await this.anonymizeAccount(user, {
+      ...actor,
+      deleteConfirmHeader: 'true',
+    });
+    return { ok: true, deleted: true };
+  }
+
+  private async anonymizeAccount(
+    user: User,
+    actor?: {
+      deleteConfirmHeader?: string | null;
+      ip?: string | null;
+      userAgent?: string | null;
+      correlationId?: string | null;
+    },
+  ) {
+    const userId = user.id;
     if (user.accountStatus === UserAccountStatus.DELETED) {
       return { ok: true, alreadyDeleted: true };
     }
@@ -241,6 +311,7 @@ export class UsersService {
     user.password = await bcrypt.hash(`deleted:${user.id}:${deletedAtStamp}`, 10);
 
     await this.userRepository.save(user);
+    await this.buddySearchService.closeForUser(userId);
 
     await Promise.all([
       this.postsRepo

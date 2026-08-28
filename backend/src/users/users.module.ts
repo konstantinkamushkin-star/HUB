@@ -12,6 +12,7 @@ import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { LocationModule } from '../location/location.module';
 import { FriendsModule } from '../friends/friends.module';
+import { BuddySearchModule } from '../buddy-search/buddy-search.module';
 import { DiveSiteEntity } from '../dive-sites/entities/dive-site.entity';
 import { UserProfileSummaryService } from './user-profile-summary.service';
 
@@ -30,6 +31,7 @@ import { UserProfileSummaryService } from './user-profile-summary.service';
     PushModule,
     LocationModule,
     FriendsModule,
+    BuddySearchModule,
   ],
   controllers: [UsersController],
   providers: [UsersService, UserProfileSummaryService],

@@ -8,6 +8,7 @@ import { UpdateUserRoleDto } from './dto/update-user-role.dto';
 import { UpdateUserSubscriptionDto } from './dto/update-user-subscription.dto';
 import { AuditLogService } from './audit-log.service';
 import { UserAccountStatus } from '../common/statuses';
+import { BuddySearchService } from '../buddy-search/buddy-search.service';
 
 @Injectable()
 export class AdminUsersService {
@@ -15,6 +16,7 @@ export class AdminUsersService {
     @InjectRepository(User)
     private readonly usersRepo: Repository<User>,
     private readonly auditLogService: AuditLogService,
+    private readonly buddySearchService: BuddySearchService,
   ) {}
 
   async listUsers(params: {
@@ -73,6 +75,9 @@ export class AdminUsersService {
     }
 
     const saved = await this.usersRepo.save(user);
+    if (dto.status === UserAccountStatus.DELETED) {
+      await this.buddySearchService.closeForUser(userId);
+    }
     const after = { accountStatus: saved.accountStatus, deletedAt: saved.deletedAt ?? null };
 
     await this.auditLogService.write({

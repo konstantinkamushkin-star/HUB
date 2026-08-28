@@ -73,6 +73,7 @@ import { AdminAnalyticsController } from './admin-analytics.controller';
 import { AnalyticsEventEntity } from './entities/analytics-event.entity';
 import { ProcessedMediaEntity } from '../processed-media/entities/processed-media.entity';
 import { MailModule } from '../mail/mail.module';
+import { BuddySearchModule } from '../buddy-search/buddy-search.module';
 import { PartnerAccountService } from './partner-account.service';
 import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
 
@@ -80,6 +81,7 @@ import { AdminOrSuperAdminGuard } from './admin-or-super-admin.guard';
   imports: [
     PushModule,
     MailModule,
+    BuddySearchModule,
     TypeOrmModule.forFeature([
       AdminAuditLogEntity,
       AdminReportEntity,

@@ -6,6 +6,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../users/entities/user.entity';
+import { UserAccountStatus } from '../common/statuses';
+import { isBuddySearchVisible } from '../common/diver-profile.util';
 import { BuddySearch } from './entities/buddy-search.entity';
 import { UpsertBuddySearchDto } from './dto/upsert-buddy-search.dto';
 import { ListBuddySearchQueryDto } from './dto/list-buddy-search.dto';
@@ -168,9 +170,13 @@ export class BuddySearchService {
 
     const qb = this.searchRepository
       .createQueryBuilder('s')
-      .leftJoinAndSelect('s.user', 'user')
+      .innerJoinAndSelect('s.user', 'user')
       .where('s.status = :status', { status: 'open' })
       .andWhere('s.userId != :uid', { uid: userId })
+      .andWhere('user.accountStatus = :active', {
+        active: UserAccountStatus.ACTIVE,
+      })
+      .andWhere('user.deletedAt IS NULL')
       .orderBy('s.updatedAt', 'DESC');
 
     const dateFrom = query.dateFrom ? normalizeDate(query.dateFrom) : undefined;
@@ -194,7 +200,9 @@ export class BuddySearchService {
       qb.andWhere('LOWER(s.certificationLevel) = LOWER(:cert)', { cert });
     }
 
-    let others = await qb.getMany();
+    let others = (await qb.getMany()).filter(
+      (row) => row.user && isBuddySearchVisible(row.user),
+    );
 
     const place = query.place?.trim();
     if (place && place.length >= 2) {
@@ -246,12 +254,24 @@ export class BuddySearchService {
     await this.searchRepository.save(row);
   }
 
+  /** Close open questionnaire when account is removed or hidden from discovery. */
+  async closeForUser(userId: string): Promise<void> {
+    await this.searchRepository.update(
+      { userId, status: 'open' },
+      { status: 'closed' },
+    );
+  }
+
   private async findMatches(userId: string, mine: BuddySearch) {
     const others = await this.searchRepository
       .createQueryBuilder('s')
-      .leftJoinAndSelect('s.user', 'user')
+      .innerJoinAndSelect('s.user', 'user')
       .where('s.status = :status', { status: 'open' })
       .andWhere('s.userId != :uid', { uid: userId })
+      .andWhere('user.accountStatus = :active', {
+        active: UserAccountStatus.ACTIVE,
+      })
+      .andWhere('user.deletedAt IS NULL')
       .andWhere('s.dateFrom <= :to', { to: mine.dateTo })
       .andWhere('s.dateTo >= :from', { from: mine.dateFrom })
       .orderBy('s.updatedAt', 'DESC')
@@ -259,6 +279,7 @@ export class BuddySearchService {
       .getMany();
 
     const scored = others
+      .filter((o) => o.user && isBuddySearchVisible(o.user))
       .filter((o) => this.placesOverlap(mine.place, o.place))
       .map((o) => this.toMatch(o, mine))
       .sort((a, b) => b.score - a.score);
