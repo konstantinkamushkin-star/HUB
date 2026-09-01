@@ -39,23 +39,29 @@ if _UVM_SRC.is_dir():
         from uvm.api.video_global_tone import (
             MAX_VIDEO_DURATION_SEC as _MAX_VIDEO_DURATION_SEC,
             assert_video_within_max_duration as _assert_video_within_max_duration,
+            prepare_opencv_input as _prepare_opencv_input,
             process_video_fast_global_bech as _process_video_fast_global_bech,
             probe_video_meta as _probe_video_meta,
+            remux_original_audio as _remux_original_audio,
         )
     except Exception:
         _downscale_bgr_for_process = None
         _upscale_bgr_to_original = None
         _MAX_VIDEO_DURATION_SEC = None
         _assert_video_within_max_duration = None
+        _prepare_opencv_input = None
         _process_video_fast_global_bech = None
         _probe_video_meta = None
+        _remux_original_audio = None
 else:
     _downscale_bgr_for_process = None
     _upscale_bgr_to_original = None
     _MAX_VIDEO_DURATION_SEC = None
     _assert_video_within_max_duration = None
+    _prepare_opencv_input = None
     _process_video_fast_global_bech = None
     _probe_video_meta = None
+    _remux_original_audio = None
 
 _VIDEO_MAX_SEC = float(_MAX_VIDEO_DURATION_SEC) if _MAX_VIDEO_DURATION_SEC is not None else 60.0
 
@@ -204,11 +210,16 @@ async def process_image(
 async def process_photo_uvm_compat(
     engine: str,
     image: UploadFile = File(...),
+    strength: float = Query(1.0, ge=0.0, le=1.0),
+    depth_hint_m: float | None = Query(None),
+    quality: str = Query("auto"),
+    mode: str = Query("default"),
 ):
     """
     Совместимость с клиентом DiveHub (NetworkService.processPhotoUnderwaterVisionModule).
-    Все движки ai1|ai2|cursor|seathru — один порт Nikolaj Bech (как в full UVM), без параметров — как upstream index.js.
+    strength: 1.0 = полный Bech; 0.9 = дефолт карточек в iOS.
     """
+    del depth_hint_m, quality, mode
     eng = (engine or "").strip().lower()
     if eng not in ("ai1", "ai2", "cursor", "seathru"):
         raise HTTPException(
@@ -233,7 +244,7 @@ async def process_photo_uvm_compat(
         bgr, decoder_tag = _decode_upload_bgr(raw)
         if bgr is None:
             raise HTTPException(status_code=400, detail="invalid image")
-        out_u8, report = _process_bgr_uint8(bgr)
+        out_u8, report = _process_bgr_uint8(bgr, strength)
         report = dict(report)
         report["engine"] = eng
         report["decoder"] = decoder_tag
@@ -309,9 +320,13 @@ async def process_video_uvm_compat(
         with open(in_path, "wb") as f:
             f.write(payload)
 
+        decode_path = (
+            _prepare_opencv_input(in_path) if _prepare_opencv_input is not None else in_path
+        )
+
         if mode == "fast":
             try:
-                n_rep, fps_guess, w0, h0 = _probe_video_meta(in_path)
+                n_rep, fps_guess, w0, h0 = _probe_video_meta(decode_path)
             except ValueError:
                 raise HTTPException(status_code=400, detail="invalid video")
             fps = float(fps_guess) if fps_guess and fps_guess > 0 else 25.0
@@ -326,7 +341,7 @@ async def process_video_uvm_compat(
                     return _process_video_frame_bgr(eng, work)
 
                 frames, keys = _process_video_fast_global_bech(
-                    in_path,
+                    decode_path,
                     out_path,
                     fps=fps,
                     fw=w0,
@@ -344,6 +359,9 @@ async def process_video_uvm_compat(
                 raise HTTPException(status_code=500, detail=f"video_processing_failed: {e}") from e
             if frames == 0 or not os.path.isfile(out_path):
                 raise HTTPException(status_code=400, detail="empty video stream")
+            audio_ok = False
+            if _remux_original_audio is not None:
+                audio_ok = _remux_original_audio(out_path, in_path)
             out_bytes = open(out_path, "rb").read()
             return Response(
                 content=out_bytes,
@@ -354,10 +372,11 @@ async def process_video_uvm_compat(
                     "X-UVM-Backend": "ai-service",
                     "X-UVM-Video-Mode": "fast",
                     "X-UVM-Fast-Keyframes": str(keys),
+                    "X-UVM-Audio": "1" if audio_ok else "0",
                 },
             )
 
-        cap = cv2.VideoCapture(in_path)
+        cap = cv2.VideoCapture(decode_path)
         if not cap.isOpened():
             raise HTTPException(status_code=400, detail="invalid video")
         fps = cap.get(cv2.CAP_PROP_FPS)
@@ -411,6 +430,9 @@ async def process_video_uvm_compat(
 
         if frames == 0 or not os.path.isfile(out_path):
             raise HTTPException(status_code=400, detail="empty video stream")
+        audio_ok = False
+        if _remux_original_audio is not None:
+            audio_ok = _remux_original_audio(out_path, in_path)
         out_bytes = open(out_path, "rb").read()
 
     return Response(
@@ -421,5 +443,6 @@ async def process_video_uvm_compat(
             "X-UVM-Frames": str(frames),
             "X-UVM-Backend": "ai-service",
             "X-UVM-Video-Mode": "full",
+            "X-UVM-Audio": "1" if audio_ok else "0",
         },
     )
